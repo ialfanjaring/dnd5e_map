@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
@@ -12,7 +13,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await AuthService().initializeGoogleSignIn();
+  // GoogleSignIn se inicializa únicamente en Android y otras
+  // plataformas nativas. En web usaremos Firebase Auth directamente.
+  if (!kIsWeb) {
+    await AuthService().initializeGoogleSignIn();
+  }
 
   runApp(const MyApp());
 }

@@ -24,3 +24,5 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+set_target_properties(${BINARY_NAME} PROPERTIES LINK_FLAGS "/ignore:4099")
+target_link_options(${BINARY_NAME} PRIVATE "/IGNORE:4099")
