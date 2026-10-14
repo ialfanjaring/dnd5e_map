@@ -1,14 +1,18 @@
-import 'package:dnd5e_map/screens/auth_wrapper.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:flutter/material.dart';
 
-void main() async {
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
+import 'screens/auth_wrapper.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await AuthService().initializeGoogleSignIn();
 
   runApp(const MyApp());
 }
@@ -19,14 +23,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Login Firebase',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-        ),
-        useMaterial3: true,
-      ),
+      title: 'D&D 5e',
       home: const AuthWrapper(),
     );
   }

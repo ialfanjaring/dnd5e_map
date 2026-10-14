@@ -6,29 +6,29 @@ import 'home_screen.dart';
 import 'login_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
-const AuthWrapper({super.key});
+  const AuthWrapper({super.key});
 
-@override
-Widget build(BuildContext context) {
-final AuthService authService = AuthService();
+  @override
+  Widget build(BuildContext context) {
+    final AuthService authService = AuthService();
 
-return StreamBuilder<User?>(
-stream: authService.authStateChanges,
-builder: (context, snapshot) {
-if (snapshot.connectionState == ConnectionState.waiting) {
-return const Scaffold(
-body: Center(
-child: CircularProgressIndicator(),
-),
-);
-}
+    return StreamBuilder<User?>(
+      stream: authService.authStateChanges,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
 
-if (snapshot.hasData) {
-return const HomeScreen();
-}
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
 
-return const LoginScreen();
-},
-);
-}
+        return const LoginScreen();
+      },
+    );
+  }
 }
