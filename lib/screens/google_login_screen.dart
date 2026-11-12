@@ -7,7 +7,8 @@ class GoogleLoginScreen extends StatefulWidget {
   const GoogleLoginScreen({super.key});
 
   @override
-  State<GoogleLoginScreen> createState() => _GoogleLoginScreenState();
+  State<GoogleLoginScreen> createState() =>
+      _GoogleLoginScreenState();
 }
 
 class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
@@ -25,8 +26,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
     try {
       await _authService.loginWithGoogle();
 
-      // Si AuthWrapper escucha authStateChanges,
-      // mostrará automáticamente la pantalla principal.
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -42,6 +41,8 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         'No se ha podido conectar con Firebase.',
         'invalid-credential' =>
         'Las credenciales de Google no son válidas.',
+        'user-disabled' =>
+        'Esta cuenta de usuario está deshabilitada.',
         _ => 'No se ha podido iniciar sesión con Google (${e.code}).',
       };
 
@@ -51,8 +52,6 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      // Cerrar el selector de Google puede producir una excepción
-      // de cancelación según la versión del paquete.
       final error = e.toString().toLowerCase();
 
       if (error.contains('cancel')) {
@@ -60,8 +59,10 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se ha podido iniciar sesión con Google.'),
+        SnackBar(
+          content: Text(
+            'No se ha podido iniciar sesión con Google: $e',
+          ),
         ),
       );
 
@@ -92,6 +93,7 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
                   Icons.account_circle_outlined,
                   size: 100,
                 ),
+
                 const SizedBox(height: 24),
 
                 const Text(
@@ -118,7 +120,10 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: _loading ? null : _loginWithGoogle,
-                    icon: const Icon(Icons.g_mobiledata, size: 32),
+                    icon: const Icon(
+                      Icons.g_mobiledata,
+                      size: 32,
+                    ),
                     label: _loading
                         ? const SizedBox(
                       width: 22,

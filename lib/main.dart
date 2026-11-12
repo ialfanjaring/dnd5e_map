@@ -9,13 +9,16 @@ import 'screens/auth_wrapper.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Inicializar Firebase.
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // GoogleSignIn se inicializa únicamente en Android y otras
-  // plataformas nativas. En web usaremos Firebase Auth directamente.
-  if (!kIsWeb) {
+  // Inicializar Google Sign-In únicamente en plataformas compatibles.
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS)) {
     await AuthService().initializeGoogleSignIn();
   }
 

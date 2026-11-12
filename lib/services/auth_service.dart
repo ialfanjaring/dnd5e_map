@@ -1,19 +1,42 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in/google_sign_in.dart' as mobile_google;
+import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart'
+as desktop_google;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Google Sign-In para Windows.
+  // Sustituye estos valores por tus credenciales OAuth de Google Cloud.
+  late final desktop_google.GoogleSignIn _desktopGoogleSignIn =
+  desktop_google.GoogleSignIn(
+    params: const desktop_google.GoogleSignInParams(
+      clientId: '553630619928-fqihdnidjdv6vmdcl1s9qvbn5m5sjkun.apps.googleusercontent.com',
+      clientSecret: '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',
+      redirectPort: 50000,
+      scopes: [
+        'openid',
+        'profile',
+        'email',
+      ],
+    ),
+  );
 
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // Inicialización de Google Sign-In para plataformas nativas.
+  bool get _isWindows =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+  // Inicialización de Google Sign-In.
   Future<void> initializeGoogleSignIn() async {
-    if (!kIsWeb) {
-      await GoogleSignIn.instance.initialize();
-    }
+    // Windows utiliza google_sign_in_all_platforms.
+    if (_isWindows || kIsWeb) return;
+
+    // Android, iOS y macOS utilizan el paquete oficial.
+    await mobile_google.GoogleSignIn.instance.initialize();
   }
 
   // Inicio de sesión con correo y contraseña.
@@ -39,36 +62,56 @@ class AuthService {
   }
 
   // Inicio de sesión con Google.
-  // En web se utiliza Firebase Auth.
-  // En Android se mantiene Google Sign-In.
   Future<UserCredential> loginWithGoogle() async {
+    // WEB
     if (kIsWeb) {
-      final GoogleAuthProvider provider = GoogleAuthProvider();
+      final provider = GoogleAuthProvider();
 
       return _auth.signInWithPopup(provider);
     }
 
-    final GoogleSignInAccount googleUser =
-    await GoogleSignIn.instance.authenticate();
+    // WINDOWS
+    if (_isWindows) {
+      final credentials = await _desktopGoogleSignIn.signIn();
 
-    final GoogleSignInAuthentication googleAuth =
+      if (credentials == null) {
+        throw Exception('El inicio de sesión con Google fue cancelado.');
+      }
+
+      final OAuthCredential firebaseCredential =
+      GoogleAuthProvider.credential(
+        idToken: credentials.idToken,
+        accessToken: credentials.accessToken,
+      );
+
+      return _auth.signInWithCredential(firebaseCredential);
+    }
+
+    // ANDROID / IOS / MACOS
+    final mobile_google.GoogleSignInAccount googleUser =
+    await mobile_google.GoogleSignIn.instance.authenticate();
+
+    final mobile_google.GoogleSignInAuthentication googleAuth =
         googleUser.authentication;
 
-    final OAuthCredential credential = GoogleAuthProvider.credential(
+    final OAuthCredential firebaseCredential =
+    GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
     );
 
-    return _auth.signInWithCredential(credential);
+    return _auth.signInWithCredential(firebaseCredential);
   }
 
   // Cierre de sesión.
   Future<void> logout() async {
     await _auth.signOut();
 
-    // La instancia de Google Sign-In solo se utiliza
-    // para las plataformas nativas.
-    if (!kIsWeb) {
-      await GoogleSignIn.instance.signOut();
+    if (kIsWeb) return;
+
+    if (_isWindows) {
+      await _desktopGoogleSignIn.signOut();
+    } else {
+      await mobile_google.GoogleSignIn.instance.signOut();
     }
   }
 }
