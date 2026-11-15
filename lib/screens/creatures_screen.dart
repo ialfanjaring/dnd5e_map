@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/creature.dart';
 import '../services/creature_service.dart';
 import '../widgets/creature_sheet_view.dart';
+import 'api_monsters_screen.dart';
 import 'creature_form_screen.dart';
 
 /// Apartado "NPC y Monstruos": bestiario del usuario con datos
@@ -59,6 +60,20 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Importar monstruos de la API',
+            icon: const Icon(Icons.cloud_download_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ApiMonstersScreen(),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
