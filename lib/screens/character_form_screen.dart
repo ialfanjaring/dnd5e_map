@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../models/character.dart';
 import '../services/character_service.dart';
+import '../widgets/spell_widgets.dart';
+import 'class_info_screen.dart';
+import 'spell_picker_screen.dart';
 
 /// Crear o editar un personaje con ficha de D&D 5e.
 class CharacterFormScreen extends StatefulWidget {
@@ -35,6 +38,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   late Map<String, int> _abilities;
   late Set<String> _saves;
   late Set<String> _skills;
+  late List<String> _spells; // índices de la API
   bool _saving = false;
 
   bool get _isEditing => widget.character != null;
@@ -61,6 +65,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     };
     _saves = {...?c?.savingThrows};
     _skills = {...?c?.skills};
+    _spells = [...?c?.spells];
   }
 
   @override
@@ -135,6 +140,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       skills: _skills.toList(),
       equipment: _equipmentCtrl.text.trim(),
       notes: _notesCtrl.text.trim(),
+      spells: DndData.spellcastingClasses.contains(_class) ? _spells : const [],
     );
 
     try {
@@ -169,6 +175,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
                 _section('Combate', _buildCombat()),
                 _section('Tiradas de salvación', _buildSaves()),
                 _section('Habilidades', _buildSkills()),
+                if (DndData.spellcastingClasses.contains(_class))
+                  _section('Hechizos', _buildSpells()),
                 _section('Equipo', _buildEquipment()),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -255,6 +263,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ],
           onChanged: (v) {
             setState(() {
+              // Los hechizos elegidos pertenecen a la clase anterior
+              if (v != _class) _spells = [];
               _class = v;
               // Salvaciones con competencia según la clase
               _saves = {...?DndData.classSaves[v]};
@@ -262,6 +272,23 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           },
           validator: (v) => v == null ? 'Elige una clase' : null,
         ),
+        if (_class != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ClassInfoScreen(
+                    className: _class!,
+                    currentLevel: _level,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text('Ver clase: $_class'),
+            ),
+          ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -470,6 +497,56 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               sel ? _skills.add(entry.key) : _skills.remove(entry.key);
             }),
           ),
+      ],
+    );
+  }
+
+  Future<void> _pickSpells() async {
+    final result = await Navigator.push<List<String>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SpellPickerScreen(
+          title: 'Hechizos de $_class',
+          className: _class!,
+          characterLevel: _level,
+          initial: _spells,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() => _spells = result);
+    }
+  }
+
+  Widget _buildSpells() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_spells.isEmpty)
+          Text(
+            'Aún no has elegido hechizos.',
+            style: TextStyle(color: Colors.grey.shade600),
+          )
+        else
+          SpellChips(
+            indexes: _spells,
+            onDelete: (index) => setState(() => _spells.remove(index)),
+          ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _pickSpells,
+          icon: const Icon(Icons.auto_fix_high),
+          label: Text(
+            _spells.isEmpty ? 'Elegir hechizos' : 'Editar hechizos',
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Solo se guarda la lista; el texto de cada hechizo se consulta en '
+          'la API.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
       ],
     );
   }

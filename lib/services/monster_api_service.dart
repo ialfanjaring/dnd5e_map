@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/character.dart';
@@ -17,6 +15,10 @@ class ApiMonsterRef {
 
 /// Cliente de la D&D 5e SRD API (https://www.dnd5eapi.co/).
 ///
+/// Los monstruos de la API NO se guardan en la base de datos: se consultan
+/// cuando se necesitan y solo se conservan en memoria mientras la app está
+/// abierta. En las partidas solo se guarda el índice del monstruo.
+///
 /// La API solo tiene los textos en inglés (soporta fr-FR y pt-BR, pero no
 /// español), así que traducimos tamaño, tipo, alineamiento y etiquetas, y
 /// dejamos en inglés los nombres y las descripciones.
@@ -26,10 +28,11 @@ class MonsterApiService {
   // Caché en memoria de las listas ya descargadas (clave: filtro de FP)
   static final Map<String, List<ApiMonsterRef>> _listCache = {};
 
-  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  // Caché en memoria de los monstruos ya consultados (clave: índice)
+  static final Map<String, Creature> _monsterCache = {};
 
-  /// Id del documento de Firestore con el que se guarda un monstruo importado.
-  String docIdFor(String index) => '${_uid}_api_$index';
+  /// Monstruo ya consultado en esta sesión (null si aún no se ha descargado).
+  Creature? cachedMonster(String index) => _monsterCache[index];
 
   // ---------------- Consultas ----------------
 
@@ -70,34 +73,13 @@ class MonsterApiService {
     return list;
   }
 
-  /// Descarga un monstruo y lo convierte a nuestro modelo.
+  /// Descarga un monstruo y lo convierte a nuestro modelo (solo en memoria).
   Future<Creature> fetchMonster(String index) async {
+    final cached = _monsterCache[index];
+    if (cached != null) return cached;
+
     final data = await _getJson('/monsters/$index') as Map<String, dynamic>;
-    return creatureFromApi(data, _uid);
-  }
-
-  /// Importa monstruos al bestiario del usuario. Devuelve cuántos se guardaron.
-  Future<int> importMonsters(List<String> indices) async {
-    final creatures = <Creature>[];
-
-    // Descargas en grupos de 5 para no saturar la red
-    for (var i = 0; i < indices.length; i += 5) {
-      final chunk = indices.skip(i).take(5);
-      creatures.addAll(await Future.wait(chunk.map(fetchMonster)));
-    }
-
-    final db = FirebaseFirestore.instance;
-    final col = db.collection('creatures');
-
-    for (var i = 0; i < creatures.length; i += 400) {
-      final batch = db.batch();
-      for (final c in creatures.skip(i).take(400)) {
-        batch.set(col.doc(c.id), c.toMap());
-      }
-      await batch.commit();
-    }
-
-    return creatures.length;
+    return _monsterCache[index] = creatureFromApi(data);
   }
 
   // ---------------- Conversión API -> Creature ----------------
@@ -168,7 +150,7 @@ class MonsterApiService {
       v is List ? v.map((e) => e.toString()).join(', ') : '';
 
   /// Convierte el JSON de la API en una criatura de nuestro modelo.
-  Creature creatureFromApi(Map<String, dynamic> m, String uid) {
+  Creature creatureFromApi(Map<String, dynamic> m) {
     final index = (m['index'] ?? '') as String;
 
     // Clase de armadura: lista de objetos {type, value} (o número en versiones antiguas)
@@ -271,8 +253,7 @@ class MonsterApiService {
     final hitRoll = (m['hit_points_roll'] ?? m['hit_dice'] ?? '').toString();
 
     return Creature(
-      id: '${uid}_api_$index',
-      ownerUid: uid,
+      ownerUid: '',
       kind: 'monster',
       name: (m['name'] ?? index) as String,
       size: _sizes[m['size']] ?? (m['size'] ?? 'Mediana') as String,
@@ -296,8 +277,6 @@ class MonsterApiService {
       languages: (m['languages'] ?? '') as String,
       traits: traitLines,
       actions: actionsText,
-      notes: 'Importado de la D&D 5e SRD API (textos en inglés).',
-      isPreset: true, // dato SRD: se muestra con la etiqueta "SRD"
     );
   }
 }

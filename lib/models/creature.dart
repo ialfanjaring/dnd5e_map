@@ -112,8 +112,9 @@ class Creature {
   final String actions;
   final String notes;
 
-  /// true si viene de los datos predeterminados (SRD)
-  final bool isPreset;
+  /// Hechizos que puede usar (solo NPC): índices de la D&D 5e SRD API.
+  /// El nombre, el nivel y el texto se consultan siempre en la API.
+  final List<String> spells;
 
   const Creature({
     this.id,
@@ -135,7 +136,7 @@ class Creature {
     this.traits = '',
     this.actions = '',
     this.notes = '',
-    this.isPreset = false,
+    this.spells = const [],
   });
 
   bool get isMonster => kind == 'monster';
@@ -165,7 +166,7 @@ class Creature {
         'traits': traits,
         'actions': actions,
         'notes': notes,
-        'isPreset': isPreset,
+        'spells': spells,
       };
 
   factory Creature.fromMap(Map<String, dynamic> m, {String? id}) {
@@ -193,7 +194,7 @@ class Creature {
       traits: (m['traits'] ?? '') as String,
       actions: (m['actions'] ?? '') as String,
       notes: (m['notes'] ?? '') as String,
-      isPreset: (m['isPreset'] ?? false) as bool,
+      spells: spellIndexesFromData(m['spells']),
     );
   }
 
@@ -201,31 +202,70 @@ class Creature {
       Creature.fromMap(doc.data() ?? {}, id: doc.id);
 }
 
-/// Criatura añadida a una partida (copia + PG actuales).
+/// Criatura añadida a una partida.
+///
+/// - Si es del bestiario del usuario, se guarda una copia (son datos suyos).
+/// - Si es de la API, solo se guarda su índice y el número de ejemplar: las
+///   estadísticas se consultan a la API cada vez y no se almacenan.
+/// En ambos casos lo único que cambia durante la partida es el daño recibido.
 class GameCreature {
   final String id;
-  final String label;
-  final int currentHp;
-  final Creature creature;
+
+  /// Nombre de la copia del bestiario (null si es de la API)
+  final String? label;
+
+  /// Índice del monstruo en la API (null si es del bestiario)
+  final String? apiIndex;
+
+  /// Número de ejemplar de ese monstruo en la partida (1, 2, 3...)
+  final int number;
+
+  /// Puntos de golpe perdidos
+  final int damage;
+
+  /// Copia de la criatura del bestiario (null si es de la API)
+  final Creature? snapshot;
 
   const GameCreature({
     required this.id,
-    required this.label,
-    required this.currentHp,
-    required this.creature,
+    this.label,
+    this.apiIndex,
+    this.number = 1,
+    this.damage = 0,
+    this.snapshot,
   });
+
+  bool get isApi => apiIndex != null;
+
+  /// Clave para ordenar la lista.
+  String get sortKey => '${(label ?? apiIndex ?? '').toLowerCase()}|'
+      '${number.toString().padLeft(4, '0')}';
 
   factory GameCreature.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
-    final creature = Creature.fromMap(
-      Map<String, dynamic>.from(data['creature'] ?? {}),
-    );
+
+    final rawCreature = data['creature'];
+    final snapshot = rawCreature is Map
+        ? Creature.fromMap(Map<String, dynamic>.from(rawCreature))
+        : null;
+
+    var damage = ((data['damageTaken'] ?? 0) as num).toInt();
+
+    // Formato antiguo: guardaba los PG actuales en lugar del daño
+    if (data['damageTaken'] == null &&
+        data['currentHp'] != null &&
+        snapshot != null) {
+      final lost = snapshot.maxHp - (data['currentHp'] as num).toInt();
+      damage = lost < 0 ? 0 : lost;
+    }
 
     return GameCreature(
       id: doc.id,
-      label: (data['label'] ?? creature.name) as String,
-      currentHp: ((data['currentHp'] ?? creature.maxHp) as num).toInt(),
-      creature: creature,
+      label: snapshot == null ? null : (data['label'] ?? snapshot.name) as String,
+      apiIndex: data['apiIndex'] as String?,
+      number: ((data['number'] ?? 1) as num).toInt(),
+      damage: damage,
+      snapshot: snapshot,
     );
   }
 }

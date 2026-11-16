@@ -107,29 +107,56 @@ class GameService {
   CollectionReference<Map<String, dynamic>> _creaturesCol(String code) =>
       _games.doc(code).collection('creatures');
 
-  /// Añade copias de las criaturas elegidas (solo el Master).
-  /// Si hay varias del mismo tipo se numeran: "Goblin 1", "Goblin 2"...
-  Future<void> addCreatures(String code, Map<Creature, int> selection) async {
+  /// Añade criaturas a la partida (solo el Master).
+  ///
+  /// - [custom]: criaturas del bestiario del usuario (se guarda una copia).
+  /// - [api]: monstruos de la API (índice -> cantidad). De estos solo se
+  ///   guarda el índice y el número de ejemplar; las estadísticas no se
+  ///   almacenan y se consultan a la API cuando hacen falta.
+  Future<void> addCreatures(
+    String code, {
+    Map<Creature, int> custom = const {},
+    Map<String, int> api = const {},
+  }) async {
     final col = _creaturesCol(code);
     final existing = await col.get();
 
-    // Cuántas hay ya de cada nombre, para seguir la numeración
-    final counts = <String, int>{};
+    // Cuántas hay ya de cada una, para seguir la numeración
+    final customCounts = <String, int>{};
+    final apiCounts = <String, int>{};
     for (final d in existing.docs) {
-      final name = (d.data()['creature']?['name'] ?? '') as String;
-      counts[name] = (counts[name] ?? 0) + 1;
+      final data = d.data();
+      final apiIndex = data['apiIndex'] as String?;
+      if (apiIndex != null) {
+        apiCounts[apiIndex] = (apiCounts[apiIndex] ?? 0) + 1;
+      } else {
+        final name = (data['creature']?['name'] ?? '') as String;
+        customCounts[name] = (customCounts[name] ?? 0) + 1;
+      }
     }
 
     final batch = FirebaseFirestore.instance.batch();
 
-    selection.forEach((c, qty) {
-      final already = counts[c.name] ?? 0;
+    custom.forEach((c, qty) {
+      final already = customCounts[c.name] ?? 0;
       for (var i = 1; i <= qty; i++) {
         final label = (already + qty > 1) ? '${c.name} ${already + i}' : c.name;
         batch.set(col.doc(), {
           'label': label,
-          'currentHp': c.maxHp,
+          'damageTaken': 0,
           'creature': c.toMap(),
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
+
+    api.forEach((index, qty) {
+      final already = apiCounts[index] ?? 0;
+      for (var i = 1; i <= qty; i++) {
+        batch.set(col.doc(), {
+          'apiIndex': index,
+          'number': already + i,
+          'damageTaken': 0,
           'addedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -141,15 +168,14 @@ class GameService {
   Stream<List<GameCreature>> creatures(String code) {
     return _creaturesCol(code).snapshots().map((snap) {
       final list = snap.docs.map(GameCreature.fromDoc).toList();
-      list.sort(
-        (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
-      );
+      list.sort((a, b) => a.sortKey.compareTo(b.sortKey));
       return list;
     });
   }
 
-  Future<void> updateCreatureHp(String code, String creatureId, int hp) =>
-      _creaturesCol(code).doc(creatureId).update({'currentHp': hp});
+  /// Guarda los puntos de golpe perdidos de una criatura.
+  Future<void> updateCreatureDamage(String code, String creatureId, int damage) =>
+      _creaturesCol(code).doc(creatureId).update({'damageTaken': damage});
 
   Future<void> removeCreature(String code, String creatureId) =>
       _creaturesCol(code).doc(creatureId).delete();

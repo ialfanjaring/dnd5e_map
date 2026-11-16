@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/creature.dart';
 import '../services/creature_service.dart';
 import '../widgets/creature_sheet_view.dart';
-import 'api_monsters_screen.dart';
 import 'creature_form_screen.dart';
 
-/// Apartado "NPC y Monstruos": bestiario del usuario con datos
-/// predeterminados ya cargados en la base de datos.
+/// Apartado "NPC y Monstruos": tu bestiario con las criaturas que creas tú.
+/// Los monstruos de la D&D 5e SRD API no se guardan aquí: el Master los añade
+/// a la partida desde su sala.
 class CreaturesScreen extends StatefulWidget {
   const CreaturesScreen({super.key});
 
@@ -20,7 +20,6 @@ class _CreaturesScreenState extends State<CreaturesScreen>
   final _service = CreatureService();
   final _searchCtrl = TextEditingController();
   late final TabController _tabController;
-  late final Future<void> _seedFuture;
 
   String _query = '';
 
@@ -29,8 +28,9 @@ class _CreaturesScreenState extends State<CreaturesScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() => setState(() {}));
-    // Carga el bestiario predeterminado la primera vez
-    _seedFuture = _service.seedPresetsIfNeeded();
+
+    // Borra (una sola vez) los datos de la API que se guardaron antes
+    _service.removeStoredApiDataIfNeeded().catchError((_) {});
   }
 
   @override
@@ -51,6 +51,17 @@ class _CreaturesScreenState extends State<CreaturesScreen>
     }
   }
 
+  void _openCreateForm() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreatureFormScreen(
+          initialKind: _currentKind ?? 'monster',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,20 +71,6 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'Importar monstruos de la API',
-            icon: const Icon(Icons.cloud_download_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ApiMonstersScreen(),
-                ),
-              );
-            },
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -84,77 +81,42 @@ class _CreaturesScreenState extends State<CreaturesScreen>
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CreatureFormScreen(
-                initialKind: _currentKind ?? 'monster',
-              ),
-            ),
-          );
-        },
+        onPressed: _openCreateForm,
         icon: const Icon(Icons.add),
         label: Text(_currentKind == 'npc' ? 'Nuevo NPC' : 'Nueva criatura'),
       ),
-      body: FutureBuilder<void>(
-        future: _seedFuture,
-        builder: (context, seedSnap) {
-          if (seedSnap.connectionState != ConnectionState.done) {
-            return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 12),
-                  Text('Preparando el bestiario...'),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              if (seedSnap.hasError)
-                MaterialBanner(
-                  content: Text(
-                    'No se pudieron cargar los datos predeterminados: '
-                    '${seedSnap.error}',
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 700),
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre o tipo...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
                   ),
-                  actions: const [SizedBox.shrink()],
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 700),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar por nombre o tipo...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _query.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _searchCtrl.clear();
-                                  setState(() => _query = '');
-                                },
-                              ),
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onChanged: (v) =>
-                          setState(() => _query = v.trim().toLowerCase()),
-                    ),
-                  ),
+                  onChanged: (v) =>
+                      setState(() => _query = v.trim().toLowerCase()),
                 ),
               ),
-              Expanded(child: _buildList()),
-            ],
-          );
-        },
+            ),
+          ),
+          Expanded(child: _buildList()),
+        ],
       ),
     );
   }
@@ -178,8 +140,12 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
+        final all = snapshot.data!;
+
+        if (all.isEmpty) return _buildEmptyState();
+
         final kind = _currentKind;
-        final list = snapshot.data!.where((c) {
+        final list = all.where((c) {
           if (kind != null && c.kind != kind) return false;
           if (_query.isEmpty) return true;
           return c.name.toLowerCase().contains(_query) ||
@@ -222,6 +188,45 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.pets, size: 80, color: Colors.red.shade800),
+              const SizedBox(height: 16),
+              const Text(
+                'Tu bestiario está vacío',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Aquí solo se guardan las criaturas que crees tú. Los '
+                'monstruos de la API de D&D 5e los añades directamente desde '
+                'la sala del Master.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _openCreateForm,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Crear criatura'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -292,8 +297,7 @@ class _CreatureTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${c.subtitle}\nCA ${c.armorClass} · PG ${c.maxHp}'
-          '${c.isPreset ? ' · SRD' : ''}',
+          '${c.subtitle}\nCA ${c.armorClass} · PG ${c.maxHp}',
         ),
         isThreeLine: true,
         trailing: PopupMenuButton<String>(

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../data/preset_creatures.dart';
 import '../models/creature.dart';
 
 class CreatureService {
@@ -33,34 +32,33 @@ class CreatureService {
 
   Future<void> delete(String id) => _col.doc(id).delete();
 
-  /// Carga en la base de datos el bestiario predeterminado del usuario.
-  ///
-  /// Se ejecuta una sola vez por versión de datos (kPresetsVersion), así que
-  /// si el usuario borra o edita una criatura predeterminada no se
-  /// sobrescribe ni se vuelve a crear.
-  Future<void> seedPresetsIfNeeded() async {
+  /// Borra, una sola vez por usuario, los datos de la API que versiones
+  /// anteriores de la app guardaron en la base de datos: las criaturas por
+  /// defecto (ids "..._srd_...") y los monstruos importados (ids "..._api_...").
+  /// Las criaturas creadas por el usuario no se tocan.
+  Future<void> removeStoredApiDataIfNeeded() async {
     final userRef = _db.collection('users').doc(uid);
     final userSnap = await userRef.get();
-    final seeded = ((userSnap.data()?['presetsVersion'] ?? 0) as num).toInt();
 
-    if (seeded >= kPresetsVersion) return;
+    if (userSnap.data()?['apiDataRemoved'] == true) return;
 
-    final existing = await _col
+    final stored = await _col
         .where('ownerUid', isEqualTo: uid)
         .where('isPreset', isEqualTo: true)
         .get();
-    final existingIds = existing.docs.map((d) => d.id).toSet();
 
     final batch = _db.batch();
 
-    for (final preset in buildPresetCreatures(uid)) {
-      if (existingIds.contains(preset.id)) continue;
-      batch.set(_col.doc(preset.id), preset.toMap());
+    for (final doc in stored.docs) {
+      if (doc.id.startsWith('${uid}_srd_') ||
+          doc.id.startsWith('${uid}_api_')) {
+        batch.delete(doc.reference);
+      }
     }
 
     batch.set(
       userRef,
-      {'presetsVersion': kPresetsVersion},
+      {'apiDataRemoved': true},
       SetOptions(merge: true),
     );
 

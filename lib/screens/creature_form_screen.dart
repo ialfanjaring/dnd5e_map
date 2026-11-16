@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/creature.dart';
 import '../services/creature_service.dart';
+import '../widgets/spell_widgets.dart';
+import 'spell_picker_screen.dart';
 
 /// Crear o editar un monstruo o NPC.
 class CreatureFormScreen extends StatefulWidget {
@@ -45,6 +47,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
   late String _alignment;
   late String _cr;
   late Map<String, int> _abilities;
+  late List<String> _spells; // índices de la API (solo NPC)
   bool _saving = false;
 
   bool get _isEditing => widget.creature != null;
@@ -74,6 +77,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
     _abilities = {
       for (final k in DndData.abilityKeys) k: c?.abilities[k] ?? 10,
     };
+    _spells = [...?c?.spells];
   }
 
   @override
@@ -121,7 +125,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       traits: _traitsCtrl.text.trim(),
       actions: _actionsCtrl.text.trim(),
       notes: _notesCtrl.text.trim(),
-      isPreset: widget.creature?.isPreset ?? false,
+      spells: _kind == 'npc' ? _spells : const [],
     );
 
     try {
@@ -157,6 +161,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
                 _section('Características', _buildAbilities()),
                 _section('Combate', _buildCombat()),
                 _section('Rasgos y acciones', _buildText()),
+                if (_kind == 'npc') _section('Hechizos', _buildSpells()),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 50,
@@ -389,6 +394,52 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickSpells() async {
+    final result = await Navigator.push<List<String>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SpellPickerScreen(
+          title: 'Hechizos del NPC',
+          initial: _spells,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() => _spells = result);
+    }
+  }
+
+  Widget _buildSpells() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_spells.isEmpty)
+          Text(
+            'Este NPC no tiene hechizos.',
+            style: TextStyle(color: Colors.grey.shade600),
+          )
+        else
+          SpellChips(
+            indexes: _spells,
+            onDelete: (index) => setState(() => _spells.remove(index)),
+          ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _pickSpells,
+          icon: const Icon(Icons.auto_fix_high),
+          label: Text(_spells.isEmpty ? 'Elegir hechizos' : 'Editar hechizos'),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Solo se guarda la lista; el texto de cada hechizo se consulta en '
+          'la API.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
       ],
     );

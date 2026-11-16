@@ -108,6 +108,47 @@ class DndData {
   ];
 
   static const List<int> standardArray = [15, 14, 13, 12, 10, 8];
+
+  /// Clase -> índice en la D&D 5e SRD API
+  static const Map<String, String> classApiIndex = {
+    'Bárbaro': 'barbarian',
+    'Bardo': 'bard',
+    'Clérigo': 'cleric',
+    'Druida': 'druid',
+    'Guerrero': 'fighter',
+    'Monje': 'monk',
+    'Paladín': 'paladin',
+    'Explorador': 'ranger',
+    'Pícaro': 'rogue',
+    'Hechicero': 'sorcerer',
+    'Brujo': 'warlock',
+    'Mago': 'wizard',
+  };
+
+  /// Clases que lanzan conjuros en el SRD.
+  static const Set<String> spellcastingClasses = {
+    'Bardo',
+    'Clérigo',
+    'Druida',
+    'Paladín',
+    'Explorador',
+    'Hechicero',
+    'Brujo',
+    'Mago',
+  };
+}
+
+/// Lee la lista de hechizos guardada: solo índices de la D&D 5e SRD API.
+/// También acepta el formato antiguo (mapas con index/name/level).
+List<String> spellIndexesFromData(dynamic raw) {
+  if (raw is! List) return const [];
+
+  final out = <String>[];
+  for (final e in raw) {
+    final index = e is Map ? (e['index'] ?? '').toString() : e.toString();
+    if (index.isNotEmpty && !out.contains(index)) out.add(index);
+  }
+  return out;
 }
 
 class Character {
@@ -127,6 +168,9 @@ class Character {
   final List<String> skills;
   final String equipment;
   final String notes;
+  /// Hechizos que puede usar: solo los índices de la D&D 5e SRD API.
+  /// El nombre, el nivel y el texto se consultan siempre en la API.
+  final List<String> spells;
 
   const Character({
     this.id,
@@ -145,6 +189,7 @@ class Character {
     this.skills = const [],
     this.equipment = '',
     this.notes = '',
+    this.spells = const [],
   });
 
   // ---------- Cálculos de la ficha ----------
@@ -188,6 +233,7 @@ class Character {
         'skills': skills,
         'equipment': equipment,
         'notes': notes,
+        'spells': spells,
       };
 
   factory Character.fromMap(Map<String, dynamic> m, {String? id}) {
@@ -214,6 +260,7 @@ class Character {
       skills: List<String>.from(m['skills'] ?? const []),
       equipment: (m['equipment'] ?? '') as String,
       notes: (m['notes'] ?? '') as String,
+      spells: spellIndexesFromData(m['spells']),
     );
   }
 

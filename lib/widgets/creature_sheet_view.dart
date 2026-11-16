@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/character.dart';
 import '../models/creature.dart';
+import 'spell_widgets.dart';
 
 /// Pantalla completa con el bloque de estadísticas de una criatura.
 class CreatureSheetScreen extends StatelessWidget {
@@ -129,6 +130,20 @@ class CreatureSheetView extends StatelessWidget {
               ),
               Divider(color: accent),
               Text(c.actions, style: const TextStyle(height: 1.4)),
+            ],
+
+            if (c.spells.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Hechizos',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: accent,
+                ),
+              ),
+              Divider(color: accent),
+              SpellChips(indexes: c.spells),
             ],
 
             if (c.notes.isNotEmpty) ...[
