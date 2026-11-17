@@ -51,50 +51,6 @@ class DndData {
     'Trato con animales': 'wis',
   };
 
-  static const List<String> races = [
-    'Humano',
-    'Elfo',
-    'Enano',
-    'Mediano',
-    'Draconato',
-    'Gnomo',
-    'Semielfo',
-    'Semiorco',
-    'Tiefling',
-  ];
-
-  /// Clase -> dado de golpe
-  static const Map<String, int> classes = {
-    'Bárbaro': 12,
-    'Bardo': 8,
-    'Clérigo': 8,
-    'Druida': 8,
-    'Guerrero': 10,
-    'Monje': 8,
-    'Paladín': 10,
-    'Explorador': 10,
-    'Pícaro': 8,
-    'Hechicero': 6,
-    'Brujo': 8,
-    'Mago': 6,
-  };
-
-  /// Clase -> competencias en tiradas de salvación
-  static const Map<String, List<String>> classSaves = {
-    'Bárbaro': ['str', 'con'],
-    'Bardo': ['dex', 'cha'],
-    'Clérigo': ['wis', 'cha'],
-    'Druida': ['int', 'wis'],
-    'Guerrero': ['str', 'con'],
-    'Monje': ['str', 'dex'],
-    'Paladín': ['wis', 'cha'],
-    'Explorador': ['str', 'dex'],
-    'Pícaro': ['dex', 'int'],
-    'Hechicero': ['con', 'cha'],
-    'Brujo': ['wis', 'cha'],
-    'Mago': ['int', 'wis'],
-  };
-
   static const List<String> alignments = [
     'Legal bueno',
     'Neutral bueno',
@@ -109,33 +65,111 @@ class DndData {
 
   static const List<int> standardArray = [15, 14, 13, 12, 10, 8];
 
-  /// Clase -> índice en la D&D 5e SRD API
-  static const Map<String, String> classApiIndex = {
-    'Bárbaro': 'barbarian',
-    'Bardo': 'bard',
-    'Clérigo': 'cleric',
-    'Druida': 'druid',
-    'Guerrero': 'fighter',
-    'Monje': 'monk',
-    'Paladín': 'paladin',
-    'Explorador': 'ranger',
-    'Pícaro': 'rogue',
-    'Hechicero': 'sorcerer',
-    'Brujo': 'warlock',
-    'Mago': 'wizard',
+  // -----------------------------------------------------------------
+  // Razas y clases: las disponibles se leen de la D&D 5e SRD API y el
+  // personaje solo guarda el índice elegido (por ejemplo "elf" o "wizard").
+  // Lo que hay aquí son traducciones de la interfaz y datos de respaldo
+  // para cuando no hay conexión con la API.
+  // -----------------------------------------------------------------
+
+  /// Raza (índice de la API) -> nombre en español
+  static const Map<String, String> raceNames = {
+    'dragonborn': 'Draconato',
+    'dwarf': 'Enano',
+    'elf': 'Elfo',
+    'gnome': 'Gnomo',
+    'half-elf': 'Semielfo',
+    'half-orc': 'Semiorco',
+    'halfling': 'Mediano',
+    'human': 'Humano',
+    'tiefling': 'Tiefling',
   };
 
-  /// Clases que lanzan conjuros en el SRD.
-  static const Set<String> spellcastingClasses = {
-    'Bardo',
-    'Clérigo',
-    'Druida',
-    'Paladín',
-    'Explorador',
-    'Hechicero',
-    'Brujo',
-    'Mago',
+  /// Clase (índice de la API) -> nombre en español
+  static const Map<String, String> classNames = {
+    'barbarian': 'Bárbaro',
+    'bard': 'Bardo',
+    'cleric': 'Clérigo',
+    'druid': 'Druida',
+    'fighter': 'Guerrero',
+    'monk': 'Monje',
+    'paladin': 'Paladín',
+    'ranger': 'Explorador',
+    'rogue': 'Pícaro',
+    'sorcerer': 'Hechicero',
+    'warlock': 'Brujo',
+    'wizard': 'Mago',
   };
+
+  /// Respaldo sin conexión: dado de golpe por clase
+  static const Map<String, int> classHitDie = {
+    'barbarian': 12,
+    'bard': 8,
+    'cleric': 8,
+    'druid': 8,
+    'fighter': 10,
+    'monk': 8,
+    'paladin': 10,
+    'ranger': 10,
+    'rogue': 8,
+    'sorcerer': 6,
+    'warlock': 8,
+    'wizard': 6,
+  };
+
+  /// Respaldo sin conexión: salvaciones con competencia por clase
+  static const Map<String, List<String>> classSaves = {
+    'barbarian': ['str', 'con'],
+    'bard': ['dex', 'cha'],
+    'cleric': ['wis', 'cha'],
+    'druid': ['int', 'wis'],
+    'fighter': ['str', 'con'],
+    'monk': ['str', 'dex'],
+    'paladin': ['wis', 'cha'],
+    'ranger': ['str', 'dex'],
+    'rogue': ['dex', 'int'],
+    'sorcerer': ['con', 'cha'],
+    'warlock': ['wis', 'cha'],
+    'wizard': ['int', 'wis'],
+  };
+
+  /// Clases que lanzan conjuros en el SRD (índices de la API).
+  static const Set<String> spellcastingClasses = {
+    'bard',
+    'cleric',
+    'druid',
+    'paladin',
+    'ranger',
+    'sorcerer',
+    'warlock',
+    'wizard',
+  };
+
+  static String raceName(String index) => raceNames[index] ?? _pretty(index);
+
+  static String className(String index) => classNames[index] ?? _pretty(index);
+
+  static String _pretty(String index) => index
+      .split('-')
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+
+  /// Lee la raza guardada. Acepta el formato antiguo (nombre en español).
+  static String raceIndexFrom(dynamic raw) => _indexFrom(raw, raceNames);
+
+  /// Lee la clase guardada. Acepta el formato antiguo (nombre en español).
+  static String classIndexFrom(dynamic raw) => _indexFrom(raw, classNames);
+
+  static String _indexFrom(dynamic raw, Map<String, String> names) {
+    final value = (raw ?? '').toString();
+    if (value.isEmpty || names.containsKey(value)) return value;
+
+    for (final e in names.entries) {
+      if (e.value == value) return e.key;
+    }
+    return value.toLowerCase().replaceAll(' ', '-');
+  }
 }
 
 /// Lee la lista de hechizos guardada: solo índices de la D&D 5e SRD API.
@@ -155,7 +189,11 @@ class Character {
   final String? id;
   final String ownerUid;
   final String name;
+  /// Índice de la raza en la D&D 5e SRD API (por ejemplo "elf").
+  /// Solo se guarda la elección: los datos de la raza se leen de la API.
   final String race;
+
+  /// Índice de la clase en la API (por ejemplo "wizard").
   final String characterClass;
   final String background;
   final String alignment;
@@ -213,7 +251,8 @@ class Character {
 
   int get passivePerception => 10 + skillBonus('Percepción');
 
-  String get summary => '$race $characterClass · Nivel $level';
+  String get summary =>
+      '${DndData.raceName(race)} ${DndData.className(characterClass)} · Nivel $level';
 
   // ---------- Firestore ----------
 
@@ -247,8 +286,8 @@ class Character {
       id: id,
       ownerUid: (m['ownerUid'] ?? '') as String,
       name: (m['name'] ?? '') as String,
-      race: (m['race'] ?? '') as String,
-      characterClass: (m['characterClass'] ?? '') as String,
+      race: DndData.raceIndexFrom(m['race']),
+      characterClass: DndData.classIndexFrom(m['characterClass']),
       background: (m['background'] ?? '') as String,
       alignment: (m['alignment'] ?? '') as String,
       level: ((m['level'] ?? 1) as num).toInt(),

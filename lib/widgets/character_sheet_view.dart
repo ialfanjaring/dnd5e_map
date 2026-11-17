@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/character.dart';
+import '../screens/class_info_screen.dart';
+import '../screens/race_info_screen.dart';
+import 'spell_widgets.dart';
 
 /// Pantalla completa con la ficha de un personaje (solo lectura).
 class CharacterSheetScreen extends StatelessWidget {
@@ -69,6 +72,36 @@ class CharacterSheetView extends StatelessWidget {
               ],
             ),
           ),
+        ),
+
+        // ACCESO A LA CLASE Y A LA RAZA (datos de la API)
+        Wrap(
+          alignment: WrapAlignment.center,
+          children: [
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ClassInfoScreen(
+                    classIndex: c.characterClass,
+                    currentLevel: c.level,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text('Ver clase: ${DndData.className(c.characterClass)}'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RaceInfoScreen(raceIndex: c.race),
+                ),
+              ),
+              icon: const Icon(Icons.diversity_3_outlined),
+              label: Text('Ver raza: ${DndData.raceName(c.race)}'),
+            ),
+          ],
         ),
 
         // COMBATE
@@ -145,6 +178,10 @@ class CharacterSheetView extends StatelessWidget {
             ],
           ),
         ),
+
+        if (c.spells.isNotEmpty ||
+            DndData.spellcastingClasses.contains(c.characterClass))
+          CharacterSpellsCard(spells: c.spells),
 
         if (c.equipment.isNotEmpty)
           _SectionCard(title: 'Equipo', child: Text(c.equipment)),

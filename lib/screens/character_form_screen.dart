@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../models/character.dart';
 import '../services/character_service.dart';
+import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
 import 'class_info_screen.dart';
+import 'race_info_screen.dart';
 import 'spell_picker_screen.dart';
 
 /// Crear o editar un personaje con ficha de D&D 5e.
@@ -39,6 +41,13 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   late Set<String> _saves;
   late Set<String> _skills;
   late List<String> _spells; // índices de la API
+
+  final _api = ClassApiService();
+  late final Future<List<ApiRef>> _racesFuture;
+  late final Future<List<ApiRef>> _classesFuture;
+  ApiClass? _classInfo; // datos de la clase elegida (leídos de la API)
+  ApiRace? _raceInfo; // datos de la raza elegida (leídos de la API)
+  late bool _isCaster;
   bool _saving = false;
 
   bool get _isEditing => widget.character != null;
@@ -56,8 +65,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _equipmentCtrl = TextEditingController(text: c?.equipment ?? '');
     _notesCtrl = TextEditingController(text: c?.notes ?? '');
 
-    _race = c?.race;
-    _class = c?.characterClass;
+    _race = (c?.race.isNotEmpty ?? false) ? c!.race : null;
+    _class = (c?.characterClass.isNotEmpty ?? false) ? c!.characterClass : null;
     _alignment = (c?.alignment.isNotEmpty ?? false) ? c!.alignment : null;
     _level = c?.level ?? 1;
     _abilities = {
@@ -66,6 +75,68 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _saves = {...?c?.savingThrows};
     _skills = {...?c?.skills};
     _spells = [...?c?.spells];
+
+    _isCaster = DndData.spellcastingClasses.contains(_class);
+    _racesFuture = _loadRaces();
+    _classesFuture = _loadClasses();
+    if (_class != null) _refreshClass(_class!, applySaves: false);
+    if (_race != null) _refreshRace(_race!);
+  }
+
+  /// Razas de la API. Sin conexión se usan las básicas del SRD.
+  Future<List<ApiRef>> _loadRaces() async {
+    try {
+      return await _api.fetchRaceList();
+    } catch (_) {
+      return [
+        for (final e in DndData.raceNames.entries)
+          ApiRef(index: e.key, name: e.value),
+      ];
+    }
+  }
+
+  /// Clases de la API. Sin conexión se usan las básicas del SRD.
+  Future<List<ApiRef>> _loadClasses() async {
+    try {
+      return await _api.fetchClassList();
+    } catch (_) {
+      return [
+        for (final e in DndData.classNames.entries)
+          ApiRef(index: e.key, name: e.value),
+      ];
+    }
+  }
+
+  /// Lee la clase de la API: dado de golpe, salvaciones y si lanza conjuros.
+  Future<void> _refreshClass(String index, {required bool applySaves}) async {
+    try {
+      final info = await _api.fetchClass(index);
+      if (!mounted || _class != index) return;
+
+      final saves = {
+        for (final n in info.savingThrows)
+          if (DndData.abilityKeys.contains(n.toLowerCase())) n.toLowerCase(),
+      };
+
+      setState(() {
+        _classInfo = info;
+        _isCaster = info.spellcastingLevel != null;
+        if (applySaves && saves.isNotEmpty) _saves = saves;
+      });
+    } catch (_) {
+      // Sin conexión: se mantienen los datos de respaldo
+    }
+  }
+
+  /// Lee la raza de la API: velocidad y bonificadores.
+  Future<void> _refreshRace(String index) async {
+    try {
+      final info = await _api.fetchRace(index);
+      if (!mounted || _race != index) return;
+      setState(() => _raceInfo = info);
+    } catch (_) {
+      // Sin conexión: simplemente no se muestran los datos de la raza
+    }
   }
 
   @override
@@ -103,7 +174,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   }
 
   void _suggestHp() {
-    final die = DndData.classes[_class];
+    final die = _classInfo?.hitDie ?? DndData.classHitDie[_class];
     if (die == null) {
       _snack('Elige primero una clase para calcular los puntos de golpe.');
       return;
@@ -140,7 +211,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       skills: _skills.toList(),
       equipment: _equipmentCtrl.text.trim(),
       notes: _notesCtrl.text.trim(),
-      spells: DndData.spellcastingClasses.contains(_class) ? _spells : const [],
+      spells: _isCaster ? _spells : const [],
     );
 
     try {
@@ -175,8 +246,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
                 _section('Combate', _buildCombat()),
                 _section('Tiradas de salvación', _buildSaves()),
                 _section('Habilidades', _buildSkills()),
-                if (DndData.spellcastingClasses.contains(_class))
-                  _section('Hechizos', _buildSpells()),
+                if (_isCaster) _section('Hechizos', _buildSpells()),
                 _section('Equipo', _buildEquipment()),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -237,58 +307,42 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               (v == null || v.trim().isEmpty) ? 'Introduce un nombre' : null,
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
+        _apiDropdown(
+          label: 'Raza',
+          future: _racesFuture,
           value: _race,
-          decoration: const InputDecoration(
-            labelText: 'Raza',
-            border: OutlineInputBorder(),
-          ),
-          items: [
-            for (final r in DndData.races)
-              DropdownMenuItem(value: r, child: Text(r)),
-          ],
-          onChanged: (v) => setState(() => _race = v),
-          validator: (v) => v == null ? 'Elige una raza' : null,
+          nameOf: DndData.raceName,
+          errorText: 'Elige una raza',
+          onChanged: (v) {
+            setState(() {
+              _race = v;
+              _raceInfo = null;
+            });
+            if (v != null) _refreshRace(v);
+          },
         ),
+        _raceExtras(),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
+        _apiDropdown(
+          label: 'Clase',
+          future: _classesFuture,
           value: _class,
-          decoration: const InputDecoration(
-            labelText: 'Clase',
-            border: OutlineInputBorder(),
-          ),
-          items: [
-            for (final c in DndData.classes.keys)
-              DropdownMenuItem(value: c, child: Text(c)),
-          ],
+          nameOf: DndData.className,
+          errorText: 'Elige una clase',
           onChanged: (v) {
             setState(() {
               // Los hechizos elegidos pertenecen a la clase anterior
               if (v != _class) _spells = [];
               _class = v;
-              // Salvaciones con competencia según la clase
+              _classInfo = null;
+              _isCaster = DndData.spellcastingClasses.contains(v);
+              // Salvaciones de respaldo; se ajustan con los datos de la API
               _saves = {...?DndData.classSaves[v]};
             });
+            if (v != null) _refreshClass(v, applySaves: true);
           },
-          validator: (v) => v == null ? 'Elige una clase' : null,
         ),
-        if (_class != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ClassInfoScreen(
-                    className: _class!,
-                    currentLevel: _level,
-                  ),
-                ),
-              ),
-              icon: const Icon(Icons.menu_book_outlined),
-              label: Text('Ver clase: $_class'),
-            ),
-          ),
+        _classExtras(),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -501,13 +555,128 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     );
   }
 
+  /// Desplegable cuyas opciones se leen de la API. Se guarda solo el índice.
+  Widget _apiDropdown({
+    required String label,
+    required Future<List<ApiRef>> future,
+    required String? value,
+    required String Function(String index) nameOf,
+    required String errorText,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return FutureBuilder<List<ApiRef>>(
+      future: future,
+      builder: (context, snapshot) {
+        final loading = snapshot.connectionState != ConnectionState.done;
+        final options = [...(snapshot.data ?? const <ApiRef>[])];
+
+        // Si el valor guardado no está en la lista, se añade para no romper el desplegable
+        if (value != null && !options.any((o) => o.index == value)) {
+          options.insert(0, ApiRef(index: value, name: value));
+        }
+
+        return DropdownButtonFormField<String>(
+          value: value,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+            suffixIcon: loading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
+          items: [
+            for (final o in options)
+              DropdownMenuItem(value: o.index, child: Text(nameOf(o.index))),
+          ],
+          onChanged: loading ? null : onChanged,
+          validator: (v) => v == null ? errorText : null,
+        );
+      },
+    );
+  }
+
+  Widget _raceExtras() {
+    final race = _race;
+    if (race == null) return const SizedBox.shrink();
+
+    final info = _raceInfo;
+    final bonuses = info == null
+        ? ''
+        : info.abilityBonuses
+            .map((b) =>
+                '${DndData.abilityShort[b.ability] ?? b.ability.toUpperCase()} '
+                '${Character.signed(b.bonus)}')
+            .join(', ');
+
+    final hint = [
+      if (info?.speed != null) 'Velocidad ${info!.speed} pies',
+      if (bonuses.isNotEmpty) 'Bonificadores: $bonuses',
+    ].join(' · ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hint.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              hint,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RaceInfoScreen(raceIndex: race),
+              ),
+            ),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: Text('Ver raza: ${DndData.raceName(race)}'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _classExtras() {
+    final cls = _class;
+    if (cls == null) return const SizedBox.shrink();
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClassInfoScreen(
+              classIndex: cls,
+              currentLevel: _level,
+            ),
+          ),
+        ),
+        icon: const Icon(Icons.menu_book_outlined),
+        label: Text('Ver clase: ${DndData.className(cls)}'),
+      ),
+    );
+  }
+
   Future<void> _pickSpells() async {
     final result = await Navigator.push<List<String>>(
       context,
       MaterialPageRoute(
         builder: (_) => SpellPickerScreen(
-          title: 'Hechizos de $_class',
-          className: _class!,
+          title: 'Hechizos de ${DndData.className(_class!)}',
+          classIndex: _class!,
           characterLevel: _level,
           initial: _spells,
         ),

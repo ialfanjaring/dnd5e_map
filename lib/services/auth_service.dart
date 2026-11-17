@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart' as mobile_google;
@@ -8,11 +10,13 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Google Sign-In para Windows.
-  // Sustituye estos valores por tus credenciales OAuth de Google Cloud.
-  late final desktop_google.GoogleSignIn _desktopGoogleSignIn =
+  // static: se crea una sola vez para toda la app (el paquete no admite
+  // inicializarse dos veces, aunque haya varias instancias de AuthService).
+  static final desktop_google.GoogleSignIn _desktopGoogleSignIn =
   desktop_google.GoogleSignIn(
     params: const desktop_google.GoogleSignInParams(
-      clientId: '553630619928-fqihdnidjdv6vmdcl1s9qvbn5m5sjkun.apps.googleusercontent.com',
+      clientId:
+      '553630619928-fqihdnidjdv6vmdcl1s9qvbn5m5sjkun.apps.googleusercontent.com',
       clientSecret: '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',
       redirectPort: 50000,
       scopes: [
@@ -84,7 +88,16 @@ class AuthService {
         accessToken: credentials.accessToken,
       );
 
-      return _auth.signInWithCredential(firebaseCredential);
+      // Diagnóstico temporal: se puede quitar cuando el acceso funcione.
+      debugPrint('Google idToken nulo: ${credentials.idToken == null}');
+      _debugJwt(credentials.idToken);
+
+      try {
+        return await _auth.signInWithCredential(firebaseCredential);
+      } on FirebaseAuthException catch (e) {
+        debugPrint('Firebase: ${e.code} - ${e.message}');
+        rethrow;
+      }
     }
 
     // ANDROID / IOS / MACOS
@@ -94,8 +107,7 @@ class AuthService {
     final mobile_google.GoogleSignInAuthentication googleAuth =
         googleUser.authentication;
 
-    final OAuthCredential firebaseCredential =
-    GoogleAuthProvider.credential(
+    final OAuthCredential firebaseCredential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
     );
 
@@ -112,6 +124,34 @@ class AuthService {
       await _desktopGoogleSignIn.signOut();
     } else {
       await mobile_google.GoogleSignIn.instance.signOut();
+    }
+  }
+
+  // Diagnóstico temporal: muestra de qué cliente es el token y cuándo caduca.
+  // No imprime el token en sí.
+  void _debugJwt(String? token) {
+    if (token == null) return;
+
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        debugPrint('idToken con formato raro');
+        return;
+      }
+
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as Map<String, dynamic>;
+
+      final exp = DateTime.fromMillisecondsSinceEpoch(
+        (payload['exp'] as num).toInt() * 1000,
+      );
+
+      debugPrint('aud: ${payload['aud']}');
+      debugPrint('iss: ${payload['iss']}');
+      debugPrint('expira: $exp   ahora: ${DateTime.now()}');
+    } catch (e) {
+      debugPrint('No se pudo leer el idToken: $e');
     }
   }
 }

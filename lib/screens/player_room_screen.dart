@@ -5,6 +5,7 @@ import '../models/character.dart';
 import '../services/character_service.dart';
 import '../services/game_service.dart';
 import '../widgets/character_sheet_view.dart';
+import '../widgets/spell_widgets.dart';
 import 'character_form_screen.dart';
 
 /// Sala de selección de personaje para el jugador que se une con código.
@@ -212,8 +213,14 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                       c.name,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(
-                      '${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}',
+                        ),
+                        SpellSummaryText(indexes: c.spells),
+                      ],
                     ),
                     isThreeLine: true,
                     trailing: IconButton(
@@ -297,7 +304,13 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                     p.character.name,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${p.character.summary}\n${p.email}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${p.character.summary}\n${p.email}'),
+                      SpellSummaryText(indexes: p.character.spells),
+                    ],
+                  ),
                   isThreeLine: true,
                   trailing: p.uid == _myUid
                       ? const Chip(label: Text('Tú'))

@@ -5,6 +5,7 @@ import '../services/game_service.dart';
 import '../models/creature.dart';
 import '../services/monster_api_service.dart';
 import '../widgets/character_sheet_view.dart';
+import '../widgets/spell_widgets.dart';
 import '../widgets/creature_sheet_view.dart';
 import 'creature_picker_screen.dart';
 
@@ -168,10 +169,16 @@ class MasterRoomScreen extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            subtitle: Text(
-                              '${p.character.summary}\n'
-                              'CA ${p.character.armorClass} · '
-                              'PG ${p.character.maxHp} · ${p.email}',
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${p.character.summary}\n'
+                                  'CA ${p.character.armorClass} · '
+                                  'PG ${p.character.maxHp} · ${p.email}',
+                                ),
+                                SpellSummaryText(indexes: p.character.spells),
+                              ],
                             ),
                             isThreeLine: true,
                             trailing: IconButton(

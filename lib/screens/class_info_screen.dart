@@ -4,14 +4,37 @@ import '../models/character.dart';
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
 
-/// Listado de las 12 clases para consultar cualquiera de ellas.
-class ClassesScreen extends StatelessWidget {
+/// Listado de clases de la API para consultar cualquiera de ellas.
+class ClassesScreen extends StatefulWidget {
   const ClassesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final names = DndData.classes.keys.toList();
+  State<ClassesScreen> createState() => _ClassesScreenState();
+}
 
+class _ClassesScreenState extends State<ClassesScreen> {
+  late Future<List<ApiRef>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  /// Si la API no responde se usan las clases básicas del SRD.
+  Future<List<ApiRef>> _load() async {
+    try {
+      return await ClassApiService().fetchClassList();
+    } catch (_) {
+      return [
+        for (final e in DndData.classNames.entries)
+          ApiRef(index: e.key, name: e.value),
+      ];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -20,47 +43,53 @@ class ClassesScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 700),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: names.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              final name = names[i];
-              final saves = (DndData.classSaves[name] ?? [])
-                  .map((k) => DndData.abilityShort[k])
-                  .join(', ');
-              final caster = DndData.spellcastingClasses.contains(name);
+      body: FutureBuilder<List<ApiRef>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-              return Card(
-                child: ListTile(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ClassInfoScreen(className: name),
+          final classes = snapshot.data ?? const <ApiRef>[];
+
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: classes.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, i) {
+                  final c = classes[i];
+                  final caster = DndData.spellcastingClasses.contains(c.index);
+
+                  return Card(
+                    child: ListTile(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ClassInfoScreen(classIndex: c.index),
+                        ),
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.deepPurple.shade100,
+                        child: Text(DndData.className(c.index)[0]),
+                      ),
+                      title: Text(
+                        DndData.className(c.index),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        '${c.name}${caster ? ' · Lanza conjuros' : ''}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
                     ),
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.deepPurple.shade100,
-                    child: Text(name[0]),
-                  ),
-                  title: Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    'Dado de golpe d${DndData.classes[name]} · '
-                    'Salvaciones: $saves'
-                    '${caster ? ' · Lanza conjuros' : ''}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-              );
-            },
-          ),
-        ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -69,15 +98,15 @@ class ClassesScreen extends StatelessWidget {
 /// Información de una clase: resumen, subidas de nivel, hechizos y subclases.
 /// Los datos vienen de la D&D 5e SRD API (textos en inglés).
 class ClassInfoScreen extends StatefulWidget {
-  /// Nombre en español (clave de DndData.classes)
-  final String className;
+  /// Índice de la clase en la API (ej. wizard)
+  final String classIndex;
 
   /// Si se indica, se resalta ese nivel en la tabla de niveles.
   final int? currentLevel;
 
   const ClassInfoScreen({
     super.key,
-    required this.className,
+    required this.classIndex,
     this.currentLevel,
   });
 
@@ -88,23 +117,22 @@ class ClassInfoScreen extends StatefulWidget {
 class _ClassInfoScreenState extends State<ClassInfoScreen> {
   final _api = ClassApiService();
 
-  late String? _apiIndex;
   late Future<ApiClass> _classFuture;
   late Future<List<ApiClassLevel>> _levelsFuture;
   late Future<List<ApiSpellRef>> _spellsFuture;
 
-  bool get _isCaster => DndData.spellcastingClasses.contains(widget.className);
+  String get _className => DndData.className(widget.classIndex);
+
+  bool get _isCaster => DndData.spellcastingClasses.contains(widget.classIndex);
 
   @override
   void initState() {
     super.initState();
-    _apiIndex = DndData.classApiIndex[widget.className];
     _load();
   }
 
   void _load() {
-    final index = _apiIndex;
-    if (index == null) return;
+    final index = widget.classIndex;
 
     _classFuture = _api.fetchClass(index);
     _levelsFuture = _api.fetchLevels(index);
@@ -115,13 +143,6 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_apiIndex == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(widget.className)),
-        body: const Center(child: Text('Clase no disponible en la API.')),
-      );
-    }
-
     final tabs = [
       const Tab(text: 'Resumen'),
       const Tab(text: 'Niveles'),
@@ -134,7 +155,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Clase: ${widget.className}',
+            'Clase: $_className',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
@@ -384,7 +405,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          '${spells.length} hechizos disponibles para ${widget.className}.',
+          '${spells.length} hechizos disponibles para $_className.',
           style: TextStyle(color: Colors.grey.shade700),
         ),
         const SizedBox(height: 8),

@@ -244,10 +244,53 @@ class CharacterSpellsCard extends StatelessWidget {
               'Hechizos',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            SpellChips(indexes: spells),
+            if (spells.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Aún no ha elegido hechizos.',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              )
+            else
+              SpellChips(indexes: spells),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Una línea con los hechizos de un personaje o NPC, para las listas.
+/// Muestra los primeros nombres (leídos de la API) y cuántos más hay.
+class SpellSummaryText extends StatelessWidget {
+  final List<String> indexes;
+  final int maxNames;
+
+  const SpellSummaryText({super.key, required this.indexes, this.maxNames = 3});
+
+  @override
+  Widget build(BuildContext context) {
+    if (indexes.isEmpty) return const SizedBox.shrink();
+
+    return FutureBuilder<Map<String, ApiSpellRef>>(
+      future: ClassApiService().fetchAllSpells(),
+      builder: (context, snapshot) {
+        final all = snapshot.data;
+        String text;
+
+        if (all == null) {
+          // Cargando o sin conexión: solo el número de hechizos
+          text = 'Hechizos: ${indexes.length}';
+        } else {
+          final names = indexes.map((i) => all[i]?.name ?? i).toList()..sort();
+          final shown = names.take(maxNames).join(', ');
+          final rest = names.length - maxNames;
+          text = 'Hechizos: $shown${rest > 0 ? ' +$rest más' : ''}';
+        }
+
+        return Text(text, maxLines: 2, overflow: TextOverflow.ellipsis);
+      },
     );
   }
 }

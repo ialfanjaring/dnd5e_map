@@ -4,6 +4,9 @@ import '../models/character.dart';
 import '../services/character_service.dart';
 import '../widgets/character_sheet_view.dart';
 import 'character_form_screen.dart';
+import '../widgets/spell_widgets.dart';
+import 'class_info_screen.dart';
+import 'race_info_screen.dart';
 
 /// Apartado "Personajes": lista, crea, edita y elimina fichas.
 class CharactersScreen extends StatelessWidget {
@@ -20,6 +23,24 @@ class CharactersScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Consultar razas',
+            icon: const Icon(Icons.diversity_3_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RacesScreen()),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Consultar clases',
+            icon: const Icon(Icons.menu_book_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ClassesScreen()),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
@@ -189,7 +210,13 @@ class _CharacterTile extends StatelessWidget {
           c.name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}'),
+            SpellSummaryText(indexes: c.spells),
+          ],
+        ),
         isThreeLine: true,
         trailing: PopupMenuButton<String>(
           onSelected: (v) {

@@ -93,6 +93,67 @@ class ApiClass {
   }
 }
 
+/// Datos de una raza.
+class ApiRace {
+  final String index;
+  final String name;
+  final int? speed;
+  final String size;
+  final String sizeDescription;
+  final String age;
+  final String alignment;
+  final String languageDescription;
+  final List<String> languages;
+  final List<String> proficiencies;
+
+  /// Bonificadores raciales: característica (str, dex...) y valor
+  final List<({String ability, int bonus})> abilityBonuses;
+  final List<ApiRef> traits;
+  final List<ApiRef> subraces;
+
+  const ApiRace({
+    required this.index,
+    required this.name,
+    required this.speed,
+    required this.size,
+    required this.sizeDescription,
+    required this.age,
+    required this.alignment,
+    required this.languageDescription,
+    required this.languages,
+    required this.proficiencies,
+    required this.abilityBonuses,
+    required this.traits,
+    required this.subraces,
+  });
+
+  factory ApiRace.fromJson(Map<String, dynamic> m) {
+    return ApiRace(
+      index: (m['index'] ?? '') as String,
+      name: (m['name'] ?? '') as String,
+      speed: _int(m['speed']),
+      size: (m['size'] ?? '').toString(),
+      sizeDescription: (m['size_description'] ?? '').toString(),
+      age: (m['age'] ?? '').toString(),
+      alignment: (m['alignment'] ?? '').toString(),
+      languageDescription: (m['language_desc'] ?? '').toString(),
+      languages: _names(m['languages']),
+      proficiencies: _names(m['starting_proficiencies']),
+      abilityBonuses: ((m['ability_bonuses'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => (
+                ability:
+                    ((e['ability_score'] as Map?)?['index'] ?? '').toString(),
+                bonus: _int(e['bonus']) ?? 0,
+              ))
+          .where((b) => b.ability.isNotEmpty)
+          .toList(),
+      traits: _refs(m['traits']),
+      subraces: _refs(m['subraces']),
+    );
+  }
+}
+
 /// Qué obtiene la clase en un nivel concreto.
 class ApiClassLevel {
   final int level;
@@ -407,5 +468,68 @@ class ClassApiService {
       if (flavor.isNotEmpty) flavor,
       ...desc,
     ];
+  }
+
+  // ---------------- Razas y lista de clases ----------------
+
+  static final Map<String, ApiRace> _raceCache = {};
+
+  /// Razas disponibles en la API (índice + nombre en inglés).
+  Future<List<ApiRef>> fetchRaceList() async {
+    final data = await _getJson('/races') as Map<String, dynamic>;
+    return _refs(data['results']);
+  }
+
+  /// Clases disponibles en la API (índice + nombre en inglés).
+  Future<List<ApiRef>> fetchClassList() async {
+    final data = await _getJson('/classes') as Map<String, dynamic>;
+    return _refs(data['results']);
+  }
+
+  Future<ApiRace> fetchRace(String index) async {
+    final cached = _raceCache[index];
+    if (cached != null) return cached;
+
+    final data = await _getJson('/races/$index') as Map<String, dynamic>;
+    return _raceCache[index] = ApiRace.fromJson(data);
+  }
+
+  /// Descripción de un rasgo racial.
+  Future<List<String>> fetchTraitText(String index) async {
+    final key = 'trait:$index';
+    final cached = _textCache[key];
+    if (cached != null) return cached;
+
+    final data = await _getJson('/traits/$index') as Map<String, dynamic>;
+    final desc = ((data['desc'] ?? const []) as List)
+        .map((e) => e.toString())
+        .toList();
+
+    return _textCache[key] = desc;
+  }
+
+  /// Descripción y bonificadores de una subraza.
+  Future<List<String>> fetchSubraceText(String index) async {
+    final key = 'subrace:$index';
+    final cached = _textCache[key];
+    if (cached != null) return cached;
+
+    final data = await _getJson('/subraces/$index') as Map<String, dynamic>;
+
+    final bonuses = ((data['ability_bonuses'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) {
+      final ability = ((e['ability_score'] as Map?)?['index'] ?? '').toString();
+      final b = _int(e['bonus']) ?? 0;
+      return '${ability.toUpperCase()} ${b >= 0 ? '+$b' : '$b'}';
+    }).toList();
+
+    final traits = _names(data['racial_traits']);
+
+    return _textCache[key] = [
+      (data['desc'] ?? '').toString(),
+      if (bonuses.isNotEmpty) 'Bonificadores: ${bonuses.join(', ')}',
+      if (traits.isNotEmpty) 'Rasgos: ${traits.join(', ')}',
+    ].where((t) => t.isNotEmpty).toList();
   }
 }

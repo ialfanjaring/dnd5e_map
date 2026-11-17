@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/character.dart';
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
 
@@ -32,19 +31,20 @@ class _PickerData {
 
 /// Elige hechizos de la D&D 5e SRD API y devuelve solo sus índices.
 ///
-/// - Con [className]: solo los hechizos de esa clase (personajes).
-/// - Sin [className]: todos los hechizos del SRD (NPC).
+/// - Con [classIndex]: solo los hechizos de esa clase (personajes).
+/// - Sin [classIndex]: todos los hechizos del SRD (NPC).
 /// Los datos de los hechizos nunca se guardan; solo se guarda la lista elegida.
 class SpellPickerScreen extends StatefulWidget {
   final String title;
-  final String? className;
+  /// Índice de la clase en la API (ej. wizard)
+  final String? classIndex;
   final int? characterLevel;
   final List<String> initial;
 
   const SpellPickerScreen({
     super.key,
     required this.title,
-    this.className,
+    this.classIndex,
     this.characterLevel,
     required this.initial,
   });
@@ -78,11 +78,10 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
   }
 
   Future<_PickerData> _load() async {
-    final className = widget.className;
+    final classIndex = widget.classIndex;
 
     // MODO CLASE: hechizos de la clase + datos de su nivel
-    if (className != null) {
-      final classIndex = DndData.classApiIndex[className]!;
+    if (classIndex != null) {
       final spells = await _api.fetchClassSpells(classIndex);
 
       // Los datos generales y los del nivel son un extra: si fallan se puede elegir igualmente
@@ -326,7 +325,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
     final spells = _selected.length - cantrips;
 
     // NPC: sin clase, solo se explica qué se guarda
-    if (widget.className == null) {
+    if (widget.classIndex == null) {
       return [
         const Text(
           'Elige los hechizos que puede usar. Los datos de cada hechizo se '
