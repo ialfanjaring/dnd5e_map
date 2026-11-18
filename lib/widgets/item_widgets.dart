@@ -13,8 +13,10 @@ List<String> itemFacts(ApiItem it) {
     if (it.rarity.isNotEmpty) {
       facts.add('Rareza: ${EquipmentApiService.rarities[it.rarity] ?? it.rarity}');
     }
-    return facts;
+    // Los objetos mágicos propios con estadísticas siguen abajo
+    if (!it.isEquippable) return facts;
   }
+  if (it.magicBonus != 0) facts.add('Bonificador mágico: +${it.magicBonus}');
 
   if (it.isWeapon) {
     final type = EquipmentApiService.damageTypes[it.damageType] ??
@@ -74,7 +76,9 @@ Future<void> showItemDetail(
         if (snap.hasError) {
           return AlertDialog(
             title: const Text('Objeto'),
-            content: const Text('No se pudo cargar el objeto (sin conexión).'),
+            content: Text(
+              'No se pudo cargar el objeto.\n\nDetalle: ${snap.error}',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -137,6 +141,10 @@ class CharacterItemsCard extends StatelessWidget {
   /// null = no se pueden quitar objetos
   final void Function(String index)? onRemove;
 
+  /// false: solo se muestran las ranuras de equipo activo (por ejemplo, en
+  /// el formulario del personaje, donde los objetos ya aparecen arriba)
+  final bool showList;
+
   const CharacterItemsCard({
     super.key,
     required this.character,
@@ -145,24 +153,69 @@ class CharacterItemsCard extends StatelessWidget {
     this.onEquippedChanged,
     this.onAdd,
     this.onRemove,
+    this.showList = true,
   });
 
-  void _toggle(String index, ApiItem it, bool on) {
-    final list = [...character.equipped];
-
-    if (on) {
-      // Solo una armadura y un escudo a la vez
-      if (it.isArmor) {
-        list.removeWhere((e) => data[e]?.isArmor == true);
-      }
-      if (it.isShield) {
-        list.removeWhere((e) => data[e]?.isShield == true);
-      }
-      list.add(index);
-    } else {
-      list.remove(index);
-    }
+  /// Cambia el objeto activo de una ranura (arma, armadura o escudo).
+  void _setSlot(bool Function(ApiItem) isKind, String? index) {
+    final list = [
+      for (final e in character.equipped)
+        if (!(data[e] != null && isKind(data[e]!))) e,
+    ];
+    if (index != null) list.add(index);
     onEquippedChanged?.call(list);
+  }
+
+  /// Objeto activo actual de una ranura.
+  String? _activeOf(bool Function(ApiItem) isKind) {
+    for (final e in character.equipped) {
+      final it = data[e];
+      if (it != null && isKind(it) && character.items.contains(e)) return e;
+    }
+    return null;
+  }
+
+  Widget _slot(
+    String label,
+    IconData icon,
+    bool Function(ApiItem) isKind,
+  ) {
+    // Opciones: los objetos de ese tipo que tiene el personaje (sin repetir)
+    final options = <String>[];
+    for (final i in character.items) {
+      final it = data[i];
+      if (it != null && isKind(it) && !options.contains(i)) options.add(i);
+    }
+
+    final active = _activeOf(isKind);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: DropdownButtonFormField<String?>(
+        value: options.contains(active) ? active : null,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        items: [
+          const DropdownMenuItem<String?>(value: null, child: Text('Ninguna')),
+          for (final i in options)
+            DropdownMenuItem<String?>(
+              value: i,
+              child: Text(
+                '${data[i]!.name} · ${_oneLine(data[i]!)}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: onEquippedChanged == null || options.isEmpty
+            ? null
+            : (v) => _setSlot(isKind, v),
+      ),
+    );
   }
 
   @override
@@ -197,10 +250,27 @@ class CharacterItemsCard extends StatelessWidget {
               Text(
                 'Sin objetos.',
                 style: TextStyle(color: Colors.grey.shade600),
+              )
+            else ...[
+              const Text(
+                'Equipo activo',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
+              _slot('Arma activa', Icons.gavel, (it) => it.slot == 'weapon'),
+              _slot('Armadura activa', Icons.checkroom, (it) => it.slot == 'armor'),
+              _slot('Escudo activo', Icons.shield_outlined, (it) => it.slot == 'shield'),
+              if (showList) ...[
+                const Divider(height: 24),
+                const Text(
+                  'Todos los objetos',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
 
-            for (var i = 0; i < c.items.length; i++)
-              _tile(context, c.items[i]),
+            if (showList)
+              for (var i = 0; i < c.items.length; i++)
+                _tile(context, c.items[i]),
 
             // Efectos del equipo
             if (effects.attacks.isNotEmpty) ...[
@@ -239,7 +309,6 @@ class CharacterItemsCard extends StatelessWidget {
     final it = data[index];
     final name = it?.name ?? index.replaceFirst(ApiItem.magicPrefix, '');
     final isEquipped = character.equipped.contains(index);
-    final canEquip = onEquippedChanged != null && (it?.isEquippable ?? false);
 
     return ListTile(
       dense: true,
@@ -263,16 +332,11 @@ class CharacterItemsCard extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (canEquip)
-            Tooltip(
-              message: isEquipped ? 'Equipado' : 'Equipar',
-              child: Switch(
-                value: isEquipped,
-                onChanged: (v) => _toggle(index, it!, v),
-              ),
-            )
-          else if (isEquipped)
-            const Icon(Icons.check_circle, color: Colors.green),
+          if (isEquipped)
+            const Tooltip(
+              message: 'Activo',
+              child: Icon(Icons.check_circle, color: Colors.green),
+            ),
           if (onRemove != null)
             IconButton(
               tooltip: 'Quitar',
@@ -289,7 +353,10 @@ class CharacterItemsCard extends StatelessWidget {
     if (it.isShield) return 'Escudo +${it.acBase} CA';
     if (it.isArmor) return 'CA ${it.acBase}${it.acDexBonus ? ' + Des' : ''}';
     if (it.isWeapon) return '${it.damageDice} ${EquipmentApiService.damageTypes[it.damageType] ?? it.damageType.toLowerCase()}';
-    if (it.isMagic) return EquipmentApiService.rarities[it.rarity] ?? it.rarity;
+    if (it.isMagic) {
+      final r = EquipmentApiService.rarities[it.rarity] ?? it.rarity;
+      return it.magicBonus != 0 ? '$r · +${it.magicBonus}' : r;
+    }
     return it.category;
   }
 }

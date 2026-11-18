@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../services/character_service.dart';
 import '../services/class_api_service.dart';
+import '../services/equipment_api_service.dart';
 import '../widgets/spell_widgets.dart';
 import 'class_info_screen.dart';
 import 'items_screen.dart';
 import 'race_info_screen.dart';
 import 'spell_picker_screen.dart';
+import '../models/equipment_effects.dart';
+import '../widgets/item_widgets.dart';
 
 /// Crear o editar un personaje con ficha de D&D 5e.
 class CharacterFormScreen extends StatefulWidget {
@@ -49,6 +52,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   late List<String> _spells; // índices de la API
   late List<String> _items; // objetos de la API (índices)
   late List<String> _equipped; // objetos equipados
+  late Map<String, Map<String, dynamic>> _customItems; // datos de objetos propios
+  Map<String, ApiItem> _itemData = {}; // objetos leídos de la API
 
   final _api = ClassApiService();
   late final Future<List<ApiRef>> _racesFuture;
@@ -88,6 +93,9 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _spells = [...?c?.spells];
     _items = [...?c?.items];
     _equipped = [...?c?.equipped];
+    _customItems = {...?c?.customItems};
+    EquipmentApiService.registerCustomMap(_customItems);
+    _loadItemData();
 
     _isCaster = DndData.spellcastingClasses.contains(_class);
     _racesFuture = _loadRaces();
@@ -198,6 +206,42 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
 
   int get _profBonus => 2 + ((_level - 1) ~/ 4);
 
+  /// Lee de la API los objetos del personaje para calcular el equipo activo.
+  Future<void> _loadItemData() async {
+    EquipmentApiService.registerCustomMap(_customItems);
+    final data = await EquipmentApiService().fetchItems(_items);
+    if (mounted) setState(() => _itemData = data);
+  }
+
+  /// Personaje con lo que hay ahora en el formulario, con raza y equipo
+  /// ya aplicados (CA, velocidad, ataques).
+  ({Character character, EquipmentEffects effects}) _derived() {
+    final base = Character(
+      ownerUid: '',
+      name: _nameCtrl.text,
+      race: _race ?? '',
+      subrace: _subrace ?? '',
+      characterClass: _class ?? '',
+      level: _level,
+      abilities: Map<String, int>.from(_abilities),
+      maxHp: int.tryParse(_hpCtrl.text) ?? 1,
+      armorClass: int.tryParse(_acCtrl.text) ?? 10,
+      speed: int.tryParse(_speedCtrl.text) ?? 30,
+      items: _items,
+      equipped: _equipped,
+      customItems: _customItems,
+    ).withRacial(_racial);
+
+    final effects = EquipmentEffects.compute(base, _itemData);
+    return (
+      character: base.withDerived(
+        ac: effects.armorClass,
+        speedPenalty: effects.speedPenalty,
+      ),
+      effects: effects,
+    );
+  }
+
   // ---------- Acciones ----------
 
   void _rollAbilities() {
@@ -260,6 +304,10 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       spells: _isCaster ? _spells : const [],
       items: _items,
       equipped: _equipped.where(_items.contains).toList(),
+      customItems: {
+        for (final e in _customItems.entries)
+          if (_items.contains('c:${e.key}')) e.key: e.value,
+      },
     );
 
     try {
@@ -559,6 +607,15 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           'Iniciativa: ${Character.signed(Character.modifier(_total('dex')))}',
           style: TextStyle(color: Colors.grey.shade700),
         ),
+        const SizedBox(height: 4),
+        Builder(builder: (context) {
+          final d = _derived().character;
+          return Text(
+            'CA total (con raza y equipo activo): ${d.effectiveAc}   ·   '
+            'Velocidad: ${d.effectiveSpeed} pies',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          );
+        }),
       ],
     );
   }
@@ -828,7 +885,11 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       MaterialPageRoute(builder: (_) => const ItemsScreen(pick: true)),
     );
     if (picked != null && picked.isNotEmpty) {
-      setState(() => _items = [..._items, ...picked]);
+      setState(() {
+        _items = [..._items, ...picked];
+        _customItems.addAll(EquipmentApiService.customData(picked));
+      });
+      _loadItemData();
     }
   }
 
@@ -867,7 +928,10 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             children: [
               for (var i = 0; i < _items.length; i++)
                 InputChip(
-                  label: Text(_items[i].replaceFirst('m:', '')),
+                  label: Text(
+                    EquipmentApiService().cachedItem(_items[i])?.name ??
+                        _items[i].replaceFirst(RegExp(r'^[mc]:'), ''),
+                  ),
                   onDeleted: () => setState(() {
                     final removed = _items.removeAt(i);
                     if (!_items.contains(removed)) _equipped.remove(removed);
@@ -875,6 +939,17 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
                 ),
             ],
           ),
+        if (_items.isNotEmpty)
+          Builder(builder: (context) {
+            final d = _derived();
+            return CharacterItemsCard(
+              character: d.character,
+              data: _itemData,
+              effects: d.effects,
+              showList: false,
+              onEquippedChanged: (list) => setState(() => _equipped = list),
+            );
+          }),
         const SizedBox(height: 12),
         TextFormField(
           controller: _equipmentCtrl,

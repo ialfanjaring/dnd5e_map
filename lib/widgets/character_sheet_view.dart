@@ -74,6 +74,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
 
   /// Lee de la API los bonificadores de raza y subraza (no se guardan).
   Future<void> _loadItems() async {
+    EquipmentApiService.registerCustomMap(widget.character.customItems);
     final key = widget.character.items.join(',');
     if (key == _itemsLoadedFor) return;
     _itemsLoadedFor = key;

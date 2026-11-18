@@ -42,6 +42,9 @@ class EquipmentEffects {
     ApiItem? shield;
     final weapons = <ApiItem>[];
 
+    // Objetos mágicos sin estadísticas (solo suman su bono a la CA)
+    var extraAcBonus = 0;
+
     for (final index in c.equipped) {
       final it = data[index];
       if (it == null) continue;
@@ -51,6 +54,8 @@ class EquipmentEffects {
         armor ??= it;
       } else if (it.isWeapon) {
         weapons.add(it);
+      } else if (it.slot == 'armor' || it.slot == 'shield') {
+        extraAcBonus += it.magicBonus;
       }
     }
 
@@ -67,7 +72,11 @@ class EquipmentEffects {
         }
         base = armor.acBase! + dexPart;
       }
-      ac = base + (shield?.acBase ?? 0);
+      ac = base + (shield?.acBase ?? 0) + (armor?.magicBonus ?? 0) + (shield?.magicBonus ?? 0);
+    }
+    if (extraAcBonus != 0) {
+      // Sin armadura con estadísticas: se parte de la CA de la ficha
+      ac = (ac ?? c.armorClass) + extraAcBonus;
     }
 
     var penalty = 0;
@@ -87,11 +96,12 @@ class EquipmentEffects {
           : (w.isFinesse ? max(str, dex) : str);
       final type = EquipmentApiService.damageTypes[w.damageType] ??
           w.damageType.toLowerCase();
-      final modText = ability == 0 ? '' : Character.signed(ability);
+      final dmgMod = ability + w.magicBonus;
+      final modText = dmgMod == 0 ? '' : Character.signed(dmgMod);
       attacks.add(WeaponAttack(
         weapon: w,
         // Se asume competencia con el arma
-        attackBonus: ability + c.proficiencyBonus,
+        attackBonus: ability + c.proficiencyBonus + w.magicBonus,
         damage: '${w.damageDice}$modText $type',
       ));
     }

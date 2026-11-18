@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/character.dart';
+import '../models/combat.dart';
 import '../models/creature.dart';
 import '../models/game_models.dart';
 import '../widgets/avatars.dart';
@@ -51,6 +52,9 @@ class GameService {
 
   DocumentReference<Map<String, dynamic>> _terrainDoc(String code) =>
       _games.doc(code).collection('map').doc('terrain');
+
+  DocumentReference<Map<String, dynamic>> _combatDoc(String code) =>
+      _games.doc(code).collection('combat').doc('state');
 
   // Sin 0/O/1/I para evitar confusiones al dictar el código
   static const String _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -485,6 +489,45 @@ class GameService {
   }
 
   // ==========================================
+  // INICIATIVA Y TURNOS
+  // ==========================================
+
+  /// Estado del combate (null si no hay combate).
+  Stream<CombatState?> combat(String code) => _combatDoc(code).snapshots().map(
+        (s) => s.exists && s.data() != null
+            ? CombatState.fromMap(s.data()!)
+            : null,
+      );
+
+  /// El Master empieza (o reinicia) el combate con las tiradas hechas.
+  Future<void> startCombat(String code, List<InitEntry> entries) {
+    return _combatDoc(code).set({
+      'active': true,
+      'round': 1,
+      'current': entries.isEmpty ? '' : entries.first.id,
+      'entries': entries.map((e) => e.toMap()).toList(),
+    });
+  }
+
+  /// El Master modifica la lista (orden, resultados, altas y bajas).
+  Future<void> saveCombatEntries(
+    String code,
+    List<InitEntry> entries, {
+    String? current,
+  }) {
+    return _combatDoc(code).update({
+      'entries': entries.map((e) => e.toMap()).toList(),
+      if (current != null) 'current': current,
+    });
+  }
+
+  /// Pasa el turno (lo puede hacer el Master o el jugador al que le toca).
+  Future<void> setTurn(String code, String current, int round) =>
+      _combatDoc(code).update({'current': current, 'round': round});
+
+  Future<void> endCombat(String code) => _combatDoc(code).delete();
+
+  // ==========================================
   // CRIATURAS DE LA PARTIDA (NPC y monstruos)
   // ==========================================
 
@@ -624,10 +667,25 @@ class GameService {
   /// Borra la partida y todo lo que cuelga de ella (solo el Master).
   Future<void> deleteGameData(String code) async {
     final game = _games.doc(code);
-    for (final name in ['players', 'creatures', 'tokens', 'rolls', 'map']) {
+    for (final name in ['players', 'creatures', 'tokens', 'rolls', 'map', 'combat']) {
       await _deleteCollection(game.collection(name));
     }
     await game.delete();
+  }
+
+  /// Reinicia la sala (solo el Master): la partida vuelve al estado de sala
+  /// de espera. Se quitan las fichas del mapa, el combate y el registro de
+  /// dados. Se conservan jugadores, criaturas, mapa y terreno.
+  Future<void> resetRoom(String code) async {
+    final game = _games.doc(code);
+    // Primero el estado, para que los jugadores vuelvan a la sala
+    await game.update({
+      'status': 'lobby',
+      'lastActivity': FieldValue.serverTimestamp(),
+    });
+    await _deleteCollection(game.collection('tokens'));
+    await _deleteCollection(game.collection('combat'));
+    await _deleteCollection(game.collection('rolls'));
   }
 
   /// Termina la sesión: avisa a los jugadores y borra la partida.
@@ -681,33 +739,60 @@ class GameService {
   // OBJETOS DE LOS JUGADORES
   // ==========================================
 
+  /// Quita los valores nulos de un mapa (anidados incluidos).
+  static Map<String, dynamic> _withoutNulls(Map<String, dynamic> m) {
+    final out = <String, dynamic>{};
+    m.forEach((k, v) {
+      if (v == null) return;
+      out[k] = v is Map ? _withoutNulls(Map<String, dynamic>.from(v)) : v;
+    });
+    return out;
+  }
+
   /// Añade objetos (índices de la API) a la copia del personaje en la partida.
+  ///
+  /// [custom] lleva los datos de los objetos creados por el Master (id -> datos),
+  /// que se copian en la ficha del jugador.
+  ///
+  /// No usa transacciones: en Windows pueden cerrar la aplicación.
   Future<void> addItemsToPlayer(
     String code,
     String uid,
-    List<String> items,
-  ) async {
+    List<String> items, {
+    Map<String, Map<String, dynamic>> custom = const {},
+  }) async {
     final ref = _playersCol(code).doc(uid);
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final current = List<String>.from(snap.data()?['character']?['items'] ?? const []);
-      tx.update(ref, {'character.items': [...current, ...items]});
+    final snap = await ref.get();
+    final char = (snap.data()?['character'] as Map?) ?? const {};
+
+    final current = List<String>.from(char['items'] ?? const []);
+    final customItems = <String, dynamic>{
+      for (final e in ((char['customItems'] as Map?) ?? const {}).entries)
+        e.key.toString(): e.value,
+      for (final e in custom.entries) e.key: _withoutNulls(e.value),
+    };
+
+    await ref.update({
+      'character.items': [...current, ...items],
+      if (customItems.isNotEmpty) 'character.customItems': customItems,
     });
   }
 
   /// Quita un ejemplar del objeto (y lo desequipa si ya no queda ninguno).
   Future<void> removeItemFromPlayer(String code, String uid, String item) async {
     final ref = _playersCol(code).doc(uid);
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final char = (snap.data()?['character'] as Map?) ?? const {};
-      final items = List<String>.from(char['items'] ?? const []);
-      final equipped = List<String>.from(char['equipped'] ?? const []);
+    final snap = await ref.get();
+    final char = (snap.data()?['character'] as Map?) ?? const {};
 
-      items.remove(item);
-      if (!items.contains(item)) equipped.remove(item);
+    final items = List<String>.from(char['items'] ?? const []);
+    final equipped = List<String>.from(char['equipped'] ?? const []);
 
-      tx.update(ref, {'character.items': items, 'character.equipped': equipped});
+    items.remove(item);
+    if (!items.contains(item)) equipped.remove(item);
+
+    await ref.update({
+      'character.items': items,
+      'character.equipped': equipped,
     });
   }
 

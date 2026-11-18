@@ -8,6 +8,7 @@ import '../widgets/spell_widgets.dart';
 import 'class_info_screen.dart';
 import 'race_info_screen.dart';
 import '../widgets/avatars.dart';
+import '../widgets/resolved_character.dart';
 
 /// Apartado "Personajes": lista, crea, edita y elimina fichas.
 class CharactersScreen extends StatelessWidget {
@@ -208,7 +209,7 @@ class _CharacterTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}'),
+            CharacterQuickStats(character: c, prefix: '${c.summary}\n'),
             SpellSummaryText(indexes: c.spells),
           ],
         ),

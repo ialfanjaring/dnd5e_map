@@ -10,6 +10,7 @@ import '../widgets/character_sheet_view.dart';
 import '../widgets/spell_widgets.dart';
 import 'character_form_screen.dart';
 import 'game_screen.dart';
+import '../widgets/resolved_character.dart';
 
 /// Sala de selección de personaje para el jugador que se une con código.
 class PlayerRoomScreen extends StatefulWidget {
@@ -269,8 +270,9 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${c.summary}\nCA ${c.armorClass} · PG ${c.maxHp}',
+                        CharacterQuickStats(
+                          character: c,
+                          prefix: '${c.summary}\n',
                         ),
                         SpellSummaryText(indexes: c.spells),
                       ],

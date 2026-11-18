@@ -8,6 +8,7 @@ import '../widgets/game_creatures_section.dart';
 import 'game_screen.dart';
 import 'map_picker_screen.dart';
 import '../widgets/avatars.dart';
+import '../widgets/resolved_character.dart';
 
 /// Sala de selección para el Master: comparte el código y ve a los
 /// jugadores con los personajes que han elegido.
@@ -116,14 +117,21 @@ class MasterRoomScreen extends StatelessWidget {
                       leading: const Icon(Icons.map_outlined, size: 32),
                       title: Text('Mapa: $name'),
                       subtitle: Text('$cols × $rows casillas'),
+                      // Con la partida en juego no se puede cambiar el mapa
+                      // (para ello hay que reiniciar la sala desde el mapa)
                       trailing: ElevatedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => MapPickerScreen(gameCode: gameCode),
-                          ),
+                        onPressed: g['status'] == 'playing'
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        MapPickerScreen(gameCode: gameCode),
+                                  ),
+                                ),
+                        child: Text(
+                          g['status'] == 'playing' ? 'En juego' : 'Elegir mapa',
                         ),
-                        child: const Text('Elegir mapa'),
                       ),
                     ),
                   );
@@ -204,10 +212,10 @@ class MasterRoomScreen extends StatelessWidget {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${p.character.summary}\n'
-                                  'CA ${p.character.armorClass} · '
-                                  'PG ${p.character.maxHp} · ${p.email}',
+                                CharacterQuickStats(
+                                  character: p.character,
+                                  prefix: '${p.character.summary}\n',
+                                  suffix: ' · ${p.email}',
                                 ),
                                 SpellSummaryText(indexes: p.character.spells),
                               ],

@@ -231,6 +231,10 @@ class Character {
   /// Objetos equipados (subconjunto de [items]): armadura, escudo, armas.
   final List<String> equipped;
 
+  /// Copia de los objetos creados por el Master que lleva el personaje
+  /// (id -> datos). Son datos del usuario, no de la API.
+  final Map<String, Map<String, dynamic>> customItems;
+
   /// Calculados al leer la API (no se guardan): CA con armadura y escudo
   /// y penalización de velocidad por armadura pesada.
   final int? acOverride;
@@ -262,6 +266,7 @@ class Character {
     this.racialBonuses = const {},
     this.items = const [],
     this.equipped = const [],
+    this.customItems = const {},
     this.acOverride,
     this.speedPenalty = 0,
   });
@@ -295,6 +300,7 @@ class Character {
         racialBonuses: racial ?? racialBonuses,
         items: items,
         equipped: equipped,
+        customItems: customItems,
         acOverride: keepAc ? (ac ?? acOverride) : ac,
         speedPenalty: speedPenalty ?? this.speedPenalty,
       );
@@ -361,6 +367,7 @@ class Character {
         'spells': spells,
         'items': items,
         'equipped': equipped,
+        'customItems': customItems,
       };
 
   factory Character.fromMap(Map<String, dynamic> m, {String? id}) {
@@ -391,6 +398,10 @@ class Character {
       spells: spellIndexesFromData(m['spells']),
       items: List<String>.from(m['items'] ?? const []),
       equipped: List<String>.from(m['equipped'] ?? const []),
+      customItems: {
+        for (final e in ((m['customItems'] as Map?) ?? const {}).entries)
+          e.key.toString(): Map<String, dynamic>.from(e.value as Map),
+      },
     );
   }
 

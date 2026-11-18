@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../screens/character_form_screen.dart';
 import '../screens/items_screen.dart';
+import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import 'character_sheet_view.dart';
 import 'avatars.dart';
+import 'resolved_character.dart';
+import '../models/character.dart';
 
 /// Ficha de un jugador en tiempo real: puntos de golpe y ficha completa.
 /// El jugador puede editar la suya; el Master puede ajustar los PG de cualquiera.
@@ -60,7 +63,12 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
     );
     if (picked == null || picked.isEmpty) return;
     try {
-      await _service.addItemsToPlayer(widget.gameCode, widget.uid, picked);
+      await _service.addItemsToPlayer(
+        widget.gameCode,
+        widget.uid,
+        picked,
+        custom: EquipmentApiService.customData(picked),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +153,41 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                       color: barColor,
                       backgroundColor: Colors.grey.shade300,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
+                    ResolvedCharacterBuilder(
+                      character: p.character,
+                      builder: (context, r) {
+                        final c = r.character;
+                        Widget stat(String label, String value) => Column(
+                              children: [
+                                Text(
+                                  value,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            );
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            stat('CA', '${c.effectiveAc}'),
+                            stat('Iniciativa', Character.signed(c.initiative)),
+                            stat('Velocidad', '${c.effectiveSpeed} pies'),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -325,8 +367,9 @@ class _PlayersPanelState extends State<PlayersPanel> {
                     p.character.name,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text(
-                    '${p.character.summary}\nCA ${p.character.armorClass}',
+                  subtitle: CharacterQuickStats(
+                    character: p.character,
+                    prefix: '${p.character.summary}\n',
                   ),
                   isThreeLine: true,
                   trailing: Row(

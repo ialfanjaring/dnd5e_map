@@ -468,6 +468,9 @@ class _ActiveGameBanner extends StatefulWidget {
 class _ActiveGameBannerState extends State<_ActiveGameBanner> {
   late Future<({String code, String name, String status})?> _future;
 
+  /// Partidas que el Master acaba de terminar: no se vuelven a mostrar.
+  final Set<String> _dismissed = {};
+
   @override
   void initState() {
     super.initState();
@@ -512,11 +515,12 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     if (ok != true) return;
 
     // El aviso desaparece al instante; la partida se borra en segundo plano
-    setState(() => _future = Future.value(null));
+    setState(() => _dismissed.add(g.code));
     try {
       await GameService().endGame(g.code);
     } catch (e) {
       if (!mounted) return;
+      setState(() => _dismissed.remove(g.code));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo terminar la sesión: $e')),
       );
@@ -530,7 +534,9 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
       future: _future,
       builder: (context, snap) {
         final g = snap.data;
-        if (g == null) return const SizedBox.shrink();
+        if (g == null || _dismissed.contains(g.code)) {
+          return const SizedBox.shrink();
+        }
 
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),

@@ -27,6 +27,12 @@ class GameBoard extends StatefulWidget {
   final void Function(int x, int y) onCellTap;
   final void Function(int x, int y) onCellPaint;
 
+  /// Casillas ("x_y") a las que puede llegar la ficha seleccionada (sombreadas)
+  final Set<String> reachable;
+
+  /// Ficha que tiene el turno de iniciativa (se resalta)
+  final String? turnId;
+
   const GameBoard({
     super.key,
     required this.cols,
@@ -41,6 +47,8 @@ class GameBoard extends StatefulWidget {
     required this.fitSignal,
     required this.onCellTap,
     required this.onCellPaint,
+    this.reachable = const {},
+    this.turnId,
   });
 
   @override
@@ -174,6 +182,7 @@ class _GameBoardState extends State<GameBoard> {
                           cols: widget.cols,
                           rows: widget.rows,
                           terrain: widget.terrain,
+                          reachable: widget.reachable,
                           cell: cell,
                         ),
                       ),
@@ -191,6 +200,7 @@ class _GameBoardState extends State<GameBoard> {
                               name: widget.nameOf(t),
               icon: widget.iconOf?.call(t),
                               selected: widget.selectedId == t.id,
+                              turn: widget.turnId == t.id,
                             ),
                           ),
                         ),
@@ -210,12 +220,14 @@ class _GridPainter extends CustomPainter {
   final int cols;
   final int rows;
   final Map<String, String> terrain;
+  final Set<String> reachable;
   final double cell;
 
   _GridPainter({
     required this.cols,
     required this.rows,
     required this.terrain,
+    required this.reachable,
     required this.cell,
   });
 
@@ -242,6 +254,25 @@ class _GridPainter extends CustomPainter {
       );
     });
 
+    // Casillas a las que puede llegar la ficha seleccionada
+    if (reachable.isNotEmpty) {
+      final fill = Paint()..color = const Color(0x6600C853);
+      final edge = Paint()
+        ..color = const Color(0xCC00A040)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      for (final key in reachable) {
+        final parts = key.split('_');
+        if (parts.length != 2) continue;
+        final x = int.tryParse(parts[0]);
+        final y = int.tryParse(parts[1]);
+        if (x == null || y == null) continue;
+        final r = Rect.fromLTWH(x * cell, y * cell, cell, cell).deflate(1);
+        canvas.drawRect(r, fill);
+        canvas.drawRect(r, edge);
+      }
+    }
+
     // Cuadrícula
     final line = Paint()
       ..color = const Color(0x33000000)
@@ -257,7 +288,10 @@ class _GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GridPainter old) =>
-      old.cols != cols || old.rows != rows || old.terrain != terrain;
+      old.cols != cols ||
+      old.rows != rows ||
+      old.terrain != terrain ||
+      old.reachable != reachable;
 }
 
 class _TokenView extends StatelessWidget {
@@ -266,6 +300,7 @@ class _TokenView extends StatelessWidget {
   final String name;
   final IconData? icon;
   final bool selected;
+  final bool turn;
 
   const _TokenView({
     required this.token,
@@ -273,6 +308,7 @@ class _TokenView extends StatelessWidget {
     required this.name,
     required this.icon,
     required this.selected,
+    required this.turn,
   });
 
   @override
@@ -304,8 +340,14 @@ class _TokenView extends StatelessWidget {
                     color: selected ? Colors.amber : Colors.white,
                     width: selected ? 4 : 2,
                   ),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black38, blurRadius: 3),
+                  boxShadow: [
+                    const BoxShadow(color: Colors.black38, blurRadius: 3),
+                    if (turn)
+                      const BoxShadow(
+                        color: Color(0xFF00E676),
+                        blurRadius: 10,
+                        spreadRadius: 3,
+                      ),
                   ],
                 ),
                 child: icon != null

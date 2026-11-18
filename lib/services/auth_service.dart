@@ -25,13 +25,12 @@ class AuthService {
   static DateTime? _lastVerificationSent;
   static const int _cooldownDuration = 60;
 
-  // Credenciales de escritorio: se pasan con --dart-define-from-file=env.json
-  static const String _desktopClientId =
-      String.fromEnvironment('proyectodnd5e-514516');
-  static const String _desktopClientSecret =
-      String.fromEnvironment('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');
-  static const int _redirectPort =
-      int.fromEnvironment('61797', defaultValue: 50000);
+  // Credenciales OAuth de escritorio (Windows), escritas directamente aquí.
+  // Rellena los dos valores con los de tu cliente OAuth de tipo "Escritorio".
+  // El ID tiene la forma 1234567890-abc123.apps.googleusercontent.com
+  static const String _desktopClientId = 'proyectodnd5e-514516';
+  static const String _desktopClientSecret = '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';
+  static const int _redirectPort = 61797;
 
   // Se crea una sola vez y solo cuando se necesita (Windows).
   static desktop_google.GoogleSignIn? _desktopGoogleSignIn;
@@ -169,10 +168,11 @@ class AuthService {
       }
 
       if (_isWindows) {
-        if (_desktopClientId.isEmpty || _desktopClientSecret.isEmpty) {
+        if (_desktopClientId.startsWith('PEGA_AQUI') ||
+            _desktopClientSecret.startsWith('PEGA_AQUI')) {
           throw const AuthException(
-              'Falta la configuración de Google. Ejecuta con '
-              '--dart-define-from-file=env.json');
+              'Faltan el Client ID y el Client Secret de Google en '
+              'auth_service.dart.');
         }
         final credentials = await _desktop.signIn();
         if (credentials == null) {
