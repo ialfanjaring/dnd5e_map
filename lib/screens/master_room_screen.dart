@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/game_service.dart';
-import '../models/creature.dart';
-import '../services/monster_api_service.dart';
 import '../widgets/character_sheet_view.dart';
 import '../widgets/spell_widgets.dart';
-import '../widgets/creature_sheet_view.dart';
-import 'creature_picker_screen.dart';
+import '../widgets/game_creatures_section.dart';
+import 'game_screen.dart';
+import 'map_picker_screen.dart';
+import '../widgets/avatars.dart';
 
 /// Sala de selección para el Master: comparte el código y ve a los
 /// jugadores con los personajes que han elegido.
@@ -32,6 +32,13 @@ class MasterRoomScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Terminar la sesión (borra la partida)',
+            icon: const Icon(Icons.stop_circle_outlined),
+            onPressed: () => _endSession(context),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -93,7 +100,37 @@ class MasterRoomScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+
+              // MAPA DE LA PARTIDA
+              StreamBuilder<Map<String, dynamic>?>(
+                stream: service.gameStream(gameCode),
+                builder: (context, snap) {
+                  final g = snap.data ?? const <String, dynamic>{};
+                  final name = (g['mapName'] ?? 'Cuadrícula vacía') as String;
+                  final cols = (g['cols'] ?? 20) as num;
+                  final rows = (g['rows'] ?? 14) as num;
+
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.map_outlined, size: 32),
+                      title: Text('Mapa: $name'),
+                      subtitle: Text('$cols × $rows casillas'),
+                      trailing: ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MapPickerScreen(gameCode: gameCode),
+                          ),
+                        ),
+                        child: const Text('Elegir mapa'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 12),
 
               // LISTA DE JUGADORES
               StreamBuilder<List<GamePlayer>>(
@@ -155,13 +192,8 @@ class MasterRoomScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.deepPurple.shade100,
-                              child: Text(
-                                p.character.name.isNotEmpty
-                                    ? p.character.name[0].toUpperCase()
-                                    : '?',
-                              ),
+                            leading: EntityAvatar.character(
+                              p.character.characterClass,
                             ),
                             title: Text(
                               p.character.name,
@@ -193,28 +225,30 @@ class MasterRoomScreen extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: players.isEmpty
-                              ? null
-                              : () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Iniciar partida: pendiente de '
-                                        'conectar con el mapa.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Iniciar partida'),
-                        ),
+                      StreamBuilder<Map<String, dynamic>?>(
+                        stream: service.gameStream(gameCode),
+                        builder: (context, gameSnap) {
+                          // Si la partida ya está en juego, se vuelve a entrar
+                          final playing =
+                              gameSnap.data?['status'] == 'playing';
+
+                          return SizedBox(
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _startGame(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                              ),
+                              icon: Icon(
+                                playing ? Icons.login : Icons.play_arrow,
+                              ),
+                              label: Text(
+                                playing ? 'Unirme de nuevo' : 'Iniciar partida',
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   );
@@ -224,7 +258,7 @@ class MasterRoomScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // NPC Y MONSTRUOS DE LA PARTIDA
-              _CreaturesSection(gameCode: gameCode),
+              GameCreaturesSection(gameCode: gameCode),
 
               const SizedBox(height: 24),
             ],
@@ -232,6 +266,64 @@ class MasterRoomScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Termina la sesión y borra la partida.
+  Future<void> _endSession(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Terminar la sesión'),
+        content: const Text(
+          'Se avisará a los jugadores y la partida se borrará por completo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Terminar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await GameService().endGame(gameCode);
+      navigator.popUntil((r) => r.isFirst);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Sesión terminada y partida borrada.')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo terminar la sesión: $e')),
+      );
+    }
+  }
+
+  /// Pasa la partida a "en juego" y abre el mapa. Los jugadores que están en
+  /// la sala entran solos. Se puede volver a pulsar para volver al mapa.
+  Future<void> _startGame(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    try {
+      await GameService().startGame(gameCode);
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => GameScreen(gameCode: gameCode, isMaster: true),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo iniciar la partida: $e')),
+      );
+    }
   }
 
   Future<void> _confirmKick(
@@ -268,242 +360,5 @@ class MasterRoomScreen extends StatelessWidget {
         SnackBar(content: Text('No se pudo expulsar al jugador: $e')),
       );
     }
-  }
-}
-
-// ==========================================
-// SECCIÓN: NPC Y MONSTRUOS DE LA PARTIDA
-// ==========================================
-
-class _CreaturesSection extends StatelessWidget {
-  final String gameCode;
-
-  const _CreaturesSection({required this.gameCode});
-
-  Future<void> _addCreatures(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-
-    final result = await Navigator.push<CreaturePickerResult>(
-      context,
-      MaterialPageRoute(builder: (_) => const CreaturePickerScreen()),
-    );
-
-    if (result == null || result.isEmpty) return;
-
-    try {
-      await GameService().addCreatures(
-        gameCode,
-        custom: result.custom,
-        api: result.api,
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('No se pudieron añadir las criaturas: $e')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final service = GameService();
-
-    return StreamBuilder<List<GameCreature>>(
-      stream: service.creatures(gameCode),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Text('No se pudieron cargar las criaturas: ${snapshot.error}');
-        }
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final creatures = snapshot.data!;
-
-        // Cuántos ejemplares hay de cada monstruo de la API (para numerarlos)
-        final apiCounts = <String, int>{};
-        for (final gc in creatures) {
-          final index = gc.apiIndex;
-          if (index != null) apiCounts[index] = (apiCounts[index] ?? 0) + 1;
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'NPC y monstruos (${creatures.length})',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _addCreatures(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Añadir'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (creatures.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Aún no has añadido criaturas. Elige monstruos de la API '
-                    'o de tu bestiario para tener la partida preparada.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-              ),
-            for (final gc in creatures)
-              _GameCreatureTile(
-                gameCode: gameCode,
-                gc: gc,
-                numbered: gc.isApi && (apiCounts[gc.apiIndex] ?? 0) > 1,
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Una criatura de la partida. Si es de la API, sus estadísticas se consultan
-/// al momento (no están guardadas en la base de datos).
-class _GameCreatureTile extends StatelessWidget {
-  final String gameCode;
-  final GameCreature gc;
-  final bool numbered;
-
-  const _GameCreatureTile({
-    required this.gameCode,
-    required this.gc,
-    required this.numbered,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final service = GameService();
-    final api = MonsterApiService();
-
-    final Creature? initial =
-        gc.snapshot ?? (gc.isApi ? api.cachedMonster(gc.apiIndex!) : null);
-
-    final Future<Creature> future = gc.snapshot != null
-        ? Future.value(gc.snapshot!)
-        : api.fetchMonster(gc.apiIndex!);
-
-    return FutureBuilder<Creature>(
-      future: future,
-      initialData: initial,
-      builder: (context, snapshot) {
-        final removeButton = IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: 'Quitar de la partida',
-          onPressed: () => service.removeCreature(gameCode, gc.id),
-          icon: const Icon(Icons.delete_outline),
-        );
-
-        if (snapshot.hasError) {
-          return Card(
-            child: ListTile(
-              title: Text(gc.apiIndex ?? 'Criatura'),
-              subtitle: const Text('No se pudo cargar de la API.'),
-              trailing: removeButton,
-            ),
-          );
-        }
-
-        final c = snapshot.data;
-        if (c == null) {
-          return const Card(
-            child: ListTile(
-              leading: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              title: Text('Cargando de la API...'),
-            ),
-          );
-        }
-
-        final base = gc.label ?? c.name;
-        final label = numbered ? '$base ${gc.number}' : base;
-
-        final lost = gc.damage > c.maxHp ? c.maxHp : gc.damage;
-        final current = c.maxHp - lost;
-
-        return Card(
-          child: ListTile(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreatureSheetScreen(creature: c, title: label),
-              ),
-            ),
-            leading: CircleAvatar(
-              backgroundColor:
-                  c.isMonster ? Colors.red.shade100 : Colors.blueGrey.shade100,
-              child: Icon(
-                c.isMonster ? Icons.pets : Icons.person,
-                color:
-                    c.isMonster ? Colors.red.shade800 : Colors.blueGrey.shade700,
-              ),
-            ),
-            title: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                decoration: current == 0 ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            subtitle: Text(
-              'CA ${c.armorClass} · '
-              '${current == 0 ? 'Derrotado' : 'FP ${c.challengeRating}'}',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Quitar 1 PG',
-                  onPressed: current > 0
-                      ? () => service.updateCreatureDamage(
-                            gameCode,
-                            gc.id,
-                            lost + 1,
-                          )
-                      : null,
-                  icon: const Icon(Icons.remove_circle_outline),
-                ),
-                Text(
-                  '$current/${c.maxHp}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Sumar 1 PG',
-                  onPressed: lost > 0
-                      ? () => service.updateCreatureDamage(
-                            gameCode,
-                            gc.id,
-                            lost - 1,
-                          )
-                      : null,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-                removeButton,
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 }

@@ -7,6 +7,7 @@ import 'character_form_screen.dart';
 import '../widgets/spell_widgets.dart';
 import 'class_info_screen.dart';
 import 'race_info_screen.dart';
+import '../widgets/avatars.dart';
 
 /// Apartado "Personajes": lista, crea, edita y elimina fichas.
 class CharactersScreen extends StatelessWidget {
@@ -199,13 +200,7 @@ class _CharacterTile extends StatelessWidget {
       child: ListTile(
         onTap: onView,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: Colors.orange.shade100,
-          child: Text(
-            c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
+        leading: EntityAvatar.character(c.characterClass),
         title: Text(
           c.name,
           style: const TextStyle(fontWeight: FontWeight.bold),

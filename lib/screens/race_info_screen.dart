@@ -97,7 +97,10 @@ class RaceInfoScreen extends StatefulWidget {
   /// Índice de la raza en la API (ej. elf)
   final String raceIndex;
 
-  const RaceInfoScreen({super.key, required this.raceIndex});
+  /// Subraza elegida (ej. high-elf): se muestra destacada si se indica.
+  final String? subraceIndex;
+
+  const RaceInfoScreen({super.key, required this.raceIndex, this.subraceIndex});
 
   @override
   State<RaceInfoScreen> createState() => _RaceInfoScreenState();
@@ -193,6 +196,8 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             ),
           ),
         ),
+        if (widget.subraceIndex != null && widget.subraceIndex!.isNotEmpty)
+          _chosenSubrace(widget.subraceIndex!),
         if (r.age.isNotEmpty) _expandable('Edad', r.age),
         if (r.alignment.isNotEmpty) _expandable('Alineamiento', r.alignment),
         if (r.sizeDescription.isNotEmpty)
@@ -243,6 +248,86 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
       ],
+    );
+  }
+
+  /// Subraza elegida por el personaje, con sus bonificadores y rasgos.
+  Widget _chosenSubrace(String index) {
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      color: Colors.teal.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<ApiSubrace>(
+          future: _api.fetchSubrace(index),
+          builder: (context, snapshot) {
+            final title = 'Tu subraza: ${DndData.subraceName(index)}';
+
+            if (snapshot.connectionState != ConnectionState.done) {
+              return Row(
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(title),
+                ],
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Text('$title\nNo se pudo cargar de la API.');
+            }
+
+            final sub = snapshot.data!;
+            final bonuses = sub.abilityBonuses
+                .map((b) =>
+                    '${DndData.abilityShort[b.ability] ?? b.ability.toUpperCase()} '
+                    '${Character.signed(b.bonus)}')
+                .join(', ');
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (bonuses.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _kv('Bonificadores', bonuses),
+                ],
+                if (sub.description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(sub.description, style: const TextStyle(height: 1.4)),
+                ],
+                if (sub.traits.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final t in sub.traits)
+                        ActionChip(
+                          label: Text(t.name),
+                          onPressed: () => showTextDialog(
+                            context,
+                            title: t.name,
+                            loader: _api.fetchTraitText(t.index),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 

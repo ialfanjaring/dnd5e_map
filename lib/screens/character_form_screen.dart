@@ -7,6 +7,7 @@ import '../services/character_service.dart';
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
 import 'class_info_screen.dart';
+import 'items_screen.dart';
 import 'race_info_screen.dart';
 import 'spell_picker_screen.dart';
 
@@ -14,7 +15,12 @@ import 'spell_picker_screen.dart';
 class CharacterFormScreen extends StatefulWidget {
   final Character? character;
 
-  const CharacterFormScreen({super.key, this.character});
+  /// Si se indica, se llama a esto al guardar en lugar de guardar el personaje
+  /// en tu colección. Se usa para editar la copia de la ficha dentro de una
+  /// partida.
+  final Future<void> Function(Character character)? onSave;
+
+  const CharacterFormScreen({super.key, this.character, this.onSave});
 
   @override
   State<CharacterFormScreen> createState() => _CharacterFormScreenState();
@@ -41,12 +47,16 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   late Set<String> _saves;
   late Set<String> _skills;
   late List<String> _spells; // índices de la API
+  late List<String> _items; // objetos de la API (índices)
+  late List<String> _equipped; // objetos equipados
 
   final _api = ClassApiService();
   late final Future<List<ApiRef>> _racesFuture;
   late final Future<List<ApiRef>> _classesFuture;
   ApiClass? _classInfo; // datos de la clase elegida (leídos de la API)
   ApiRace? _raceInfo; // datos de la raza elegida (leídos de la API)
+  String? _subrace; // índice de la subraza elegida (opcional)
+  ApiSubrace? _subraceInfo; // datos de la subraza (leídos de la API)
   late bool _isCaster;
   bool _saving = false;
 
@@ -67,6 +77,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
 
     _race = (c?.race.isNotEmpty ?? false) ? c!.race : null;
     _class = (c?.characterClass.isNotEmpty ?? false) ? c!.characterClass : null;
+    _subrace = (c?.subrace.isNotEmpty ?? false) ? c!.subrace : null;
     _alignment = (c?.alignment.isNotEmpty ?? false) ? c!.alignment : null;
     _level = c?.level ?? 1;
     _abilities = {
@@ -75,12 +86,15 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _saves = {...?c?.savingThrows};
     _skills = {...?c?.skills};
     _spells = [...?c?.spells];
+    _items = [...?c?.items];
+    _equipped = [...?c?.equipped];
 
     _isCaster = DndData.spellcastingClasses.contains(_class);
     _racesFuture = _loadRaces();
     _classesFuture = _loadClasses();
     if (_class != null) _refreshClass(_class!, applySaves: false);
     if (_race != null) _refreshRace(_race!);
+    if (_subrace != null) _refreshSubrace(_subrace!);
   }
 
   /// Razas de la API. Sin conexión se usan las básicas del SRD.
@@ -128,12 +142,43 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     }
   }
 
+  /// Bonificadores de raza + subraza por característica.
+  Map<String, int> get _racial {
+    final t = <String, int>{};
+    for (final b in [
+      ...?_raceInfo?.abilityBonuses,
+      ...?_subraceInfo?.abilityBonuses,
+    ]) {
+      t[b.ability] = (t[b.ability] ?? 0) + b.bonus;
+    }
+    return t;
+  }
+
+  /// Puntuación total (base + raza).
+  int _total(String key) => _abilities[key]! + (_racial[key] ?? 0);
+
+  /// Lee la subraza de la API: bonificadores y rasgos.
+  Future<void> _refreshSubrace(String index) async {
+    try {
+      final info = await _api.fetchSubrace(index);
+      if (!mounted || _subrace != index) return;
+      setState(() => _subraceInfo = info);
+    } catch (_) {
+      // Sin conexión: simplemente no se muestran los datos de la subraza
+    }
+  }
+
   /// Lee la raza de la API: velocidad y bonificadores.
-  Future<void> _refreshRace(String index) async {
+  Future<void> _refreshRace(String index, {bool applySpeed = false}) async {
     try {
       final info = await _api.fetchRace(index);
       if (!mounted || _race != index) return;
-      setState(() => _raceInfo = info);
+      setState(() {
+        _raceInfo = info;
+        if (applySpeed && info.speed != null) {
+          _speedCtrl.text = '${info.speed}';
+        }
+      });
     } catch (_) {
       // Sin conexión: simplemente no se muestran los datos de la raza
     }
@@ -179,7 +224,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       _snack('Elige primero una clase para calcular los puntos de golpe.');
       return;
     }
-    final conMod = Character.modifier(_abilities['con']!);
+    final conMod = Character.modifier(_total('con'));
     // Nivel 1: dado máximo. Siguientes niveles: media del dado.
     final hp = die + conMod + (_level - 1) * (die ~/ 2 + 1 + conMod);
     _hpCtrl.text = '${max(1, hp)}';
@@ -199,6 +244,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       ownerUid: _service.uid,
       name: _nameCtrl.text.trim(),
       race: _race!,
+      subrace: _subrace ?? '',
       characterClass: _class!,
       background: _backgroundCtrl.text.trim(),
       alignment: _alignment ?? '',
@@ -212,10 +258,16 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       equipment: _equipmentCtrl.text.trim(),
       notes: _notesCtrl.text.trim(),
       spells: _isCaster ? _spells : const [],
+      items: _items,
+      equipped: _equipped.where(_items.contains).toList(),
     );
 
     try {
-      await _service.save(character);
+      if (widget.onSave != null) {
+        await widget.onSave!(character);
+      } else {
+        await _service.save(character);
+      }
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
@@ -317,8 +369,11 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             setState(() {
               _race = v;
               _raceInfo = null;
+              // La subraza elegida pertenece a la raza anterior
+              _subrace = null;
+              _subraceInfo = null;
             });
-            if (v != null) _refreshRace(v);
+            if (v != null) _refreshRace(v, applySpeed: true);
           },
         ),
         _raceExtras(),
@@ -422,10 +477,11 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
 
   Widget _abilityBox(String key) {
     final score = _abilities[key]!;
-    final mod = Character.modifier(score);
+    final racial = _racial[key] ?? 0;
+    final mod = Character.modifier(score + racial);
 
     return Container(
-      width: 140,
+      width: 190,
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade400),
@@ -451,7 +507,12 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
                     : null,
                 icon: const Icon(Icons.remove),
               ),
-              Text('$score', style: const TextStyle(fontSize: 16)),
+              Text(
+                racial == 0
+                    ? '$score'
+                    : '$score ${Character.signed(racial)} = ${score + racial}',
+                style: const TextStyle(fontSize: 16),
+              ),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 onPressed: score < 30
@@ -495,7 +556,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         const SizedBox(height: 12),
         Text(
           'Bonificador de competencia: ${Character.signed(_profBonus)}   ·   '
-          'Iniciativa: ${Character.signed(Character.modifier(_abilities['dex']!))}',
+          'Iniciativa: ${Character.signed(Character.modifier(_total('dex')))}',
           style: TextStyle(color: Colors.grey.shade700),
         ),
       ],
@@ -524,7 +585,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           FilterChip(
             label: Text(
               '${DndData.abilityNames[k]} '
-              '${Character.signed(Character.modifier(_abilities[k]!) + (_saves.contains(k) ? _profBonus : 0))}',
+              '${Character.signed(Character.modifier(_total(k)) + (_saves.contains(k) ? _profBonus : 0))}',
             ),
             selected: _saves.contains(k),
             onSelected: (sel) => setState(() {
@@ -544,7 +605,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           FilterChip(
             label: Text(
               '${entry.key} (${DndData.abilityShort[entry.value]}) '
-              '${Character.signed(Character.modifier(_abilities[entry.value]!) + (_skills.contains(entry.key) ? _profBonus : 0))}',
+              '${Character.signed(Character.modifier(_total(entry.value)) + (_skills.contains(entry.key) ? _profBonus : 0))}',
             ),
             selected: _skills.contains(entry.key),
             onSelected: (sel) => setState(() {
@@ -607,13 +668,20 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     if (race == null) return const SizedBox.shrink();
 
     final info = _raceInfo;
-    final bonuses = info == null
-        ? ''
-        : info.abilityBonuses
-            .map((b) =>
-                '${DndData.abilityShort[b.ability] ?? b.ability.toUpperCase()} '
-                '${Character.signed(b.bonus)}')
-            .join(', ');
+
+    // Bonificadores de la raza y de la subraza, sumados por característica
+    final totals = <String, int>{};
+    for (final b in [
+      ...?info?.abilityBonuses,
+      ...?_subraceInfo?.abilityBonuses,
+    ]) {
+      totals[b.ability] = (totals[b.ability] ?? 0) + b.bonus;
+    }
+    final bonuses = totals.entries
+        .map((e) =>
+            '${DndData.abilityShort[e.key] ?? e.key.toUpperCase()} '
+            '${Character.signed(e.value)}')
+        .join(', ');
 
     final hint = [
       if (info?.speed != null) 'Velocidad ${info!.speed} pies',
@@ -623,6 +691,37 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // SUBRAZA (solo si la raza tiene)
+        if (info != null && info.subraces.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            value: info.subraces.any((r) => r.index == _subrace)
+                ? _subrace
+                : null,
+            decoration: const InputDecoration(
+              labelText: 'Subraza (opcional)',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Sin subraza'),
+              ),
+              for (final r in info.subraces)
+                DropdownMenuItem<String?>(
+                  value: r.index,
+                  child: Text(DndData.subraceName(r.index)),
+                ),
+            ],
+            onChanged: (v) {
+              setState(() {
+                _subrace = v;
+                _subraceInfo = null;
+              });
+              if (v != null) _refreshSubrace(v);
+            },
+          ),
+        ],
         if (hint.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -637,7 +736,10 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => RaceInfoScreen(raceIndex: race),
+                builder: (_) => RaceInfoScreen(
+                  raceIndex: race,
+                  subraceIndex: _subrace,
+                ),
               ),
             ),
             icon: const Icon(Icons.menu_book_outlined),
@@ -720,9 +822,60 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     );
   }
 
+  Future<void> _pickItems() async {
+    final picked = await Navigator.push<List<String>>(
+      context,
+      MaterialPageRoute(builder: (_) => const ItemsScreen(pick: true)),
+    );
+    if (picked != null && picked.isNotEmpty) {
+      setState(() => _items = [..._items, ...picked]);
+    }
+  }
+
   Widget _buildEquipment() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // OBJETOS DE LA API (afectan a CA, velocidad y ataques)
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Objetos de la API',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _pickItems,
+              icon: const Icon(Icons.add),
+              label: const Text('Añadir objetos'),
+            ),
+          ],
+        ),
+        if (_items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Sin objetos. Armaduras, escudos y armas se equipan en la ficha '
+              'y cambian la CA y los ataques automáticamente.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 6,
+            children: [
+              for (var i = 0; i < _items.length; i++)
+                InputChip(
+                  label: Text(_items[i].replaceFirst('m:', '')),
+                  onDeleted: () => setState(() {
+                    final removed = _items.removeAt(i);
+                    if (!_items.contains(removed)) _equipped.remove(removed);
+                  }),
+                ),
+            ],
+          ),
+        const SizedBox(height: 12),
         TextFormField(
           controller: _equipmentCtrl,
           maxLines: 4,

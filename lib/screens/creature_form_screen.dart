@@ -47,7 +47,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
   late String _alignment;
   late String _cr;
   late Map<String, int> _abilities;
-  late List<String> _spells; // índices de la API (solo NPC)
+  late List<String> _spells; // índices de la API (monstruos y NPC)
   bool _saving = false;
 
   bool get _isEditing => widget.creature != null;
@@ -125,7 +125,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       traits: _traitsCtrl.text.trim(),
       actions: _actionsCtrl.text.trim(),
       notes: _notesCtrl.text.trim(),
-      spells: _kind == 'npc' ? _spells : const [],
+      spells: _spells,
     );
 
     try {
@@ -161,7 +161,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
                 _section('Características', _buildAbilities()),
                 _section('Combate', _buildCombat()),
                 _section('Rasgos y acciones', _buildText()),
-                if (_kind == 'npc') _section('Hechizos', _buildSpells()),
+                _section('Hechizos', _buildSpells()),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 50,

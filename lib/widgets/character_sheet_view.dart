@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../models/character.dart';
+import '../models/equipment_effects.dart';
+import '../services/class_api_service.dart';
+import '../services/equipment_api_service.dart';
+import 'item_widgets.dart';
 import '../screens/class_info_screen.dart';
 import '../screens/race_info_screen.dart';
 import 'spell_widgets.dart';
@@ -28,14 +32,79 @@ class CharacterSheetScreen extends StatelessWidget {
   }
 }
 
-class CharacterSheetView extends StatelessWidget {
+class CharacterSheetView extends StatefulWidget {
   final Character character;
 
-  const CharacterSheetView({super.key, required this.character});
+  /// Si se indican, la ficha permite equipar, añadir y quitar objetos.
+  final void Function(List<String> equipped)? onEquippedChanged;
+  final VoidCallback? onAddItems;
+  final void Function(String index)? onRemoveItem;
+
+  const CharacterSheetView({
+    super.key,
+    required this.character,
+    this.onEquippedChanged,
+    this.onAddItems,
+    this.onRemoveItem,
+  });
+
+  @override
+  State<CharacterSheetView> createState() => _CharacterSheetViewState();
+}
+
+class _CharacterSheetViewState extends State<CharacterSheetView> {
+  final ClassApiService _api = ClassApiService();
+  final EquipmentApiService _equipApi = EquipmentApiService();
+  Map<String, int> _racial = const {};
+  String _loadedFor = '';
+  Map<String, ApiItem> _itemData = const {};
+  String _itemsLoadedFor = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant CharacterSheetView old) {
+    super.didUpdateWidget(old);
+    _load();
+  }
+
+  /// Lee de la API los bonificadores de raza y subraza (no se guardan).
+  Future<void> _loadItems() async {
+    final key = widget.character.items.join(',');
+    if (key == _itemsLoadedFor) return;
+    _itemsLoadedFor = key;
+    final data = await _equipApi.fetchItems(widget.character.items);
+    if (mounted && _itemsLoadedFor == key) setState(() => _itemData = data);
+  }
+
+  Future<void> _load() async {
+    _loadItems();
+    final c = widget.character;
+    final key = '${c.race}|${c.subrace}';
+    if (key == _loadedFor) return;
+    _loadedFor = key;
+    try {
+      final b = await _api.fetchRacialBonuses(c.race, c.subrace);
+      if (mounted && _loadedFor == key) setState(() => _racial = b);
+    } catch (_) {
+      // Sin conexión: se muestran las puntuaciones base
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final c = character;
+    final base = widget.character.withRacial(_racial);
+
+    // El equipo cambia la CA, la velocidad y los ataques automáticamente
+    final effects = EquipmentEffects.compute(base, _itemData);
+    final c = base.withDerived(
+      ac: effects.armorClass,
+      speedPenalty: effects.speedPenalty,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,11 +164,14 @@ class CharacterSheetView extends StatelessWidget {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => RaceInfoScreen(raceIndex: c.race),
+                  builder: (_) => RaceInfoScreen(
+                    raceIndex: c.race,
+                    subraceIndex: c.subrace,
+                  ),
                 ),
               ),
               icon: const Icon(Icons.diversity_3_outlined),
-              label: Text('Ver raza: ${DndData.raceName(c.race)}'),
+              label: Text('Ver raza: ${c.raceLabel}'),
             ),
           ],
         ),
@@ -110,9 +182,9 @@ class CharacterSheetView extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _StatBox(label: 'CA', value: '${c.armorClass}'),
+            _StatBox(label: 'CA', value: '${c.effectiveAc}'),
             _StatBox(label: 'PG', value: '${c.maxHp}'),
-            _StatBox(label: 'Velocidad', value: '${c.speed} pies'),
+            _StatBox(label: 'Velocidad', value: '${c.effectiveSpeed} pies'),
             _StatBox(label: 'Iniciativa', value: Character.signed(c.initiative)),
             _StatBox(
               label: 'Competencia',
@@ -137,7 +209,9 @@ class CharacterSheetView extends StatelessWidget {
               _StatBox(
                 label: DndData.abilityNames[k]!,
                 value: Character.signed(c.mod(k)),
-                caption: '${c.abilities[k]}',
+                caption: (c.racialBonuses[k] ?? 0) == 0
+                    ? '${c.score(k)}'
+                    : '${c.score(k)} (${c.abilities[k]} ${Character.signed(c.racialBonuses[k]!)})',
                 width: 110,
               ),
           ],
@@ -179,9 +253,34 @@ class CharacterSheetView extends StatelessWidget {
           ),
         ),
 
+        // RASGOS DE RAZA Y SUBRAZA
+        _SectionCard(
+          title: 'Rasgos de raza: ${c.raceLabel}',
+          child: _RaceTraits(race: c.race, subrace: c.subrace),
+        ),
+
+        // SUBCLASES DE LA CLASE
+        _SectionCard(
+          title: 'Subclases: ${DndData.className(c.characterClass)}',
+          child: _Subclasses(classIndex: c.characterClass),
+        ),
+
         if (c.spells.isNotEmpty ||
             DndData.spellcastingClasses.contains(c.characterClass))
           CharacterSpellsCard(spells: c.spells),
+
+        // OBJETOS (API): equipar, CA, ataques...
+        if (c.items.isNotEmpty ||
+            widget.onAddItems != null ||
+            widget.onEquippedChanged != null)
+          CharacterItemsCard(
+            character: c,
+            data: _itemData,
+            effects: effects,
+            onEquippedChanged: widget.onEquippedChanged,
+            onAdd: widget.onAddItems,
+            onRemove: widget.onRemoveItem,
+          ),
 
         if (c.equipment.isNotEmpty)
           _SectionCard(title: 'Equipo', child: Text(c.equipment)),
@@ -309,6 +408,117 @@ class _ProfRow extends StatelessWidget {
           Expanded(child: Text(label, overflow: TextOverflow.ellipsis)),
         ],
       ),
+    );
+  }
+}
+
+
+/// Texto expandible leído de la API.
+class _ApiTextTile extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Future<List<String>> Function() loader;
+
+  const _ApiTextTile({required this.title, required this.loader, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      childrenPadding: const EdgeInsets.only(bottom: 8),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<List<String>>(
+          future: loader(),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const Padding(
+                padding: EdgeInsets.all(8),
+                child: LinearProgressIndicator(),
+              );
+            }
+            if (snap.hasError) {
+              return const Text('No se pudo cargar la descripción.');
+            }
+            return Text(snap.data!.join('\n\n'));
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _RaceTraits extends StatelessWidget {
+  final String race;
+  final String subrace;
+
+  const _RaceTraits({required this.race, required this.subrace});
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ClassApiService();
+
+    return FutureBuilder<List<ApiRef>>(
+      future: () async {
+        final r = await api.fetchRace(race);
+        final sub = subrace.isEmpty ? null : await api.fetchSubrace(subrace);
+        return [...r.traits, ...?sub?.traits];
+      }(),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const LinearProgressIndicator();
+        }
+        if (snap.hasError) {
+          return const Text('No se pudieron cargar los rasgos (sin conexión).');
+        }
+        final traits = snap.data!;
+        if (traits.isEmpty) return const Text('Esta raza no tiene rasgos.');
+        return Column(
+          children: [
+            for (final t in traits)
+              _ApiTextTile(
+                title: t.name,
+                loader: () => api.fetchTraitText(t.index),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _Subclasses extends StatelessWidget {
+  final String classIndex;
+
+  const _Subclasses({required this.classIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ClassApiService();
+
+    return FutureBuilder<ApiClass>(
+      future: api.fetchClass(classIndex),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const LinearProgressIndicator();
+        }
+        if (snap.hasError) {
+          return const Text('No se pudieron cargar las subclases.');
+        }
+        final subs = snap.data!.subclasses;
+        if (subs.isEmpty) return const Text('Sin subclases en el SRD.');
+        return Column(
+          children: [
+            for (final sc in subs)
+              _ApiTextTile(
+                title: sc.name,
+                loader: () => api.fetchSubclassText(sc.index),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -5,7 +5,10 @@ import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import 'characters_screen.dart';
 import 'creatures_screen.dart';
+import 'items_screen.dart';
 import 'join_game_screen.dart';
+import 'map_picker_screen.dart';
+import 'game_screen.dart';
 import 'master_room_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -81,7 +84,12 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
+
+                  // PARTIDA ACTIVA COMO MASTER (para reconectarse)
+                  const _ActiveGameBanner(),
+
+                  const SizedBox(height: 16),
 
                   const Text(
                     '¿Qué quieres hacer?',
@@ -167,8 +175,9 @@ class HomeScreen extends StatelessWidget {
                           icon: Icons.pets,
                           title: 'NPC y Monstruos',
                           description:
-                              'Crea monstruos y NPC, o usa el bestiario ya '
-                              'cargado, para añadirlos a tus partidas.',
+                              'Crea tus propios monstruos y NPC para usarlos '
+                              'en tus partidas. Los de la API de D&D 5e los '
+                              'añade el Master desde su sala.',
                           buttonText: 'Bestiario',
                           color: Colors.red.shade800,
                           onTap: () {
@@ -176,6 +185,50 @@ class HomeScreen extends StatelessWidget {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => const CreaturesScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      // OBJETOS
+                      SizedBox(
+                        width: cardWidth,
+                        child: _MenuCard(
+                          icon: Icons.inventory_2_outlined,
+                          title: 'Objetos',
+                          description:
+                              'Consulta armas, armaduras, escudos y objetos '
+                              'mágicos de D&D 5e.',
+                          buttonText: 'Ver objetos',
+                          color: Colors.brown.shade700,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ItemsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      // MAPAS
+                      SizedBox(
+                        width: cardWidth,
+                        child: _MenuCard(
+                          icon: Icons.map_outlined,
+                          title: 'Mapas',
+                          description:
+                              'Mapas predeterminados y editor para crear '
+                              'los tuyos. Los eliges al preparar la partida.',
+                          buttonText: 'Mis mapas',
+                          color: Colors.green.shade800,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MapPickerScreen(),
                               ),
                             );
                           },
@@ -397,6 +450,116 @@ class _MenuCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Si el Master tiene una partida activa en la base de datos, permite
+/// reconectarse (por ejemplo, tras salirse sin querer). De paso borra sus
+/// partidas inactivas de más de 24 horas.
+class _ActiveGameBanner extends StatefulWidget {
+  const _ActiveGameBanner();
+
+  @override
+  State<_ActiveGameBanner> createState() => _ActiveGameBannerState();
+}
+
+class _ActiveGameBannerState extends State<_ActiveGameBanner> {
+  late Future<({String code, String name, String status})?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<({String code, String name, String status})?> _load() =>
+      GameService().cleanupAndFindMyGame().catchError((_) => null);
+
+  void _refresh() => setState(() => _future = _load());
+
+  Future<void> _resume(({String code, String name, String status}) g) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => g.status == 'playing'
+            ? GameScreen(gameCode: g.code, isMaster: true)
+            : MasterRoomScreen(gameCode: g.code, gameName: g.name),
+      ),
+    );
+    if (mounted) _refresh();
+  }
+
+  Future<void> _end(({String code, String name, String status}) g) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Terminar la sesión'),
+        content: Text('Se borrará la partida «${g.name}» por completo.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Terminar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    // El aviso desaparece al instante; la partida se borra en segundo plano
+    setState(() => _future = Future.value(null));
+    try {
+      await GameService().endGame(g.code);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo terminar la sesión: $e')),
+      );
+      _refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<({String code, String name, String status})?>(
+      future: _future,
+      builder: (context, snap) {
+        final g = snap.data;
+        if (g == null) return const SizedBox.shrink();
+
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: Card(
+            color: Colors.deepPurple.shade50,
+            child: ListTile(
+              leading: const Icon(Icons.play_circle_outline, size: 34),
+              title: Text('Tienes una partida activa: ${g.name}'),
+              subtitle: Text(
+                'Código ${g.code} · '
+                '${g.status == 'playing' ? 'en juego' : 'en la sala'}',
+              ),
+              trailing: Wrap(
+                spacing: 4,
+                children: [
+                  TextButton(
+                    onPressed: () => _end(g),
+                    child: const Text('Terminar'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _resume(g),
+                    child: const Text('Reanudar'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/creature.dart';
 import '../services/creature_service.dart';
 import '../widgets/creature_sheet_view.dart';
+import '../widgets/default_monsters_view.dart';
 import 'creature_form_screen.dart';
+import '../widgets/avatars.dart';
 
 /// Apartado "NPC y Monstruos": tu bestiario con las criaturas que creas tú.
 /// Los monstruos de la D&D 5e SRD API no se guardan aquí: el Master los añade
@@ -26,7 +28,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() => setState(() {}));
 
     // Borra (una sola vez) los datos de la API que se guardaron antes
@@ -73,19 +75,28 @@ class _CreaturesScreenState extends State<CreaturesScreen>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Todos'),
             Tab(text: 'Monstruos'),
             Tab(text: 'NPC'),
+            Tab(text: 'Predeterminados'),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateForm,
-        icon: const Icon(Icons.add),
-        label: Text(_currentKind == 'npc' ? 'Nuevo NPC' : 'Nueva criatura'),
-      ),
-      body: Column(
+      // En la pestaña de predeterminados no se puede crear nada
+      floatingActionButton: _tabController.index == 3
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _openCreateForm,
+              icon: const Icon(Icons.add),
+              label: Text(
+                _currentKind == 'npc' ? 'Nuevo NPC' : 'Nueva criatura',
+              ),
+            ),
+      body: _tabController.index == 3
+          ? const DefaultMonstersView()
+          : Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -284,13 +295,9 @@ class _CreatureTile extends StatelessWidget {
       elevation: 2,
       child: ListTile(
         onTap: onView,
-        leading: CircleAvatar(
-          backgroundColor:
-              c.isMonster ? Colors.red.shade100 : Colors.blueGrey.shade100,
-          child: Icon(
-            c.isMonster ? Icons.pets : Icons.person,
-            color: c.isMonster ? Colors.red.shade800 : Colors.blueGrey.shade700,
-          ),
+        leading: EntityAvatar.creature(
+          isNpc: !c.isMonster,
+          type: c.creatureType,
         ),
         title: Text(
           c.name,

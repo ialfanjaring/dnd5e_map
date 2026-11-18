@@ -85,6 +85,14 @@ class DndData {
     'tiefling': 'Tiefling',
   };
 
+  /// Subraza (índice de la API) -> nombre en español
+  static const Map<String, String> subraceNames = {
+    'hill-dwarf': 'Enano de las colinas',
+    'high-elf': 'Alto elfo',
+    'lightfoot-halfling': 'Mediano piesligeros',
+    'rock-gnome': 'Gnomo de las rocas',
+  };
+
   /// Clase (índice de la API) -> nombre en español
   static const Map<String, String> classNames = {
     'barbarian': 'Bárbaro',
@@ -149,6 +157,9 @@ class DndData {
 
   static String className(String index) => classNames[index] ?? _pretty(index);
 
+  static String subraceName(String index) =>
+      subraceNames[index] ?? _pretty(index);
+
   static String _pretty(String index) => index
       .split('-')
       .where((w) => w.isNotEmpty)
@@ -193,6 +204,9 @@ class Character {
   /// Solo se guarda la elección: los datos de la raza se leen de la API.
   final String race;
 
+  /// Índice de la subraza en la API (por ejemplo "high-elf"); vacío si no tiene.
+  final String subrace;
+
   /// Índice de la clase en la API (por ejemplo "wizard").
   final String characterClass;
   final String background;
@@ -210,11 +224,28 @@ class Character {
   /// El nombre, el nivel y el texto se consultan siempre en la API.
   final List<String> spells;
 
+  /// Objetos del personaje: solo índices de la API (los mágicos con "m:").
+  /// Pueden repetirse (dos dagas).
+  final List<String> items;
+
+  /// Objetos equipados (subconjunto de [items]): armadura, escudo, armas.
+  final List<String> equipped;
+
+  /// Calculados al leer la API (no se guardan): CA con armadura y escudo
+  /// y penalización de velocidad por armadura pesada.
+  final int? acOverride;
+  final int speedPenalty;
+
+  /// Bonificadores de raza y subraza por característica. No se guardan en la
+  /// base de datos: se calculan leyendo la API (ver [withRacial]).
+  final Map<String, int> racialBonuses;
+
   const Character({
     this.id,
     required this.ownerUid,
     required this.name,
     required this.race,
+    this.subrace = '',
     required this.characterClass,
     this.background = '',
     this.alignment = '',
@@ -228,7 +259,56 @@ class Character {
     this.equipment = '',
     this.notes = '',
     this.spells = const [],
+    this.racialBonuses = const {},
+    this.items = const [],
+    this.equipped = const [],
+    this.acOverride,
+    this.speedPenalty = 0,
   });
+
+  /// Copia con los valores calculados a partir de la API (raza y equipo).
+  Character withDerived({
+    Map<String, int>? racial,
+    int? ac,
+    bool keepAc = true,
+    int? speedPenalty,
+  }) =>
+      Character(
+        id: id,
+        ownerUid: ownerUid,
+        name: name,
+        race: race,
+        subrace: subrace,
+        characterClass: characterClass,
+        background: background,
+        alignment: alignment,
+        level: level,
+        abilities: abilities,
+        maxHp: maxHp,
+        armorClass: armorClass,
+        speed: speed,
+        savingThrows: savingThrows,
+        skills: skills,
+        equipment: equipment,
+        notes: notes,
+        spells: spells,
+        racialBonuses: racial ?? racialBonuses,
+        items: items,
+        equipped: equipped,
+        acOverride: keepAc ? (ac ?? acOverride) : ac,
+        speedPenalty: speedPenalty ?? this.speedPenalty,
+      );
+
+  Character withRacial(Map<String, int> bonuses) => withDerived(racial: bonuses);
+
+  /// CA que se muestra: la calculada con el equipo, o la de la ficha.
+  int get effectiveAc => acOverride ?? armorClass;
+
+  /// Velocidad real (con la penalización de la armadura).
+  int get effectiveSpeed => (speed - speedPenalty).clamp(0, 999).toInt();
+
+  /// Puntuación total: base + bonificador racial.
+  int score(String key) => (abilities[key] ?? 10) + (racialBonuses[key] ?? 0);
 
   // ---------- Cálculos de la ficha ----------
 
@@ -238,7 +318,7 @@ class Character {
 
   int get proficiencyBonus => 2 + ((level - 1) ~/ 4);
 
-  int mod(String key) => modifier(abilities[key] ?? 10);
+  int mod(String key) => modifier(score(key));
 
   int get initiative => mod('dex');
 
@@ -251,8 +331,13 @@ class Character {
 
   int get passivePerception => 10 + skillBonus('Percepción');
 
+  /// Raza con su subraza entre paréntesis, si la tiene.
+  String get raceLabel => subrace.isEmpty
+      ? DndData.raceName(race)
+      : '${DndData.raceName(race)} (${DndData.subraceName(subrace)})';
+
   String get summary =>
-      '${DndData.raceName(race)} ${DndData.className(characterClass)} · Nivel $level';
+      '$raceLabel ${DndData.className(characterClass)} · Nivel $level';
 
   // ---------- Firestore ----------
 
@@ -260,6 +345,7 @@ class Character {
         'ownerUid': ownerUid,
         'name': name,
         'race': race,
+        'subrace': subrace,
         'characterClass': characterClass,
         'background': background,
         'alignment': alignment,
@@ -273,6 +359,8 @@ class Character {
         'equipment': equipment,
         'notes': notes,
         'spells': spells,
+        'items': items,
+        'equipped': equipped,
       };
 
   factory Character.fromMap(Map<String, dynamic> m, {String? id}) {
@@ -287,6 +375,7 @@ class Character {
       ownerUid: (m['ownerUid'] ?? '') as String,
       name: (m['name'] ?? '') as String,
       race: DndData.raceIndexFrom(m['race']),
+      subrace: (m['subrace'] ?? '') as String,
       characterClass: DndData.classIndexFrom(m['characterClass']),
       background: (m['background'] ?? '') as String,
       alignment: (m['alignment'] ?? '') as String,
@@ -300,6 +389,8 @@ class Character {
       equipment: (m['equipment'] ?? '') as String,
       notes: (m['notes'] ?? '') as String,
       spells: spellIndexesFromData(m['spells']),
+      items: List<String>.from(m['items'] ?? const []),
+      equipped: List<String>.from(m['equipped'] ?? const []),
     );
   }
 

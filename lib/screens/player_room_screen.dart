@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +9,7 @@ import '../services/game_service.dart';
 import '../widgets/character_sheet_view.dart';
 import '../widgets/spell_widgets.dart';
 import 'character_form_screen.dart';
+import 'game_screen.dart';
 
 /// Sala de selección de personaje para el jugador que se une con código.
 class PlayerRoomScreen extends StatefulWidget {
@@ -25,7 +28,57 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
   String? _selectedId;
   bool _saving = false;
 
+  // Entrada automática al mapa cuando el Master inicia la partida
+  StreamSubscription<Map<String, dynamic>?>? _gameSub;
+  StreamSubscription<bool>? _joinedSub;
+  bool _playing = false;
+  bool _joined = false;
+  bool _entered = false;
+
   String get _myUid => FirebaseAuth.instance.currentUser!.uid;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _gameSub = _gameService.gameStream(widget.gameCode).listen((game) {
+      if (game?['status'] == 'ended' && mounted && !_entered) {
+        _entered = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('El Master ha terminado la sesión.')),
+        );
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        return;
+      }
+      _playing = game?['status'] == 'playing';
+      _maybeEnterGame();
+    });
+
+    _joinedSub = _gameService.amIInGame(widget.gameCode).listen((joined) {
+      _joined = joined;
+      _maybeEnterGame();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gameSub?.cancel();
+    _joinedSub?.cancel();
+    super.dispose();
+  }
+
+  /// Entra al mapa si la partida está en juego y ya has elegido personaje.
+  void _maybeEnterGame() {
+    if (!mounted || _entered || !_playing || !_joined) return;
+    _entered = true;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GameScreen(gameCode: widget.gameCode, isMaster: false),
+      ),
+    );
+  }
 
   Future<void> _confirm(List<Character> characters) async {
     final selected = characters.where((c) => c.id == _selectedId).toList();
@@ -263,7 +316,25 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
     );
   }
 
+  /// Los demás jugadores solo se ven una vez que has entrado con tu
+  /// personaje: nadie ve personajes ajenos fuera de una partida.
   Widget _buildPlayersList() {
+    return StreamBuilder<bool>(
+      stream: _gameService.amIInGame(widget.gameCode),
+      builder: (context, joined) {
+        if (joined.data != true) {
+          return Text(
+            'Confirma tu personaje para entrar en la partida y ver a los '
+            'demás jugadores.',
+            style: TextStyle(color: Colors.grey.shade600),
+          );
+        }
+        return _buildMembersList();
+      },
+    );
+  }
+
+  Widget _buildMembersList() {
     return StreamBuilder<List<GamePlayer>>(
       stream: _gameService.players(widget.gameCode),
       builder: (context, snapshot) {

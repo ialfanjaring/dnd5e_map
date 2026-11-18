@@ -4,6 +4,7 @@ import '../models/creature.dart';
 import '../services/creature_service.dart';
 import '../services/monster_api_service.dart';
 import '../widgets/creature_sheet_view.dart';
+import '../widgets/avatars.dart';
 
 /// Lo que el Master elige añadir a la partida.
 class CreaturePickerResult {
@@ -107,7 +108,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
   }
 
   void _change(Map<String, int> map, String key, int delta) {
-    final next = ((map[key] ?? 0) + delta).clamp(0, 20);
+    final next = ((map[key] ?? 0) + delta).clamp(0, 20).toInt();
     setState(() {
       if (next == 0) {
         map.remove(key);
@@ -370,16 +371,9 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                     builder: (_) => CreatureSheetScreen(creature: c),
                   ),
                 ),
-                leading: CircleAvatar(
-                  backgroundColor: c.isMonster
-                      ? Colors.red.shade100
-                      : Colors.blueGrey.shade100,
-                  child: Icon(
-                    c.isMonster ? Icons.pets : Icons.person,
-                    color: c.isMonster
-                        ? Colors.red.shade800
-                        : Colors.blueGrey.shade700,
-                  ),
+                leading: EntityAvatar.creature(
+                  isNpc: !c.isMonster,
+                  type: c.creatureType,
                 ),
                 title: Text(
                   c.name,

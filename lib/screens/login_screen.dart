@@ -1,9 +1,21 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
-import 'google_login_screen.dart';
+import '../widgets/password_field.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+
+final RegExp emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
+
+/// Validación de correo compartida por las pantallas de acceso.
+String? validateEmail(String? value) {
+  final v = (value ?? '').trim();
+  if (v.isEmpty) return 'Introduce tu correo';
+  if (v.length > 254 || !emailPattern.hasMatch(v)) {
+    return 'Introduce un correo válido';
+  }
+  return null;
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,241 +26,170 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  final AuthService _authService = AuthService();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _auth = AuthService();
 
   bool _loading = false;
-  bool _hidePassword = true;
+  String? _error;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_loading || !_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _loading = true;
+      _error = null;
     });
 
     try {
-      await _authService.login(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-
-      // AuthWrapper detectará el inicio de sesión
-      // y mostrará la pantalla principal.
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-
-      final message = switch (e.code) {
-        'invalid-email' => 'El correo electrónico no es válido.',
-        'invalid-credential' ||
-        'wrong-password' ||
-        'user-not-found' => 'Correo o contraseña incorrectos.',
-        'user-disabled' => 'Esta cuenta está deshabilitada.',
-        'too-many-requests' =>
-        'Demasiados intentos. Inténtalo más tarde.',
-        'network-request-failed' =>
-        'No se ha podido conectar con Firebase.',
-        'operation-not-allowed' =>
-        'El inicio de sesión con correo no está habilitado.',
-        _ => 'No se ha podido iniciar sesión. (${e.code})',
-      };
-
-      _showMessage(message);
-    } catch (e) {
-      if (!mounted) return;
-
-      _showMessage('Se ha producido un error inesperado.');
-      debugPrint('Error de inicio de sesión: $e');
-    } finally {
+      await _auth.login(email: _emailCtrl.text, password: _passCtrl.text);
+      // AuthWrapper reacciona solo al nuevo estado de la sesión
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _loading = false;
-        });
+        setState(() => _error = 'No se pudo iniciar sesión. Inténtalo de nuevo.');
       }
+    } finally {
+      // La contraseña no se queda en memoria de la pantalla
+      _passCtrl.clear();
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
+  Future<void> _google() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-  void _openGoogleLogin() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const GoogleLoginScreen(),
-      ),
-    );
-  }
-
-  void _openRegister() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const RegisterScreen(),
-      ),
-    );
+    try {
+      await _auth.loginWithGoogle();
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.lock_outline,
-                    size: 80,
-                  ),
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    'Iniciar sesión',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: AutofillGroup(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(Icons.castle, size: 80, color: Colors.deepPurple),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'D&D 5e',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
                     ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo electrónico',
-                      prefixIcon: Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Inicia sesión para continuar',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade600),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Introduce tu correo electrónico.';
-                      }
-
-                      if (!RegExp(
-                        r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                      ).hasMatch(value.trim())) {
-                        return 'Introduce un correo válido.';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _hidePassword,
-                    autofillHints: const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!_loading) _login();
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        tooltip: _hidePassword
-                            ? 'Mostrar contraseña'
-                            : 'Ocultar contraseña',
-                        icon: Icon(
-                          _hidePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _hidePassword = !_hidePassword;
-                          });
-                        },
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      maxLength: 254,
+                      decoration: const InputDecoration(
+                        labelText: 'Correo electrónico',
+                        prefixIcon: Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(),
+                        counterText: '',
                       ),
+                      validator: validateEmail,
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Introduce tu contraseña.';
-                      }
-
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _login,
-                      child: _loading
-                          ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                          : const Text('Entrar'),
+                    const SizedBox(height: 12),
+                    PasswordField(
+                      controller: _passCtrl,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _loading ? null : _login(),
+                      autofillHints: const [AutofillHints.password],
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Row(
-                    children: [
-                      Expanded(child: Divider()),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('O'),
+                    if (_error != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: Colors.red.shade700),
                       ),
-                      Expanded(child: Divider()),
                     ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: _loading ? null : _openGoogleLogin,
-                      icon: const Icon(Icons.g_mobiledata, size: 32),
-                      label: const Text('Continuar con Google'),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _login,
+                        child: _loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Iniciar sesión'),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  TextButton(
-                    onPressed: _loading ? null : _openRegister,
-                    child: const Text(
-                      '¿No tienes cuenta? Regístrate',
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPasswordScreen(),
+                                  ),
+                                ),
+                        child: const Text('¿Olvidaste tu contraseña?'),
+                      ),
                     ),
-                  ),
-                ],
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: _loading ? null : _google,
+                        icon: const Icon(Icons.g_mobiledata, size: 28),
+                        label: const Text('Continuar con Google'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _loading
+                          ? null
+                          : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              ),
+                      child: const Text('¿No tienes cuenta? Regístrate'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

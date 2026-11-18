@@ -5,17 +5,27 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/character.dart';
 import '../models/creature.dart';
+import '../models/game_models.dart';
+import '../widgets/avatars.dart';
 
-/// Jugador dentro de una sala, con una copia de su personaje.
+/// Jugador dentro de una partida, con una copia de su personaje.
 class GamePlayer {
   final String uid;
   final String email;
   final Character character;
 
+  /// Color asignado al jugador (ARGB); null hasta que el Master lo asigna.
+  final int? color;
+
+  /// Puntos de golpe actuales
+  final int currentHp;
+
   const GamePlayer({
     required this.uid,
     required this.email,
     required this.character,
+    this.color,
+    required this.currentHp,
   });
 }
 
@@ -24,6 +34,23 @@ class GameService {
       FirebaseFirestore.instance.collection('games');
 
   User get _user => FirebaseAuth.instance.currentUser!;
+
+  String get myUid => _user.uid;
+
+  CollectionReference<Map<String, dynamic>> _playersCol(String code) =>
+      _games.doc(code).collection('players');
+
+  CollectionReference<Map<String, dynamic>> _creaturesCol(String code) =>
+      _games.doc(code).collection('creatures');
+
+  CollectionReference<Map<String, dynamic>> _tokensCol(String code) =>
+      _games.doc(code).collection('tokens');
+
+  CollectionReference<Map<String, dynamic>> _rollsCol(String code) =>
+      _games.doc(code).collection('rolls');
+
+  DocumentReference<Map<String, dynamic>> _terrainDoc(String code) =>
+      _games.doc(code).collection('map').doc('terrain');
 
   // Sin 0/O/1/I para evitar confusiones al dictar el código
   static const String _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -36,6 +63,10 @@ class GameService {
     ).join();
   }
 
+  // ==========================================
+  // PARTIDA Y SALA
+  // ==========================================
+
   /// Crea la partida y devuelve el código de invitación.
   Future<String> createGame(String name) async {
     for (var i = 0; i < 10; i++) {
@@ -47,7 +78,11 @@ class GameService {
           'name': name,
           'masterUid': _user.uid,
           'masterEmail': _user.email ?? '',
+          'status': 'lobby',
+          'cols': 20,
+          'rows': 14,
           'createdAt': FieldValue.serverTimestamp(),
+          'lastActivity': FieldValue.serverTimestamp(),
         });
         return code;
       }
@@ -65,34 +100,46 @@ class GameService {
       _games.doc(code).snapshots().map((s) => s.data());
 
   /// El jugador entra (o cambia de personaje) en la sala.
+  /// Se hace merge para no perder el color que ya tuviera asignado.
   Future<void> joinWithCharacter(String code, Character c) {
-    return _games.doc(code).collection('players').doc(_user.uid).set({
+    return _playersCol(code).doc(_user.uid).set({
       'playerUid': _user.uid,
       'playerEmail': _user.email ?? '',
       'characterId': c.id,
       'character': c.toMap(),
+      'currentHp': c.maxHp,
       'joinedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
-  Future<void> leave(String code) =>
-      _games.doc(code).collection('players').doc(_user.uid).delete();
+  /// true si el usuario actual ya ha entrado en la partida con un personaje.
+  Stream<bool> amIInGame(String code) =>
+      _playersCol(code).doc(_user.uid).snapshots().map((snap) => snap.exists);
 
-  /// Solo el Master puede expulsar a un jugador.
-  Future<void> removePlayer(String code, String playerUid) =>
-      _games.doc(code).collection('players').doc(playerUid).delete();
+  Future<void> leave(String code) => _playersCol(code).doc(_user.uid).delete();
+
+  /// Solo el Master puede expulsar a un jugador (y su ficha del mapa).
+  Future<void> removePlayer(String code, String playerUid) async {
+    final batch = FirebaseFirestore.instance.batch();
+    batch.delete(_playersCol(code).doc(playerUid));
+    batch.delete(_tokensCol(code).doc('p_$playerUid'));
+    await batch.commit();
+  }
 
   Stream<List<GamePlayer>> players(String code) {
-    return _games.doc(code).collection('players').snapshots().map((snap) {
+    return _playersCol(code).snapshots().map((snap) {
       final list = snap.docs.map((d) {
         final data = d.data();
+        final character = Character.fromMap(
+          Map<String, dynamic>.from(data['character'] ?? {}),
+          id: data['characterId'] as String?,
+        );
         return GamePlayer(
           uid: d.id,
           email: (data['playerEmail'] ?? '') as String,
-          character: Character.fromMap(
-            Map<String, dynamic>.from(data['character'] ?? {}),
-            id: data['characterId'] as String?,
-          ),
+          character: character,
+          color: (data['color'] as num?)?.toInt(),
+          currentHp: ((data['currentHp'] ?? character.maxHp) as num).toInt(),
         );
       }).toList();
       list.sort((a, b) => a.character.name.compareTo(b.character.name));
@@ -101,13 +148,348 @@ class GameService {
   }
 
   // ==========================================
+  // INICIO DE LA PARTIDA (SOLO EL MASTER)
+  // ==========================================
+
+  /// Casilla libre más cercana al origen.
+  ({int x, int y}) _freeCell(Set<String> occupied, int cols, int rows) {
+    for (var y = 0; y < rows; y++) {
+      for (var x = 0; x < cols; x++) {
+        if (!occupied.contains(cellKey(x, y))) return (x: x, y: y);
+      }
+    }
+    return (x: 0, y: 0);
+  }
+
+  /// Pasa la partida a "en juego": asigna colores, crea las fichas de los
+  /// jugadores y deja preparado el mapa. Se puede repetir sin perder nada.
+  Future<void> startGame(String code) async {
+    final gameRef = _games.doc(code);
+    final gameData = (await gameRef.get()).data() ?? {};
+    final cols = ((gameData['cols'] ?? 20) as num).toInt();
+    final rows = ((gameData['rows'] ?? 14) as num).toInt();
+
+    final playersSnap = await _playersCol(code).get();
+    final tokensSnap = await _tokensCol(code).get();
+
+    final masterColor =
+        (gameData['masterColor'] as num?)?.toInt() ?? GameColors.palette.first;
+
+    final used = <int>[masterColor];
+    for (final d in playersSnap.docs) {
+      final c = (d.data()['color'] as num?)?.toInt();
+      if (c != null) used.add(c);
+    }
+
+    final occupied = <String>{
+      for (final t in tokensSnap.docs)
+        cellKey(((t.data()['x'] ?? 0) as num).toInt(),
+            ((t.data()['y'] ?? 0) as num).toInt()),
+    };
+    final tokenIds = tokensSnap.docs.map((d) => d.id).toSet();
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (final d in playersSnap.docs) {
+      if ((d.data()['color'] as num?) == null) {
+        final color = GameColors.nextFree(used);
+        used.add(color);
+        batch.update(d.reference, {'color': color});
+      }
+
+      final tokenId = 'p_${d.id}';
+      if (!tokenIds.contains(tokenId)) {
+        final cell = _freeCell(occupied, cols, rows);
+        occupied.add(cellKey(cell.x, cell.y));
+        batch.set(_tokensCol(code).doc(tokenId), {
+          'kind': 'player',
+          'refId': d.id,
+          'number': 1,
+          'label': '',
+          'x': cell.x,
+          'y': cell.y,
+          'hidden': false,
+          'span': 1,
+        });
+      }
+    }
+
+    batch.update(gameRef, {
+      'lastActivity': FieldValue.serverTimestamp(),
+      'status': 'playing',
+      'masterColor': masterColor,
+      'cols': cols,
+      'rows': rows,
+    });
+    batch.set(
+      _terrainDoc(code),
+      {'cells': <String, dynamic>{}},
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
+  }
+
+  /// Asigna color a los jugadores que todavía no lo tienen (los que entran
+  /// con la partida ya empezada).
+  Future<void> assignMissingColors(
+    String code,
+    List<GamePlayer> players,
+    int masterColor,
+  ) async {
+    final used = <int>[
+      masterColor,
+      for (final p in players)
+        if (p.color != null) p.color!,
+    ];
+
+    final batch = FirebaseFirestore.instance.batch();
+    var changed = false;
+
+    for (final p in players) {
+      if (p.color == null) {
+        final color = GameColors.nextFree(used);
+        used.add(color);
+        batch.update(_playersCol(code).doc(p.uid), {'color': color});
+        changed = true;
+      }
+    }
+
+    if (changed) await batch.commit();
+  }
+
+  // ==========================================
+  // FICHA DEL JUGADOR EN TIEMPO REAL
+  // ==========================================
+
+  Future<void> updatePlayerHp(String code, String uid, int hp) =>
+      _playersCol(code).doc(uid).update({'currentHp': hp < 0 ? 0 : hp});
+
+  /// El jugador modifica la copia de su ficha que está en la partida.
+  Future<void> updatePlayerCharacter(String code, Character c) async {
+    final ref = _playersCol(code).doc(_user.uid);
+    final snap = await ref.get();
+    final hp = ((snap.data()?['currentHp'] ?? c.maxHp) as num).toInt();
+
+    await ref.update({
+      'character': c.toMap(),
+      'currentHp': hp > c.maxHp ? c.maxHp : hp,
+    });
+  }
+
+  // ==========================================
+  // FICHAS DEL MAPA
+  // ==========================================
+
+  /// El Master ve todas las fichas; los jugadores solo las no ocultas.
+  Stream<List<GameToken>> tokens(String code, {required bool isMaster}) {
+    final Query<Map<String, dynamic>> query = isMaster
+        ? _tokensCol(code)
+        : _tokensCol(code).where('hidden', isEqualTo: false);
+
+    return query
+        .snapshots()
+        .map((snap) => snap.docs.map(GameToken.fromDoc).toList());
+  }
+
+  /// El jugador crea su propia ficha si todavía no la tiene
+  /// (por ejemplo, si entra con la partida ya empezada).
+  Future<void> ensurePlayerToken(String code) async {
+    final ref = _tokensCol(code).doc('p_${_user.uid}');
+    if ((await ref.get()).exists) return;
+
+    await ref.set({
+      'kind': 'player',
+      'refId': _user.uid,
+      'number': 1,
+      'label': '',
+      'x': 0,
+      'y': 0,
+      'hidden': false,
+      'span': 1,
+    });
+  }
+
+  Future<void> moveToken(String code, String tokenId, int x, int y) =>
+      _tokensCol(code).doc(tokenId).update({'x': x, 'y': y});
+
+  Future<void> setTokenHidden(String code, String tokenId, bool hidden) =>
+      _tokensCol(code).doc(tokenId).update({'hidden': hidden});
+
+  /// Saca una ficha de la zona "fuera del mapa" y la coloca en el mapa:
+  /// en la casilla indicada o, si no se indica, en la primera libre.
+  Future<void> placeTokenOnMap(
+    String code,
+    String tokenId, {
+    int? x,
+    int? y,
+  }) async {
+    var px = x;
+    var py = y;
+
+    if (px == null || py == null) {
+      final gameData = (await _games.doc(code).get()).data() ?? {};
+      final cols = ((gameData['cols'] ?? 20) as num).toInt();
+      final rows = ((gameData['rows'] ?? 14) as num).toInt();
+      final tokens = await _tokensCol(code).get();
+      final occupied = <String>{
+        for (final t in tokens.docs)
+          if (t.id != tokenId && t.data()['hidden'] != true)
+            cellKey(((t.data()['x'] ?? 0) as num).toInt(),
+                ((t.data()['y'] ?? 0) as num).toInt()),
+      };
+      final cell = _freeCell(occupied, cols, rows);
+      px = cell.x;
+      py = cell.y;
+    }
+
+    await _tokensCol(code)
+        .doc(tokenId)
+        .update({'x': px, 'y': py, 'hidden': false});
+  }
+
+  Future<void> setTokenSpan(String code, String tokenId, int span) =>
+      _tokensCol(code).doc(tokenId).update({'span': span});
+
+  Future<void> setTokenLabel(String code, String tokenId, String label) =>
+      _tokensCol(code).doc(tokenId).update({'label': label});
+
+  /// Quita solo la ficha del mapa (la criatura sigue en la partida).
+  Future<void> removeToken(String code, String tokenId) =>
+      _tokensCol(code).doc(tokenId).delete();
+
+  Map<String, dynamic> _creatureTokenData(
+    String id,
+    Map<String, dynamic> creatureDoc,
+    int x,
+    int y,
+  ) {
+    final apiIndex = creatureDoc['apiIndex'] as String?;
+    return {
+      'kind': 'creature',
+      'refId': id,
+      if (apiIndex != null) 'apiIndex': apiIndex,
+      'number': ((creatureDoc['number'] ?? 1) as num).toInt(),
+      // Solo las criaturas del bestiario llevan nombre; el de las de la API
+      // se consulta a la API.
+      'label': apiIndex == null ? (creatureDoc['label'] ?? '') : '',
+      'x': x,
+      'y': y,
+      // Empiezan ocultas: el Master las coloca y las muestra cuando quiere
+      'hidden': true,
+      'span': 1,
+      if (apiIndex == null && creatureDoc['creature'] is Map)
+        'icon': Avatars.tokenKey(
+          isNpc: creatureDoc['creature']['kind'] == 'npc',
+          type: (creatureDoc['creature']['creatureType'] ?? '').toString(),
+        ),
+    };
+  }
+
+  /// Crea la ficha de las criaturas de la partida que aún no tienen una.
+  Future<void> ensureCreatureTokens(String code) async {
+    final creatures = await _creaturesCol(code).get();
+    if (creatures.docs.isEmpty) return;
+
+    final tokens = await _tokensCol(code).get();
+    final tokenIds = tokens.docs.map((d) => d.id).toSet();
+    final missing =
+        creatures.docs.where((d) => !tokenIds.contains(d.id)).toList();
+    if (missing.isEmpty) return;
+
+    final gameData = (await _games.doc(code).get()).data() ?? {};
+    final cols = ((gameData['cols'] ?? 20) as num).toInt();
+    final rows = ((gameData['rows'] ?? 14) as num).toInt();
+
+    final occupied = <String>{
+      for (final t in tokens.docs)
+        cellKey(((t.data()['x'] ?? 0) as num).toInt(),
+            ((t.data()['y'] ?? 0) as num).toInt()),
+    };
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (final d in missing) {
+      final cell = _freeCell(occupied, cols, rows);
+      occupied.add(cellKey(cell.x, cell.y));
+      batch.set(
+        _tokensCol(code).doc(d.id),
+        _creatureTokenData(d.id, d.data(), cell.x, cell.y),
+      );
+    }
+    await batch.commit();
+  }
+
+  /// Al cambiar el tamaño del mapa, las fichas que quedan fuera se acercan.
+  Future<void> setGridSize(String code, int cols, int rows) async {
+    final batch = FirebaseFirestore.instance.batch();
+    batch.update(_games.doc(code), {'cols': cols, 'rows': rows});
+
+    final tokens = await _tokensCol(code).get();
+    for (final t in tokens.docs) {
+      final data = t.data();
+      final x = ((data['x'] ?? 0) as num).toInt();
+      final y = ((data['y'] ?? 0) as num).toInt();
+      final nx = x >= cols ? cols - 1 : x;
+      final ny = y >= rows ? rows - 1 : y;
+      if (nx != x || ny != y) batch.update(t.reference, {'x': nx, 'y': ny});
+    }
+
+    await batch.commit();
+  }
+
+  // ==========================================
+  // TERRENO DEL MAPA
+  // ==========================================
+
+  Stream<Map<String, String>> terrain(String code) {
+    return _terrainDoc(code).snapshots().map((snap) {
+      final raw = (snap.data()?['cells'] as Map?) ?? {};
+      return {for (final e in raw.entries) e.key.toString(): e.value.toString()};
+    });
+  }
+
+  /// Pinta (o borra, si el valor es null) varias casillas a la vez.
+  Future<void> paintCells(String code, Map<String, String?> cells) {
+    return _terrainDoc(code).set({
+      'cells': {
+        for (final e in cells.entries) e.key: e.value ?? FieldValue.delete(),
+      },
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> clearTerrain(String code) =>
+      _terrainDoc(code).set({'cells': <String, dynamic>{}});
+
+  // ==========================================
+  // DADOS
+  // ==========================================
+
+  Stream<List<DiceRoll>> rolls(String code) {
+    return _rollsCol(code)
+        .orderBy('at', descending: true)
+        .limit(60)
+        .snapshots()
+        .map((snap) => snap.docs.map(DiceRoll.fromDoc).toList());
+  }
+
+  /// Publica una tirada descubierta: la ven todos en el registro.
+  Future<void> postRoll(String code, DiceRoll roll) {
+    return _rollsCol(code).add({
+      'uid': roll.uid,
+      'name': roll.name,
+      'color': roll.color,
+      'die': roll.die,
+      'values': roll.values,
+      'at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ==========================================
   // CRIATURAS DE LA PARTIDA (NPC y monstruos)
   // ==========================================
 
-  CollectionReference<Map<String, dynamic>> _creaturesCol(String code) =>
-      _games.doc(code).collection('creatures');
-
-  /// Añade criaturas a la partida (solo el Master).
+  /// Añade criaturas a la partida (solo el Master) y crea su ficha oculta
+  /// en el mapa.
   ///
   /// - [custom]: criaturas del bestiario del usuario (se guarda una copia).
   /// - [api]: monstruos de la API (índice -> cantidad). De estos solo se
@@ -135,13 +517,36 @@ class GameService {
       }
     }
 
+    // Casillas libres para las fichas nuevas
+    final gameData = (await _games.doc(code).get()).data() ?? {};
+    final cols = ((gameData['cols'] ?? 20) as num).toInt();
+    final rows = ((gameData['rows'] ?? 14) as num).toInt();
+    final tokens = await _tokensCol(code).get();
+    final occupied = <String>{
+      for (final t in tokens.docs)
+        cellKey(((t.data()['x'] ?? 0) as num).toInt(),
+            ((t.data()['y'] ?? 0) as num).toInt()),
+    };
+
     final batch = FirebaseFirestore.instance.batch();
+
+    void addDoc(Map<String, dynamic> creatureData) {
+      final ref = col.doc();
+      final cell = _freeCell(occupied, cols, rows);
+      occupied.add(cellKey(cell.x, cell.y));
+
+      batch.set(ref, creatureData);
+      batch.set(
+        _tokensCol(code).doc(ref.id),
+        _creatureTokenData(ref.id, creatureData, cell.x, cell.y),
+      );
+    }
 
     custom.forEach((c, qty) {
       final already = customCounts[c.name] ?? 0;
       for (var i = 1; i <= qty; i++) {
         final label = (already + qty > 1) ? '${c.name} ${already + i}' : c.name;
-        batch.set(col.doc(), {
+        addDoc({
           'label': label,
           'damageTaken': 0,
           'creature': c.toMap(),
@@ -153,7 +558,7 @@ class GameService {
     api.forEach((index, qty) {
       final already = apiCounts[index] ?? 0;
       for (var i = 1; i <= qty; i++) {
-        batch.set(col.doc(), {
+        addDoc({
           'apiIndex': index,
           'number': already + i,
           'damageTaken': 0,
@@ -173,10 +578,139 @@ class GameService {
     });
   }
 
+  /// Una criatura de la partida (para abrir su ficha desde el mapa).
+  Future<GameCreature?> getGameCreature(String code, String id) async {
+    final snap = await _creaturesCol(code).doc(id).get();
+    return snap.exists ? GameCreature.fromDoc(snap) : null;
+  }
+
   /// Guarda los puntos de golpe perdidos de una criatura.
   Future<void> updateCreatureDamage(String code, String creatureId, int damage) =>
       _creaturesCol(code).doc(creatureId).update({'damageTaken': damage});
 
-  Future<void> removeCreature(String code, String creatureId) =>
-      _creaturesCol(code).doc(creatureId).delete();
+  /// Quita la criatura de la partida y su ficha del mapa.
+  Future<void> removeCreature(String code, String creatureId) async {
+    final batch = FirebaseFirestore.instance.batch();
+    batch.delete(_creaturesCol(code).doc(creatureId));
+    batch.delete(_tokensCol(code).doc(creatureId));
+    await batch.commit();
+  }
+
+  // ==========================================
+  // ACTIVIDAD, LIMPIEZA Y FIN DE SESIÓN
+  // ==========================================
+
+  /// Una partida sin actividad durante este tiempo se borra.
+  static const Duration inactivityLimit = Duration(hours: 24);
+
+  /// Marca la partida como activa (se llama cada pocos minutos mientras
+  /// alguien tiene el mapa abierto).
+  Future<void> touch(String code) =>
+      _games.doc(code).update({'lastActivity': FieldValue.serverTimestamp()});
+
+  Future<void> _deleteCollection(
+    CollectionReference<Map<String, dynamic>> col,
+  ) async {
+    final snap = await col.get();
+    for (var i = 0; i < snap.docs.length; i += 400) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final d in snap.docs.skip(i).take(400)) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+    }
+  }
+
+  /// Borra la partida y todo lo que cuelga de ella (solo el Master).
+  Future<void> deleteGameData(String code) async {
+    final game = _games.doc(code);
+    for (final name in ['players', 'creatures', 'tokens', 'rolls', 'map']) {
+      await _deleteCollection(game.collection(name));
+    }
+    await game.delete();
+  }
+
+  /// Termina la sesión: avisa a los jugadores y borra la partida.
+  Future<void> endGame(String code) async {
+    await _games.doc(code).update({'status': 'ended'});
+    // Margen para que los jugadores reciban el aviso antes de borrar
+    await Future<void>.delayed(const Duration(seconds: 3));
+    await deleteGameData(code);
+  }
+
+  /// Borra mis partidas inactivas (más de 24 h) o terminadas y devuelve la
+  /// más reciente que siga activa, para poder reconectarse como Master.
+  Future<({String code, String name, String status})?>
+      cleanupAndFindMyGame() async {
+    final snap =
+        await _games.where('masterUid', isEqualTo: _user.uid).get();
+
+    final now = DateTime.now();
+    QueryDocumentSnapshot<Map<String, dynamic>>? best;
+    DateTime? bestAt;
+
+    for (final d in snap.docs) {
+      final data = d.data();
+      final at = ((data['lastActivity'] ?? data['createdAt']) as Timestamp?)
+          ?.toDate();
+      final stale = data['status'] == 'ended' ||
+          (at != null && now.difference(at) > inactivityLimit);
+
+      if (stale) {
+        try {
+          await deleteGameData(d.id);
+        } catch (_) {}
+        continue;
+      }
+      if (best == null || (at != null && (bestAt == null || at.isAfter(bestAt)))) {
+        best = d;
+        bestAt = at;
+      }
+    }
+
+    if (best == null) return null;
+    final data = best.data();
+    return (
+      code: best.id,
+      name: (data['name'] ?? 'Partida') as String,
+      status: (data['status'] ?? 'lobby') as String,
+    );
+  }
+
+  // ==========================================
+  // OBJETOS DE LOS JUGADORES
+  // ==========================================
+
+  /// Añade objetos (índices de la API) a la copia del personaje en la partida.
+  Future<void> addItemsToPlayer(
+    String code,
+    String uid,
+    List<String> items,
+  ) async {
+    final ref = _playersCol(code).doc(uid);
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final current = List<String>.from(snap.data()?['character']?['items'] ?? const []);
+      tx.update(ref, {'character.items': [...current, ...items]});
+    });
+  }
+
+  /// Quita un ejemplar del objeto (y lo desequipa si ya no queda ninguno).
+  Future<void> removeItemFromPlayer(String code, String uid, String item) async {
+    final ref = _playersCol(code).doc(uid);
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final char = (snap.data()?['character'] as Map?) ?? const {};
+      final items = List<String>.from(char['items'] ?? const []);
+      final equipped = List<String>.from(char['equipped'] ?? const []);
+
+      items.remove(item);
+      if (!items.contains(item)) equipped.remove(item);
+
+      tx.update(ref, {'character.items': items, 'character.equipped': equipped});
+    });
+  }
+
+  Future<void> setPlayerEquipped(String code, String uid, List<String> equipped) =>
+      _playersCol(code).doc(uid).update({'character.equipped': equipped});
 }

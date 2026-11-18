@@ -154,6 +154,43 @@ class ApiRace {
   }
 }
 
+/// Datos de una subraza.
+class ApiSubrace {
+  final String index;
+  final String name;
+  final String description;
+
+  /// Bonificadores de la subraza: característica (str, dex...) y valor
+  final List<({String ability, int bonus})> abilityBonuses;
+  final List<ApiRef> traits;
+
+  const ApiSubrace({
+    required this.index,
+    required this.name,
+    required this.description,
+    required this.abilityBonuses,
+    required this.traits,
+  });
+
+  factory ApiSubrace.fromJson(Map<String, dynamic> m) {
+    return ApiSubrace(
+      index: (m['index'] ?? '') as String,
+      name: (m['name'] ?? '') as String,
+      description: (m['desc'] ?? '').toString(),
+      abilityBonuses: ((m['ability_bonuses'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => (
+                ability:
+                    ((e['ability_score'] as Map?)?['index'] ?? '').toString(),
+                bonus: _int(e['bonus']) ?? 0,
+              ))
+          .where((b) => b.ability.isNotEmpty)
+          .toList(),
+      traits: _refs(m['racial_traits']),
+    );
+  }
+}
+
 /// Qué obtiene la clase en un nivel concreto.
 class ApiClassLevel {
   final int level;
@@ -508,28 +545,49 @@ class ClassApiService {
     return _textCache[key] = desc;
   }
 
-  /// Descripción y bonificadores de una subraza.
-  Future<List<String>> fetchSubraceText(String index) async {
-    final key = 'subrace:$index';
-    final cached = _textCache[key];
+  static final Map<String, ApiSubrace> _subraceCache = {};
+
+  Future<ApiSubrace> fetchSubrace(String index) async {
+    final cached = _subraceCache[index];
     if (cached != null) return cached;
 
     final data = await _getJson('/subraces/$index') as Map<String, dynamic>;
+    return _subraceCache[index] = ApiSubrace.fromJson(data);
+  }
 
-    final bonuses = ((data['ability_bonuses'] as List?) ?? const [])
-        .whereType<Map>()
-        .map((e) {
-      final ability = ((e['ability_score'] as Map?)?['index'] ?? '').toString();
-      final b = _int(e['bonus']) ?? 0;
-      return '${ability.toUpperCase()} ${b >= 0 ? '+$b' : '$b'}';
-    }).toList();
+  /// Descripción, bonificadores y rasgos de una subraza, como texto.
+  Future<List<String>> fetchSubraceText(String index) async {
+    final sub = await fetchSubrace(index);
 
-    final traits = _names(data['racial_traits']);
+    final bonuses = sub.abilityBonuses
+        .map((b) =>
+            '${b.ability.toUpperCase()} ${b.bonus >= 0 ? '+${b.bonus}' : '${b.bonus}'}')
+        .toList();
 
-    return _textCache[key] = [
-      (data['desc'] ?? '').toString(),
+    return [
+      sub.description,
       if (bonuses.isNotEmpty) 'Bonificadores: ${bonuses.join(', ')}',
-      if (traits.isNotEmpty) 'Rasgos: ${traits.join(', ')}',
+      if (sub.traits.isNotEmpty)
+        'Rasgos: ${sub.traits.map((t) => t.name).join(', ')}',
     ].where((t) => t.isNotEmpty).toList();
+  }
+
+  /// Bonificadores totales (raza + subraza) por característica.
+  Future<Map<String, int>> fetchRacialBonuses(
+    String race,
+    String subrace,
+  ) async {
+    final totals = <String, int>{};
+    if (race.isNotEmpty) {
+      for (final b in (await fetchRace(race)).abilityBonuses) {
+        totals[b.ability] = (totals[b.ability] ?? 0) + b.bonus;
+      }
+    }
+    if (subrace.isNotEmpty) {
+      for (final b in (await fetchSubrace(subrace)).abilityBonuses) {
+        totals[b.ability] = (totals[b.ability] ?? 0) + b.bonus;
+      }
+    }
+    return totals;
   }
 }
