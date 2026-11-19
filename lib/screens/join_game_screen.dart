@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../services/game_service.dart';
 import 'player_room_screen.dart';
+import '../i18n/i18n.dart';
+import '../widgets/app_icon.dart';
 
 /// Pantalla para unirse a una partida con un código de invitación.
 class JoinGameScreen extends StatefulWidget {
@@ -70,7 +72,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Unirse a partida',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -84,15 +86,15 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.group_add_outlined, size: 85, color: Colors.teal),
+                const AppIcon('llave', size: 90),
                 const SizedBox(height: 16),
-                const Text(
+                const Tx(
                   'Introduce el código de invitación',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                Tx(
                   'Te lo da el Master de la partida. Después podrás elegir '
                   'con qué personaje quieres jugar.',
                   textAlign: TextAlign.center,
@@ -111,7 +113,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'ABC123',
+                    hintText: tr('ABC123'),
                     errorText: _error,
                     border: const OutlineInputBorder(),
                   ),
@@ -134,7 +136,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.login),
-                    label: const Text('Entrar a la sala'),
+                    label: const Tx('Entrar a la sala'),
                   ),
                 ),
               ],

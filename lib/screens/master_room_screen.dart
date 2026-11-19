@@ -11,6 +11,8 @@ import 'game_screen.dart';
 import 'map_picker_screen.dart';
 import '../widgets/avatars.dart';
 import '../widgets/resolved_character.dart';
+import '../i18n/i18n.dart';
+import '../widgets/app_icon.dart';
 
 /// Sala de selección para el Master: comparte el código y ve a los
 /// jugadores con los personajes que han elegido.
@@ -30,14 +32,14 @@ class MasterRoomScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Sala del Master',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: 'Terminar la sesión (borra la partida)',
+            tooltip: tr('Terminar la sesión (borra la partida)'),
             icon: const Icon(Icons.stop_circle_outlined),
             onPressed: () => _endSession(context),
           ),
@@ -64,7 +66,7 @@ class MasterRoomScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Text(
+                      Tx(
                         'Código de invitación',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
@@ -82,7 +84,7 @@ class MasterRoomScreen extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Copiar código',
+                            tooltip: tr('Copiar código'),
                             icon: const Icon(Icons.copy),
                             onPressed: () async {
                               final messenger = ScaffoldMessenger.of(context);
@@ -91,7 +93,7 @@ class MasterRoomScreen extends StatelessWidget {
                               );
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('Código copiado.'),
+                                  content: Tx('Código copiado.'),
                                 ),
                               );
                             },
@@ -116,7 +118,7 @@ class MasterRoomScreen extends StatelessWidget {
 
                   return Card(
                     child: ListTile(
-                      leading: const Icon(Icons.map_outlined, size: 32),
+                      leading: const AppIcon('mapa', size: 36),
                       title: Text('Mapa: $name'),
                       subtitle: Text('$cols × $rows casillas'),
                       // Con la partida en juego no se puede cambiar el mapa
@@ -180,7 +182,7 @@ class MasterRoomScreen extends StatelessWidget {
                                   color: Colors.grey,
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
+                                Tx(
                                   'Esperando jugadores...\n'
                                   'Comparte el código para que se unan '
                                   'con sus personajes.',
@@ -224,7 +226,7 @@ class MasterRoomScreen extends StatelessWidget {
                             ),
                             isThreeLine: true,
                             trailing: IconButton(
-                              tooltip: 'Expulsar jugador',
+                              tooltip: tr('Expulsar jugador'),
                               icon: const Icon(Icons.person_remove_outlined),
                               onPressed: () => _confirmKick(
                                 context,
@@ -283,18 +285,18 @@ class MasterRoomScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Terminar la sesión'),
-        content: const Text(
+        title: const Tx('Terminar la sesión'),
+        content: const Tx(
           'Se avisará a los jugadores y la partida se borrará por completo.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Terminar sesión'),
+            child: const Tx('Terminar sesión'),
           ),
         ],
       ),
@@ -311,7 +313,7 @@ class MasterRoomScreen extends StatelessWidget {
       );
       navigator.popUntil((r) => r.isFirst);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Sesión terminada y partida borrada.')),
+        const SnackBar(content: Tx('Sesión terminada y partida borrada.')),
       );
     } catch (e) {
       messenger.showSnackBar(
@@ -350,16 +352,16 @@ class MasterRoomScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Expulsar jugador'),
+        title: const Tx('Expulsar jugador'),
         content: Text('¿Quitar a "${p.character.name}" de la sala?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Expulsar'),
+            child: const Tx('Expulsar'),
           ),
         ],
       ),

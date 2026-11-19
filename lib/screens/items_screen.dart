@@ -5,6 +5,8 @@ import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import '../widgets/item_widgets.dart';
 import 'item_form_screen.dart';
+import '../i18n/i18n.dart';
+import '../widgets/options_button.dart';
 
 /// Lista de objetos predeterminados (API de D&D 5e).
 ///
@@ -16,7 +18,15 @@ class ItemsScreen extends StatefulWidget {
   final String? gameCode;
   final bool pick;
 
-  const ItemsScreen({super.key, this.gameCode, this.pick = false});
+  /// true cuando se muestra como apartado de la pantalla principal
+  final bool embedded;
+
+  const ItemsScreen({
+    super.key,
+    this.gameCode,
+    this.pick = false,
+    this.embedded = false,
+  });
 
   @override
   State<ItemsScreen> createState() => _ItemsScreenState();
@@ -60,7 +70,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     if (!dialogContext.mounted) return;
     if (players.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('No hay jugadores en la partida.')),
+        const SnackBar(content: Tx('No hay jugadores en la partida.')),
       );
       return;
     }
@@ -68,7 +78,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final uid = await showDialog<String>(
       context: dialogContext,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Asignar a…'),
+        title: const Tx('Asignar a…'),
         children: [
           for (final p in players)
             SimpleDialogOption(
@@ -105,18 +115,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar objeto'),
+        title: const Tx('Eliminar objeto'),
         content: Text(
           '¿Eliminar «$name»? Los jugadores que ya lo tienen lo conservan.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
+            child: const Tx('Eliminar'),
           ),
         ],
       ),
@@ -129,7 +139,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final items =
         all.where((r) => q.isEmpty || r.name.toLowerCase().contains(q)).toList();
 
-    if (items.isEmpty) return const Center(child: Text('Sin resultados.'));
+    if (items.isEmpty) return const Center(child: Tx('Sin resultados.'));
 
     return ListView.builder(
       padding: EdgeInsets.only(bottom: custom ? 88 : 8),
@@ -157,7 +167,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       ),
                     );
                   },
-                  child: const Text('Editar'),
+                  child: const Tx('Editar'),
                 ),
               if (widget.pick)
                 TextButton(
@@ -165,13 +175,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                     setState(() => _picked[r.index] = count + 1);
                     Navigator.pop(dialogContext);
                   },
-                  child: const Text('Añadir'),
+                  child: const Tx('Añadir'),
                 )
               else if (widget.gameCode != null)
                 ElevatedButton.icon(
                   onPressed: () => _assign(dialogContext, r.index),
                   icon: const Icon(Icons.person_add_alt_1),
-                  label: const Text('Asignar a jugador'),
+                  label: const Tx('Asignar a jugador'),
                 ),
             ],
           ),
@@ -203,7 +213,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                 )
               : (custom
                   ? IconButton(
-                      tooltip: 'Eliminar',
+                      tooltip: tr('Eliminar'),
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _deleteCustom(r.index, r.name),
                     )
@@ -219,6 +229,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       appBar: AppBar(
         title: Text(widget.pick ? 'Elegir objetos' : 'Objetos'),
         actions: [
+          if (widget.embedded) const OptionsButton(),
           if (widget.pick)
             TextButton.icon(
               onPressed: () => Navigator.pop(context, [
@@ -237,7 +248,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                 MaterialPageRoute(builder: (_) => const ItemFormScreen()),
               ),
               icon: const Icon(Icons.add),
-              label: const Text('Crear objeto'),
+              label: const Tx('Crear objeto'),
             )
           : null,
       body: Column(
@@ -290,7 +301,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                         return const Center(
                           child: Padding(
                             padding: EdgeInsets.all(24),
-                            child: Text(
+                            child: Tx(
                               'Todavía no has creado ningún objeto.\n'
                               'Pulsa «Crear objeto».',
                               textAlign: TextAlign.center,
@@ -324,7 +335,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                     textAlign: TextAlign.center),
                                 TextButton(
                                   onPressed: () => _setCategory(_category),
-                                  child: const Text('Reintentar'),
+                                  child: const Tx('Reintentar'),
                                 ),
                               ],
                             ),

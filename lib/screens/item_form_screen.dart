@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../services/custom_item_service.dart';
 import '../services/equipment_api_service.dart';
+import '../i18n/i18n.dart';
 
 /// Crear o editar un objeto propio del Master.
 class ItemFormScreen extends StatefulWidget {
@@ -154,7 +155,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
           TextButton.icon(
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.save),
-            label: const Text('Guardar'),
+            label: const Tx('Guardar'),
           ),
         ],
       ),
@@ -184,10 +185,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'weapon', child: Text('Arma')),
-                    DropdownMenuItem(value: 'armor', child: Text('Armadura')),
-                    DropdownMenuItem(value: 'shield', child: Text('Escudo')),
-                    DropdownMenuItem(value: 'other', child: Text('Otro (sin estadísticas)')),
+                    DropdownMenuItem(value: 'weapon', child: Tx('Arma')),
+                    DropdownMenuItem(value: 'armor', child: Tx('Armadura')),
+                    DropdownMenuItem(value: 'shield', child: Tx('Escudo')),
+                    DropdownMenuItem(value: 'other', child: Tx('Otro (sin estadísticas)')),
                   ],
                   onChanged: (v) => setState(() => _kind = v ?? 'weapon'),
                 ),
@@ -237,8 +238,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'Melee', child: Text('Cuerpo a cuerpo')),
-                            DropdownMenuItem(value: 'Ranged', child: Text('A distancia')),
+                            DropdownMenuItem(value: 'Melee', child: Tx('Cuerpo a cuerpo')),
+                            DropdownMenuItem(value: 'Ranged', child: Tx('A distancia')),
                           ],
                           onChanged: (v) => setState(() => _weaponRange = v ?? 'Melee'),
                         ),
@@ -252,8 +253,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'Simple', child: Text('Sencilla')),
-                            DropdownMenuItem(value: 'Martial', child: Text('Marcial')),
+                            DropdownMenuItem(value: 'Simple', child: Tx('Sencilla')),
+                            DropdownMenuItem(value: 'Martial', child: Tx('Marcial')),
                           ],
                           onChanged: (v) => setState(() => _weaponCategory = v ?? 'Simple'),
                         ),
@@ -273,7 +274,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  const Text('Propiedades'),
+                  const Tx('Propiedades'),
                   Wrap(
                     spacing: 6,
                     children: [
@@ -318,14 +319,14 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   if (isArmor) ...[
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Suma el modificador de Destreza'),
+                      title: const Tx('Suma el modificador de Destreza'),
                       value: _dexBonus,
                       onChanged: (v) => setState(() => _dexBonus = v),
                     ),
                     if (_dexBonus)
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Limitar la Destreza (como la armadura media)'),
+                        title: const Tx('Limitar la Destreza (como la armadura media)'),
                         value: _limitDex,
                         onChanged: (v) => setState(() => _limitDex = v),
                       ),
@@ -351,7 +352,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     ),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Desventaja en Sigilo'),
+                      title: const Tx('Desventaja en Sigilo'),
                       value: _stealth,
                       onChanged: (v) => setState(() => _stealth = v),
                     ),
@@ -381,7 +382,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
 
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Objeto mágico'),
+                  title: const Tx('Objeto mágico'),
                   value: _magic || _bonus != 0,
                   onChanged: _bonus != 0 ? null : (v) => setState(() => _magic = v),
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/creature.dart';
 import 'spell_widgets.dart';
+import '../i18n/i18n.dart';
 
 /// Pantalla completa con el bloque de estadísticas de una criatura.
 class CreatureSheetScreen extends StatelessWidget {
@@ -120,7 +121,7 @@ class CreatureSheetView extends StatelessWidget {
 
             if (c.actions.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text(
+              Tx(
                 'Acciones',
                 style: TextStyle(
                   fontSize: 20,
@@ -134,7 +135,7 @@ class CreatureSheetView extends StatelessWidget {
 
             if (c.spells.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text(
+              Tx(
                 'Hechizos',
                 style: TextStyle(
                   fontSize: 20,
@@ -148,7 +149,7 @@ class CreatureSheetView extends StatelessWidget {
 
             if (c.notes.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text(
+              Tx(
                 'Notas',
                 style: TextStyle(
                   fontSize: 20,

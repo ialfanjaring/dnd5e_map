@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
+import '../i18n/i18n.dart';
 
 /// Listado de razas de la API para consultar cualquiera de ellas.
 class RacesScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _RacesScreenState extends State<RacesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Razas',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -150,7 +151,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
                         () => _future = _api.fetchRace(widget.raceIndex),
                       ),
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar'),
+                      label: const Tx('Reintentar'),
                     ),
                   ],
                 ),
@@ -242,7 +243,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             ),
           ),
         const SizedBox(height: 8),
-        Text(
+        Tx(
           'Datos de la D&D 5e SRD API (textos en inglés).',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),

@@ -6,12 +6,18 @@ import '../widgets/creature_sheet_view.dart';
 import '../widgets/default_monsters_view.dart';
 import 'creature_form_screen.dart';
 import '../widgets/avatars.dart';
+import '../i18n/i18n.dart';
+import '../widgets/app_icon.dart';
+import '../widgets/options_button.dart';
 
 /// Apartado "NPC y Monstruos": tu bestiario con las criaturas que creas tú.
 /// Los monstruos de la D&D 5e SRD API no se guardan aquí: el Master los añade
 /// a la partida desde su sala.
 class CreaturesScreen extends StatefulWidget {
-  const CreaturesScreen({super.key});
+  /// true cuando se muestra como apartado de la pantalla principal
+  final bool embedded;
+
+  const CreaturesScreen({super.key, this.embedded = false});
 
   @override
   State<CreaturesScreen> createState() => _CreaturesScreenState();
@@ -68,11 +74,12 @@ class _CreaturesScreenState extends State<CreaturesScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'NPC y Monstruos',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [if (widget.embedded) const OptionsButton()],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -106,7 +113,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
                 child: TextField(
                   controller: _searchCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Buscar por nombre o tipo...',
+                    hintText: tr('Buscar por nombre o tipo...'),
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _query.isEmpty
                         ? null
@@ -165,7 +172,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
 
         if (list.isEmpty) {
           return Center(
-            child: Text(
+            child: Tx(
               'No hay criaturas que mostrar.',
               style: TextStyle(color: Colors.grey.shade600),
             ),
@@ -211,14 +218,14 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.pets, size: 80, color: Colors.red.shade800),
+              const AppIcon('calavera', size: 90),
               const SizedBox(height: 16),
-              const Text(
+              const Tx(
                 'Tu bestiario está vacío',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              Text(
+              Tx(
                 'Aquí solo se guardan las criaturas que crees tú. Los '
                 'monstruos de la API de D&D 5e los añades directamente desde '
                 'la sala del Master.',
@@ -231,7 +238,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
                 child: ElevatedButton.icon(
                   onPressed: _openCreateForm,
                   icon: const Icon(Icons.add),
-                  label: const Text('Crear criatura'),
+                  label: const Tx('Crear criatura'),
                 ),
               ),
             ],
@@ -247,16 +254,16 @@ class _CreaturesScreenState extends State<CreaturesScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Eliminar criatura'),
+        title: const Tx('Eliminar criatura'),
         content: Text('¿Seguro que quieres eliminar "${c.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Eliminar'),
+            child: const Tx('Eliminar'),
           ),
         ],
       ),
@@ -322,9 +329,9 @@ class _CreatureTile extends StatelessWidget {
             }
           },
           itemBuilder: (_) => const [
-            PopupMenuItem(value: 'view', child: Text('Ver ficha')),
-            PopupMenuItem(value: 'edit', child: Text('Editar')),
-            PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+            PopupMenuItem(value: 'view', child: Tx('Ver ficha')),
+            PopupMenuItem(value: 'edit', child: Tx('Editar')),
+            PopupMenuItem(value: 'delete', child: Tx('Eliminar')),
           ],
         ),
       ),

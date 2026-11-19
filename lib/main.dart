@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_wrapper.dart';
+import 'settings/app_settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,12 +40,31 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Mismo morado que el tema por defecto de Material 3.
+  static const Color _seed = Color(0xFF6750A4);
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'D&D 5e',
-      home: const AuthWrapper(),
+    // Se reconstruye al cambiar el idioma o el tema en Opciones.
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'D&D 5e',
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(seedColor: _seed),
+        ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: _seed,
+            brightness: Brightness.dark,
+          ),
+        ),
+        themeMode: AppSettings.instance.themeMode,
+        home: const AuthWrapper(),
+      ),
     );
   }
 }

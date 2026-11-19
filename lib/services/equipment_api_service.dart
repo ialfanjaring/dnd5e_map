@@ -228,6 +228,7 @@ class ApiNotFound implements Exception {
 /// Cliente de la D&D 5e SRD API para objetos y equipo. Nada se guarda en la
 /// base de datos: solo los índices de los objetos que tiene cada personaje.
 class EquipmentApiService {
+
   static const String _base = 'https://www.dnd5eapi.co/api/2014';
 
   /// Categorías que se pueden consultar: id -> nombre en español.

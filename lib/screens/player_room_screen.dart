@@ -11,6 +11,7 @@ import '../widgets/spell_widgets.dart';
 import 'character_form_screen.dart';
 import 'game_screen.dart';
 import '../widgets/resolved_character.dart';
+import '../i18n/i18n.dart';
 
 /// Sala de selección de personaje para el jugador que se une con código.
 class PlayerRoomScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
       if (game?['status'] == 'ended' && mounted && !_entered) {
         _entered = true;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('El Master ha terminado la sesión.')),
+          const SnackBar(content: Tx('El Master ha terminado la sesión.')),
         );
         Navigator.of(context).popUntil((r) => r.isFirst);
         return;
@@ -117,7 +118,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Sala de partida',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -126,7 +127,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
           IconButton(
             onPressed: _leave,
             icon: const Icon(Icons.exit_to_app),
-            tooltip: 'Salir de la sala',
+            tooltip: tr('Salir de la sala'),
           ),
         ],
       ),
@@ -142,7 +143,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
 
           final game = gameSnap.data;
           if (game == null) {
-            return const Center(child: Text('La partida ya no existe.'));
+            return const Center(child: Tx('La partida ya no existe.'));
           }
 
           return Center(
@@ -211,7 +212,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            const Tx(
               'Elige tu personaje',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
@@ -222,7 +223,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      const Text(
+                      const Tx(
                         'Todavía no tienes personajes. Crea uno para poder '
                         'entrar a la partida.',
                         textAlign: TextAlign.center,
@@ -236,7 +237,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                           ),
                         ),
                         icon: const Icon(Icons.add),
-                        label: const Text('Crear personaje'),
+                        label: const Tx('Crear personaje'),
                       ),
                     ],
                   ),
@@ -279,7 +280,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                     ),
                     isThreeLine: true,
                     trailing: IconButton(
-                      tooltip: 'Ver ficha',
+                      tooltip: tr('Ver ficha'),
                       icon: const Icon(Icons.description_outlined),
                       onPressed: () => Navigator.push(
                         context,
@@ -308,7 +309,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.check),
-                  label: const Text('Confirmar personaje'),
+                  label: const Tx('Confirmar personaje'),
                 ),
               ),
             ],
@@ -325,7 +326,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
       stream: _gameService.amIInGame(widget.gameCode),
       builder: (context, joined) {
         if (joined.data != true) {
-          return Text(
+          return Tx(
             'Confirma tu personaje para entrar en la partida y ver a los '
             'demás jugadores.',
             style: TextStyle(color: Colors.grey.shade600),
@@ -365,7 +366,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
             ),
             const SizedBox(height: 10),
             if (players.isEmpty)
-              Text(
+              Tx(
                 'Todavía no hay nadie. Confirma tu personaje para entrar.',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
@@ -386,7 +387,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                   ),
                   isThreeLine: true,
                   trailing: p.uid == _myUid
-                      ? const Chip(label: Text('Tú'))
+                      ? const Chip(label: Tx('Tú'))
                       : null,
                 ),
               ),

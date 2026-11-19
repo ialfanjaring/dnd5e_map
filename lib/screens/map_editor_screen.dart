@@ -4,6 +4,7 @@ import '../models/game_models.dart';
 import '../models/map_template.dart';
 import '../services/map_service.dart';
 import '../widgets/game_board.dart';
+import '../i18n/i18n.dart';
 
 /// Editor de mapas del Master: nombre, tamaño y terreno.
 class MapEditorScreen extends StatefulWidget {
@@ -81,7 +82,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Ponle un nombre al mapa.')));
+          .showSnackBar(const SnackBar(content: Tx('Ponle un nombre al mapa.')));
       return;
     }
 
@@ -113,7 +114,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
           TextButton.icon(
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.save),
-            label: const Text('Guardar'),
+            label: const Tx('Guardar'),
           ),
         ],
       ),
@@ -164,14 +165,14 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
                 ChoiceChip(
                   selected: _brush == null,
                   avatar: const Icon(Icons.cleaning_services, size: 16),
-                  label: const Text('Borrar'),
+                  label: const Tx('Borrar'),
                   onSelected: (_) => setState(() => _brush = null),
                 ),
                 const SizedBox(width: 6),
                 TextButton.icon(
                   onPressed: () => setState(() => _cells.clear()),
                   icon: const Icon(Icons.layers_clear),
-                  label: const Text('Vaciar'),
+                  label: const Tx('Vaciar'),
                 ),
               ],
             ),

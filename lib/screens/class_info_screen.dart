@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
+import '../i18n/i18n.dart';
 
 /// Listado de clases de la API para consultar cualquiera de ellas.
 class ClassesScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Clases',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -198,7 +199,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                   OutlinedButton.icon(
                     onPressed: () => setState(_load),
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
+                    label: const Tx('Reintentar'),
                   ),
                 ],
               ),
@@ -244,7 +245,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
         _section(
           'Competencias',
           c.proficiencies.isEmpty
-              ? const Text('—')
+              ? const Tx('—')
               : Wrap(
                   spacing: 6,
                   runSpacing: 6,
@@ -286,7 +287,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
             ),
           ),
         const SizedBox(height: 8),
-        Text(
+        Tx(
           'Datos de la D&D 5e SRD API (textos en inglés).',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -360,7 +361,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                 _kv('Datos de la clase', l.classSpecific.join(' · ')),
               if (l.features.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                const Text(
+                const Tx(
                   'Rasgos (toca para leerlos)',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
@@ -392,7 +393,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
 
   Widget _spellsTab(List<ApiSpellRef> spells) {
     if (spells.isEmpty) {
-      return const Center(child: Text('Esta clase no tiene hechizos.'));
+      return const Center(child: Tx('Esta clase no tiene hechizos.'));
     }
 
     final byLevel = <int, List<ApiSpellRef>>{};
@@ -440,7 +441,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
 
   Widget _subclassesTab(ApiClass c) {
     if (c.subclasses.isEmpty) {
-      return const Center(child: Text('Sin subclases en el SRD.'));
+      return const Center(child: Tx('Sin subclases en el SRD.'));
     }
 
     return ListView(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/password_field.dart';
 import 'login_screen.dart' show validateEmail;
+import '../i18n/i18n.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -59,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
+      appBar: AppBar(title: const Tx('Crear cuenta')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -137,11 +138,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('Crear cuenta'),
+                            : const Tx('Crear cuenta'),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
+                    Tx(
                       'Te enviaremos un correo para verificar tu dirección. '
                       'No podrás usar la app hasta confirmarlo.',
                       textAlign: TextAlign.center,

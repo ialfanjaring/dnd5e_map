@@ -4,6 +4,8 @@ import '../models/map_template.dart';
 import '../services/map_service.dart';
 import '../widgets/map_preview.dart';
 import 'map_editor_screen.dart';
+import '../i18n/i18n.dart';
+import '../widgets/options_button.dart';
 
 /// Biblioteca de mapas: predeterminados y creados por el Master.
 ///
@@ -12,7 +14,10 @@ import 'map_editor_screen.dart';
 class MapPickerScreen extends StatelessWidget {
   final String? gameCode;
 
-  const MapPickerScreen({super.key, this.gameCode});
+  /// true cuando se muestra como apartado de la pantalla principal
+  final bool embedded;
+
+  const MapPickerScreen({super.key, this.gameCode, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +26,7 @@ class MapPickerScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text(gameCode == null ? 'Mapas' : 'Elegir mapa'),
+          actions: [if (embedded) const OptionsButton()],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Predeterminados'),
@@ -34,7 +40,7 @@ class MapPickerScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const MapEditorScreen()),
           ),
           icon: const Icon(Icons.add),
-          label: const Text('Crear mapa'),
+          label: const Tx('Crear mapa'),
         ),
         body: TabBarView(
           children: [
@@ -59,7 +65,7 @@ class MapPickerScreen extends StatelessWidget {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text(
+                      child: Tx(
                         'Todavía no has creado ningún mapa.\n'
                         'Pulsa «Crear mapa» o duplica uno predeterminado.',
                         textAlign: TextAlign.center,
@@ -100,18 +106,18 @@ class _MapGrid extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Usar «${m.name}»'),
-        content: const Text(
+        content: const Tx(
           'Sustituye el mapa actual de la partida. Las fichas se mantienen '
           'y, si quedan fuera, se acercan al borde.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Usar mapa'),
+            child: const Tx('Usar mapa'),
           ),
         ],
       ),
@@ -133,16 +139,16 @@ class _MapGrid extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar mapa'),
+        title: const Tx('Eliminar mapa'),
         content: Text('¿Eliminar «${m.name}»? No afecta a partidas ya creadas.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
+            child: const Tx('Eliminar'),
           ),
         ],
       ),
@@ -208,11 +214,11 @@ class _MapGrid extends StatelessWidget {
                             ),
                           ),
                           icon: const Icon(Icons.copy, size: 16),
-                          label: const Text('Duplicar'),
+                          label: const Tx('Duplicar'),
                         ),
                       if (owned) ...[
                         IconButton(
-                          tooltip: 'Editar',
+                          tooltip: tr('Editar'),
                           visualDensity: VisualDensity.compact,
                           onPressed: () => Navigator.push(
                             context,
@@ -223,7 +229,7 @@ class _MapGrid extends StatelessWidget {
                           icon: const Icon(Icons.edit_outlined, size: 20),
                         ),
                         IconButton(
-                          tooltip: 'Eliminar',
+                          tooltip: tr('Eliminar'),
                           visualDensity: VisualDensity.compact,
                           onPressed: () => _delete(context, m),
                           icon: const Icon(Icons.delete_outline, size: 20),

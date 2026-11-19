@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../models/game_models.dart';
 import '../services/game_service.dart';
+import '../i18n/i18n.dart';
+import 'app_icon.dart';
 
 /// Tirada de dados y registro de la partida.
 ///
@@ -111,7 +113,7 @@ class _DicePanelState extends State<DicePanel> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
-              const Text('Cantidad'),
+              const Tx('Cantidad'),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 onPressed: _count > 1 ? () => setState(() => _count--) : null,
@@ -127,7 +129,7 @@ class _DicePanelState extends State<DicePanel> {
                 icon: const Icon(Icons.add_circle_outline),
               ),
               const Spacer(),
-              const Text('Oculta'),
+              const Tx('Oculta'),
               Transform.scale(
                 scale: 0.85,
                 child: Switch(
@@ -147,7 +149,7 @@ class _DicePanelState extends State<DicePanel> {
             height: 40,
             child: ElevatedButton.icon(
               onPressed: _rolling ? null : _roll,
-              icon: Icon(_hidden ? Icons.visibility_off : Icons.casino),
+              icon: AppIcon(_hidden ? 'ojo' : 'd20_vacio', size: 22),
               label: Text(
                 'Tirar ${_count > 1 ? '$_count × ' : ''}'
                 '${DiceRoll.dieName(_die)}'
@@ -197,7 +199,7 @@ class _DicePanelState extends State<DicePanel> {
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Center(
-                      child: Text(
+                      child: Tx(
                         'Todavía no hay tiradas.',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
@@ -206,7 +208,7 @@ class _DicePanelState extends State<DicePanel> {
                 if (hidden.isNotEmpty) ...[
                   const Padding(
                     padding: EdgeInsets.fromLTRB(12, 8, 12, 2),
-                    child: Text(
+                    child: Tx(
                       'Mis tiradas ocultas (solo tú)',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,

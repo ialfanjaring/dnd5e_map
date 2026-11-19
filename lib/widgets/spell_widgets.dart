@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/class_api_service.dart';
+import '../i18n/i18n.dart';
 
 String spellLevelLabel(int level) => level == 0 ? 'Truco' : 'Nivel $level';
 
@@ -30,10 +31,9 @@ Future<void> showTextDialog(
             }
             final text = (snapshot.data ?? const <String>[]).join('\n\n');
             return SingleChildScrollView(
-              child: Text(
-                text.isEmpty ? 'Sin descripción.' : text,
-                style: const TextStyle(height: 1.4),
-              ),
+              child: text.isEmpty
+                  ? const Tx('Sin descripción.', style: TextStyle(height: 1.4))
+                  : Text(text, style: const TextStyle(height: 1.4)),
             );
           },
         ),
@@ -41,7 +41,7 @@ Future<void> showTextDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cerrar'),
+          child: const Tx('Cerrar'),
         ),
       ],
     ),
@@ -102,7 +102,7 @@ Future<void> showSpellDetail(
                   Text(s.desc.join('\n\n'), style: const TextStyle(height: 1.4)),
                   if (s.higherLevel.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const Text(
+                    const Tx(
                       'A niveles superiores',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -120,7 +120,7 @@ Future<void> showSpellDetail(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cerrar'),
+          child: const Tx('Cerrar'),
         ),
       ],
     ),
@@ -240,14 +240,14 @@ class CharacterSpellsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const Tx(
               'Hechizos',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             if (spells.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text(
+                child: Tx(
                   'Aún no ha elegido hechizos.',
                   style: TextStyle(color: Colors.grey.shade600),
                 ),

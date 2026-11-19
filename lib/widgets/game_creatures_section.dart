@@ -7,6 +7,7 @@ import '../services/game_service.dart';
 import '../services/monster_api_service.dart';
 import 'creature_sheet_view.dart';
 import 'avatars.dart';
+import '../i18n/i18n.dart';
 
 // ==========================================
 // SECCIÓN: NPC Y MONSTRUOS DE LA PARTIDA
@@ -94,7 +95,7 @@ class GameCreaturesSection extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => _addCreatures(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('Añadir'),
+                  label: const Tx('Añadir'),
                 ),
               ],
             ),
@@ -103,7 +104,7 @@ class GameCreaturesSection extends StatelessWidget {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
+                  child: Tx(
                     'Aún no has añadido criaturas. Elige monstruos de la API '
                     'o de tu bestiario para tener la partida preparada.',
                     textAlign: TextAlign.center,
@@ -164,7 +165,7 @@ class _GameCreatureTile extends StatelessWidget {
       builder: (context, snapshot) {
         final removeButton = IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'Quitar de la partida',
+          tooltip: tr('Quitar de la partida'),
           onPressed: () => service.removeCreature(gameCode, gc.id),
           icon: const Icon(Icons.delete_outline),
         );
@@ -173,7 +174,7 @@ class _GameCreatureTile extends StatelessWidget {
           return Card(
             child: ListTile(
               title: Text(gc.apiIndex ?? 'Criatura'),
-              subtitle: const Text('No se pudo cargar de la API.'),
+              subtitle: const Tx('No se pudo cargar de la API.'),
               trailing: removeButton,
             ),
           );
@@ -188,7 +189,7 @@ class _GameCreatureTile extends StatelessWidget {
                 height: 24,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              title: Text('Cargando de la API...'),
+              title: Tx('Cargando de la API...'),
             ),
           );
         }
@@ -205,7 +206,7 @@ class _GameCreatureTile extends StatelessWidget {
           children: [
             IconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Quitar 1 PG',
+              tooltip: tr('Quitar 1 PG'),
               onPressed: current > 0
                   ? () => service.updateCreatureDamage(gameCode, gc.id, lost + 1)
                   : null,
@@ -217,7 +218,7 @@ class _GameCreatureTile extends StatelessWidget {
             ),
             IconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Sumar 1 PG',
+              tooltip: tr('Sumar 1 PG'),
               onPressed: lost > 0
                   ? () => service.updateCreatureDamage(gameCode, gc.id, lost - 1)
                   : null,
@@ -306,7 +307,7 @@ class _GameCreatureTile extends StatelessWidget {
                           if (onLocate != null)
                             IconButton(
                               visualDensity: VisualDensity.compact,
-                              tooltip: 'Seleccionar en el mapa',
+                              tooltip: tr('Seleccionar en el mapa'),
                               icon: const Icon(Icons.my_location),
                               onPressed: () => onLocate!(t.id),
                             ),

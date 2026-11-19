@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
 
 import '../widgets/blocking_progress.dart';
@@ -13,358 +14,171 @@ import 'join_game_screen.dart';
 import 'map_picker_screen.dart';
 import 'game_screen.dart';
 import 'master_room_screen.dart';
+import '../i18n/i18n.dart';
+import '../settings/app_settings.dart';
+import 'settings_screen.dart';
+import '../widgets/app_icon.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
-    final User? user = authService.currentUser;
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'D&D 5e',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await authService.logout();
-            },
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-          ),
-        ],
-      ),
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Idioma y tema guardados del usuario
+    AppSettings.instance.load();
+  }
 
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final double maxWidth = constraints.maxWidth;
+  int _tab = 0;
+  final Set<int> _visited = {0};
 
-              // 1 tarjeta por fila en móvil, 2 en tablet, 3 en escritorio
-              final double cardWidth = maxWidth > 900
-                  ? (maxWidth > 1200 ? 360 : (maxWidth - 40) / 3)
-                  : (maxWidth > 600 ? (maxWidth - 20) / 2 : maxWidth);
+  /// Apartados de la barra inferior: (título, icono).
+  static const List<(String, String)> _tabs = [
+    ('Partidas', 'castillo'),
+    ('Personajes', 'yelmo'),
+    ('Bestiario', 'calavera'),
+    ('Objetos', 'cofre'),
+    ('Mapas', 'mapa'),
+  ];
 
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ICONO PRINCIPAL
-                  const Icon(
-                    Icons.castle,
-                    size: 85,
-                    color: Colors.deepPurple,
-                  ),
+  void _open(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
 
-                  const SizedBox(height: 16),
-
-                  // BIENVENIDA
-                  const Text(
-                    'Bienvenido a D&D 5e',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // USUARIO CONECTADO
-                  Text(
-                    user?.email ?? 'Usuario autenticado',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // PARTIDA ACTIVA COMO MASTER (para reconectarse)
-                  const _ActiveGameBanner(),
-
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    '¿Qué quieres hacer?',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // TARJETAS DEL MENÚ
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 20,
-                    runSpacing: 20,
-                    children: [
-                      // CREAR PARTIDA
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.add_circle_outline,
-                          title: 'Crear partida',
-                          description:
-                              'Crea una nueva campaña, prepara el mapa '
-                              'y administra tu aventura como Master.',
-                          buttonText: 'Crear partida',
-                          color: Colors.deepPurple,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CreateGameScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // UNIRSE A PARTIDA
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.group_add_outlined,
-                          title: 'Unirse a partida',
-                          description:
-                              'Introduce el código de una campaña '
-                              'para unirte a la aventura como jugador.',
-                          buttonText: 'Unirse a partida',
-                          color: Colors.teal,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const JoinGameScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // PERSONAJES
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.person_outline,
-                          title: 'Personajes',
-                          description:
-                              'Crea y gestiona tus fichas de personaje '
-                              'de D&D 5e para usarlas en tus partidas.',
-                          buttonText: 'Mis personajes',
-                          color: Colors.orange.shade800,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CharactersScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // NPC Y MONSTRUOS
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.pets,
-                          title: 'NPC y Monstruos',
-                          description:
-                              'Crea tus propios monstruos y NPC para usarlos '
-                              'en tus partidas.',
-                          buttonText: 'Bestiario',
-                          color: Colors.red.shade800,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CreaturesScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // OBJETOS
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.inventory_2_outlined,
-                          title: 'Objetos',
-                          description:
-                              'Consulta armas, armaduras, escudos y objetos '
-                              'mágicos de D&D 5e.',
-                          buttonText: 'Ver objetos',
-                          color: Colors.brown.shade700,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ItemsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // MAPAS
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MenuCard(
-                          icon: Icons.map_outlined,
-                          title: 'Mapas',
-                          description:
-                              'Mapas predeterminados y editor para crear '
-                              'los tuyos. Los eliges al preparar la partida.',
-                          buttonText: 'Mis mapas',
-                          color: Colors.green.shade800,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const MapPickerScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  Text(
-                    'Prepara tus dados y comienza tu aventura.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              );
-            },
+  /// Contenido centrado y con scroll de cada apartado.
+  Widget _scrollPage(List<Widget> children) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: children,
           ),
         ),
       ),
     );
   }
 
-  // ==========================================
-  // FORMULARIO PARA CREAR PARTIDA
-  // ==========================================
+  Widget _cardBox(Widget card) => ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: card,
+      );
 
-  void _showCreateGameDialog(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-    bool creating = false;
+  Widget _gamesPage(User? user) {
+    return _scrollPage([
+      Image.asset('assets/icons/logo_app.png', width: 96, height: 96),
+      const SizedBox(height: 10),
+      const Tx(
+        'Bienvenido a D&D 5e',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        user?.email ?? tr('Usuario autenticado'),
+        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+      ),
+      const SizedBox(height: 16),
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (innerContext, setState) {
-            return AlertDialog(
-              scrollable: true,
-              title: const Text('Crear nueva partida'),
+      // Todas mis partidas como Master (para reconectarse)
+      const _ActiveGameBanner(),
 
-              content: TextField(
-                controller: nameController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la partida',
-                  hintText: 'Ej. La mina perdida',
-                  prefixIcon: Icon(Icons.edit),
-                  border: OutlineInputBorder(),
-                ),
+      const SizedBox(height: 12),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          _cardBox(
+            _MenuCard(
+              asset: 'castillo',
+              title: 'Crear partida',
+              description: 'Crea una nueva campaña, prepara el mapa '
+                  'y administra tu aventura como Master.',
+              buttonText: 'Crear partida',
+              color: Colors.deepPurple,
+              onTap: () => _open(const CreateGameScreen()),
+            ),
+          ),
+          _cardBox(
+            _MenuCard(
+              asset: 'llave',
+              title: 'Unirse a partida',
+              description: 'Introduce el código de una campaña '
+                  'para unirte a la aventura como jugador.',
+              buttonText: 'Unirse a partida',
+              color: Colors.teal,
+              onTap: () => _open(const JoinGameScreen()),
+            ),
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AuthService authService = AuthService();
+    final User? user = authService.currentUser;
+
+    // Los apartados se crean al visitarlos por primera vez
+    Widget lazy(int i, Widget Function() build) =>
+        _visited.contains(i) ? build() : const SizedBox.shrink();
+
+    final pages = <Widget>[
+      _gamesPage(user),
+      lazy(1, () => const CharactersScreen(embedded: true)),
+      lazy(2, () => const CreaturesScreen(embedded: true)),
+      lazy(3, () => const ItemsScreen(embedded: true)),
+      lazy(4, () => const MapPickerScreen(embedded: true)),
+    ];
+
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => Scaffold(
+        // Los demás apartados llevan su propia barra superior
+        appBar: _tab != 0
+            ? null
+            : AppBar(
+          title: const Tx(
+            'D&D 5e',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              onPressed: () => _open(const SettingsScreen()),
+              icon: const AppIcon('opciones', size: 28),
+              tooltip: tr('Opciones'),
+            ),
+          ],
+        ),
+        body: IndexedStack(index: _tab, children: pages),
+        bottomNavigationBar: NavigationBar(
+          height: 66,
+          selectedIndex: _tab,
+          onDestinationSelected: (i) => setState(() {
+            _tab = i;
+            _visited.add(i);
+          }),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            for (final (title, asset) in _tabs)
+              NavigationDestination(
+                icon: Opacity(opacity: 0.55, child: AppIcon(asset, size: 28)),
+                selectedIcon: AppIcon(asset, size: 32),
+                label: tr(title),
               ),
-
-              actions: [
-                TextButton(
-                  onPressed: creating
-                      ? null
-                      : () {
-                          Navigator.pop(dialogContext);
-                        },
-                  child: const Text('Cancelar'),
-                ),
-
-                ElevatedButton.icon(
-                  onPressed: creating
-                      ? null
-                      : () async {
-                          final String name = nameController.text.trim();
-
-                          if (name.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Introduce un nombre para la partida.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          setState(() => creating = true);
-
-                          try {
-                            final String code =
-                                await GameService().createGame(name);
-
-                            if (!dialogContext.mounted) return;
-                            Navigator.pop(dialogContext);
-
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => MasterRoomScreen(
-                                  gameCode: code,
-                                  gameName: name,
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!dialogContext.mounted) return;
-                            setState(() => creating = false);
-
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'No se pudo crear la partida: $e',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                  icon: creating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add),
-                  label: const Text('Crear sala'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
@@ -374,7 +188,7 @@ class HomeScreen extends StatelessWidget {
 // ==========================================
 
 class _MenuCard extends StatelessWidget {
-  final IconData icon;
+  final String asset;
   final String title;
   final String description;
   final String buttonText;
@@ -382,7 +196,7 @@ class _MenuCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _MenuCard({
-    required this.icon,
+    required this.asset,
     required this.title,
     required this.description,
     required this.buttonText,
@@ -404,16 +218,12 @@ class _MenuCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 65,
-              color: color,
-            ),
+            AppIcon(asset, size: 84),
 
             const SizedBox(height: 18),
 
             Text(
-              title,
+              tr(title),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 22,
@@ -424,7 +234,7 @@ class _MenuCard extends StatelessWidget {
             const SizedBox(height: 12),
 
             Text(
-              description,
+              tr(description),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -437,7 +247,7 @@ class _MenuCard extends StatelessWidget {
 
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
                 onPressed: onTap,
 
                 style: ElevatedButton.styleFrom(
@@ -451,8 +261,7 @@ class _MenuCard extends StatelessWidget {
                   ),
                 ),
 
-                icon: Icon(icon),
-                label: Text(buttonText),
+                child: Text(tr(buttonText)),
               ),
             ),
           ],
@@ -466,6 +275,10 @@ class _MenuCard extends StatelessWidget {
 /// Si el Master tiene una partida activa en la base de datos, permite
 /// reconectarse (por ejemplo, tras salirse sin querer). De paso borra sus
 /// partidas inactivas de más de 24 horas.
+typedef _MyGame = ({String code, String name, String status});
+
+/// Lista de todas las partidas que tengo creadas como Master, para
+/// reanudarlas o terminarlas desde la pantalla principal.
 class _ActiveGameBanner extends StatefulWidget {
   const _ActiveGameBanner();
 
@@ -474,7 +287,7 @@ class _ActiveGameBanner extends StatefulWidget {
 }
 
 class _ActiveGameBannerState extends State<_ActiveGameBanner> {
-  late Future<({String code, String name, String status})?> _future;
+  late Future<List<_MyGame>> _future;
 
   /// Partidas que el Master acaba de terminar: no se vuelven a mostrar.
   final Set<String> _dismissed = {};
@@ -485,8 +298,9 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     _future = _load();
   }
 
-  Future<({String code, String name, String status})?> _load() =>
-      GameService().cleanupAndFindMyGame().catchError((_) => null);
+  Future<List<_MyGame>> _load() => GameService()
+      .cleanupAndFindMyGames()
+      .catchError((_) => <_MyGame>[]);
 
   void _refresh() {
     final next = _load();
@@ -495,7 +309,7 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     });
   }
 
-  Future<void> _resume(({String code, String name, String status}) g) async {
+  Future<void> _resume(_MyGame g) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -507,20 +321,20 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     if (mounted) _refresh();
   }
 
-  Future<void> _end(({String code, String name, String status}) g) async {
+  Future<void> _end(_MyGame g) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Terminar la sesión'),
+        title: const Tx('Terminar la sesión'),
         content: Text('Se borrará la partida «${g.name}» por completo.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Terminar sesión'),
+            child: const Tx('Terminar sesión'),
           ),
         ],
       ),
@@ -547,39 +361,52 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<({String code, String name, String status})?>(
+    return FutureBuilder<List<_MyGame>>(
       future: _future,
       builder: (context, snap) {
-        final g = snap.data;
-        if (g == null || _dismissed.contains(g.code)) {
-          return const SizedBox.shrink();
-        }
+        final games = (snap.data ?? const <_MyGame>[])
+            .where((g) => !_dismissed.contains(g.code))
+            .toList();
+        if (games.isEmpty) return const SizedBox.shrink();
 
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
-          child: Card(
-            color: Colors.deepPurple.shade50,
-            child: ListTile(
-              leading: const Icon(Icons.play_circle_outline, size: 34),
-              title: Text('Tienes una partida activa: ${g.name}'),
-              subtitle: Text(
-                'Código ${g.code} · '
-                '${g.status == 'playing' ? 'en juego' : 'en la sala'}',
-              ),
-              trailing: Wrap(
-                spacing: 4,
-                children: [
-                  TextButton(
-                    onPressed: () => _end(g),
-                    child: const Text('Terminar'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final g in games)
+                Card(
+                  color: Colors.deepPurple.shade50,
+                  child: ListTile(
+                    leading: const AppIcon('castillo', size: 40),
+                    title: Text(
+                      g.name,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${tr('Código')} ${g.code} · '
+                      '${g.status == 'playing' ? tr('en juego') : tr('en la sala')}',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        TextButton(
+                          onPressed: () => _end(g),
+                          child: const Tx('Terminar'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => _resume(g),
+                          child: const Tx('Reanudar'),
+                        ),
+                      ],
+                    ),
                   ),
-                  ElevatedButton(
-                    onPressed: () => _resume(g),
-                    child: const Text('Reanudar'),
-                  ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         );
       },

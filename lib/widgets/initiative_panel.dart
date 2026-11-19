@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../models/character.dart';
 import '../models/combat.dart';
 import '../services/game_service.dart';
+import '../i18n/i18n.dart';
+import 'app_icon.dart';
 
 /// Lista de iniciativa. El Master puede editarla; los jugadores solo la leen
 /// y pueden finalizar su turno cuando les toca.
@@ -76,11 +78,11 @@ class InitiativePanel extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text.trim())),
-            child: const Text('Guardar'),
+            child: const Tx('Guardar'),
           ),
         ],
       ),
@@ -132,19 +134,19 @@ class InitiativePanel extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Volver a tirar iniciativa'),
-        content: const Text(
+        title: const Tx('Volver a tirar iniciativa'),
+        content: const Tx(
           'Se tirará de nuevo para todas las fichas y se perderán los '
           'cambios hechos a mano en la lista.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Tirar'),
+            child: const Tx('Tirar'),
           ),
         ],
       ),
@@ -186,14 +188,14 @@ class InitiativePanel extends StatelessWidget {
                           onPressed: () => active
                               ? _confirmReroll(context)
                               : _run(context, onRollAll),
-                          icon: const Icon(Icons.casino),
+                          icon: const AppIcon('d20_vacio', size: 22),
                           label: Text(
                             active ? 'Volver a tirar' : 'Tirar iniciativa (d20)',
                           ),
                         ),
                         if (active)
                           PopupMenuButton<String>(
-                            tooltip: 'Añadir ficha a la lista',
+                            tooltip: tr('Añadir ficha a la lista'),
                             enabled: missing(st).isNotEmpty,
                             onSelected: (id) =>
                                 _run(context, () => onAdd(id, st)),
@@ -215,7 +217,7 @@ class InitiativePanel extends StatelessWidget {
                             onPressed: () =>
                                 _run(context, () => service.endCombat(gameCode)),
                             icon: const Icon(Icons.flag_outlined),
-                            label: const Text('Terminar combate'),
+                            label: const Tx('Terminar combate'),
                           ),
                       ],
                     ),
@@ -249,8 +251,8 @@ class InitiativePanel extends StatelessWidget {
                         if (isMaster || myTurn)
                           FilledButton.icon(
                             onPressed: () => _endTurn(context, st),
-                            icon: const Icon(Icons.skip_next),
-                            label: const Text('Finalizar turno'),
+                            icon: const AppIcon('reloj_arena', size: 22),
+                            label: const Tx('Finalizar turno'),
                           ),
                       ],
                     ),
@@ -258,7 +260,7 @@ class InitiativePanel extends StatelessWidget {
                   if (isMaster)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
+                      child: Tx(
                         'Arrastra para cambiar el orden · toca el resultado '
                         'para editarlo.',
                         style: TextStyle(fontSize: 11, color: Colors.black54),
@@ -372,7 +374,7 @@ class InitiativePanel extends StatelessWidget {
               ),
             if (isMaster) ...[
               IconButton(
-                tooltip: 'Dar el turno a esta ficha',
+                tooltip: tr('Dar el turno a esta ficha'),
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.play_arrow),
                 onPressed: isCurrent
@@ -383,7 +385,7 @@ class InitiativePanel extends StatelessWidget {
                         ),
               ),
               IconButton(
-                tooltip: 'Quitar de la lista',
+                tooltip: tr('Quitar de la lista'),
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.close),
                 onPressed: () => _remove(context, st, e),

@@ -5,6 +5,7 @@ import '../services/creature_service.dart';
 import '../services/monster_api_service.dart';
 import '../widgets/creature_sheet_view.dart';
 import '../widgets/avatars.dart';
+import '../i18n/i18n.dart';
 
 /// Lo que el Master elige añadir a la partida.
 class CreaturePickerResult {
@@ -145,7 +146,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Añadir NPC y monstruos',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -195,11 +196,11 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                               const SizedBox(width: 12),
                               DropdownButton<String?>(
                                 value: _crKey,
-                                hint: const Text('FP'),
+                                hint: const Tx('FP'),
                                 items: [
                                   const DropdownMenuItem<String?>(
                                     value: null,
-                                    child: Text('Todos'),
+                                    child: Tx('Todos'),
                                   ),
                                   for (final k in _crFilters.keys)
                                     DropdownMenuItem<String?>(
@@ -221,18 +222,18 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                             spacing: 8,
                             children: [
                               ChoiceChip(
-                                label: const Text('Todos'),
+                                label: const Tx('Todos'),
                                 selected: _kind == null,
                                 onSelected: (_) => setState(() => _kind = null),
                               ),
                               ChoiceChip(
-                                label: const Text('Monstruos'),
+                                label: const Tx('Monstruos'),
                                 selected: _kind == 'monster',
                                 onSelected: (_) =>
                                     setState(() => _kind = 'monster'),
                               ),
                               ChoiceChip(
-                                label: const Text('NPC'),
+                                label: const Tx('NPC'),
                                 selected: _kind == 'npc',
                                 onSelected: (_) =>
                                     setState(() => _kind = 'npc'),
@@ -242,7 +243,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                         ] else
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
-                            child: Text(
+                            child: Tx(
                               'Los monstruos de la API no se guardan: se '
                               'consultan cuando los necesitas.',
                               style: TextStyle(
@@ -325,7 +326,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
+          child: Tx(
             'Tu bestiario está vacío. Crea tus criaturas desde '
             '«NPC y Monstruos» o usa los monstruos de la pestaña API.',
             textAlign: TextAlign.center,
@@ -337,7 +338,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
 
     if (list.isEmpty) {
       return Center(
-        child: Text(
+        child: Tx(
           'No hay criaturas que mostrar.',
           style: TextStyle(color: Colors.grey.shade600),
         ),
@@ -423,7 +424,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                   OutlinedButton.icon(
                     onPressed: _reloadApi,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
+                    label: const Tx('Reintentar'),
                   ),
                 ],
               ),
@@ -437,7 +438,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
 
         if (list.isEmpty) {
           return Center(
-            child: Text(
+            child: Tx(
               'No hay monstruos que mostrar.',
               style: TextStyle(color: Colors.grey.shade600),
             ),
@@ -477,7 +478,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : IconButton(
-                            tooltip: 'Ver ficha',
+                            tooltip: tr('Ver ficha'),
                             icon: const Icon(Icons.description_outlined),
                             onPressed:
                                 _previewing == null ? () => _previewApi(m) : null,

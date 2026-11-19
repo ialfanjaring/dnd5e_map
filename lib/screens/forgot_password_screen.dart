@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import 'login_screen.dart' show validateEmail;
+import '../i18n/i18n.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -45,7 +46,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Recuperar contraseña')),
+      appBar: AppBar(title: const Tx('Recuperar contraseña')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -64,12 +65,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       children: [
         const Icon(Icons.mark_email_read_outlined, size: 72, color: Colors.teal),
         const SizedBox(height: 16),
-        const Text(
+        const Tx(
           'Revisa tu correo',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        Text(
+        Tx(
           'Si existe una cuenta con ese correo, recibirás un mensaje con las '
           'instrucciones para crear una contraseña nueva. Mira también la '
           'carpeta de spam.',
@@ -79,7 +80,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 20),
         ElevatedButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Volver al inicio de sesión'),
+          child: const Tx('Volver al inicio de sesión'),
         ),
       ],
     );
@@ -91,7 +92,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
+          Tx(
             'Escribe tu correo y te enviaremos un enlace para restablecer la '
             'contraseña.',
             style: TextStyle(color: Colors.grey.shade700),
@@ -128,7 +129,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Enviar enlace'),
+                  : const Tx('Enviar enlace'),
             ),
           ),
         ],

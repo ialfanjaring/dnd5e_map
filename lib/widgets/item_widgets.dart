@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/character.dart';
 import '../models/equipment_effects.dart';
 import '../services/equipment_api_service.dart';
+import '../i18n/i18n.dart';
 
 /// Resumen de las características de un objeto, en español.
 List<String> itemFacts(ApiItem it) {
@@ -75,14 +76,14 @@ Future<void> showItemDetail(
         }
         if (snap.hasError) {
           return AlertDialog(
-            title: const Text('Objeto'),
+            title: const Tx('Objeto'),
             content: Text(
               'No se pudo cargar el objeto.\n\nDetalle: ${snap.error}',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cerrar'),
+                child: const Tx('Cerrar'),
               ),
             ],
           );
@@ -116,7 +117,7 @@ Future<void> showItemDetail(
             ...?extraActions?.call(ctx, it),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cerrar'),
+              child: const Tx('Cerrar'),
             ),
           ],
         );
@@ -201,7 +202,7 @@ class CharacterItemsCard extends StatelessWidget {
           isDense: true,
         ),
         items: [
-          const DropdownMenuItem<String?>(value: null, child: Text('Ninguna')),
+          const DropdownMenuItem<String?>(value: null, child: Tx('Ninguna')),
           for (final i in options)
             DropdownMenuItem<String?>(
               value: i,
@@ -232,7 +233,7 @@ class CharacterItemsCard extends StatelessWidget {
             Row(
               children: [
                 const Expanded(
-                  child: Text(
+                  child: Tx(
                     'Objetos',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
@@ -241,18 +242,18 @@ class CharacterItemsCard extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onAdd,
                     icon: const Icon(Icons.add),
-                    label: const Text('Añadir'),
+                    label: const Tx('Añadir'),
                   ),
               ],
             ),
 
             if (c.items.isEmpty)
-              Text(
+              Tx(
                 'Sin objetos.',
                 style: TextStyle(color: Colors.grey.shade600),
               )
             else ...[
-              const Text(
+              const Tx(
                 'Equipo activo',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
@@ -261,7 +262,7 @@ class CharacterItemsCard extends StatelessWidget {
               _slot('Escudo activo', Icons.shield_outlined, (it) => it.slot == 'shield'),
               if (showList) ...[
                 const Divider(height: 24),
-                const Text(
+                const Tx(
                   'Todos los objetos',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
@@ -275,7 +276,7 @@ class CharacterItemsCard extends StatelessWidget {
             // Efectos del equipo
             if (effects.attacks.isNotEmpty) ...[
               const Divider(),
-              const Text('Ataques', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Tx('Ataques', style: TextStyle(fontWeight: FontWeight.bold)),
               for (final a in effects.attacks)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -284,7 +285,7 @@ class CharacterItemsCard extends StatelessWidget {
                     'impactar · ${a.damage}',
                   ),
                 ),
-              Text(
+              Tx(
                 'Se asume competencia con el arma.',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
@@ -296,7 +297,7 @@ class CharacterItemsCard extends StatelessWidget {
               if (effects.armorClass != null)
                 Text('CA con el equipo: ${effects.armorClass}'),
               if (effects.stealthDisadvantage)
-                const Text('Desventaja en Sigilo por la armadura.'),
+                const Tx('Desventaja en Sigilo por la armadura.'),
               for (final n in effects.notes) Text(n),
             ],
           ],
@@ -339,7 +340,7 @@ class CharacterItemsCard extends StatelessWidget {
             ),
           if (onRemove != null)
             IconButton(
-              tooltip: 'Quitar',
+              tooltip: tr('Quitar'),
               visualDensity: VisualDensity.compact,
               icon: const Icon(Icons.delete_outline),
               onPressed: () => onRemove!(index),

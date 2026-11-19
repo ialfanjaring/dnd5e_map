@@ -703,16 +703,17 @@ class GameService {
     await deleteGameData(code);
   }
 
-  /// Borra mis partidas inactivas (más de 24 h) o terminadas y devuelve la
-  /// más reciente que siga activa, para poder reconectarse como Master.
-  Future<({String code, String name, String status})?>
-      cleanupAndFindMyGame() async {
+  /// Borra mis partidas inactivas (más de 24 h) o terminadas y devuelve todas
+  /// las que siguen activas (la más reciente primero), para poder
+  /// reconectarse como Master a cualquiera de ellas.
+  Future<List<({String code, String name, String status})>>
+      cleanupAndFindMyGames() async {
     final snap =
         await _games.where('masterUid', isEqualTo: _user.uid).get();
 
     final now = DateTime.now();
-    QueryDocumentSnapshot<Map<String, dynamic>>? best;
-    DateTime? bestAt;
+    final alive =
+        <({String code, String name, String status, DateTime? at})>[];
 
     for (final d in snap.docs) {
       final data = d.data();
@@ -727,19 +728,25 @@ class GameService {
         } catch (_) {}
         continue;
       }
-      if (best == null || (at != null && (bestAt == null || at.isAfter(bestAt)))) {
-        best = d;
-        bestAt = at;
-      }
+      alive.add((
+        code: d.id,
+        name: (data['name'] ?? 'Partida') as String,
+        status: (data['status'] ?? 'lobby') as String,
+        at: at,
+      ));
     }
 
-    if (best == null) return null;
-    final data = best.data();
-    return (
-      code: best.id,
-      name: (data['name'] ?? 'Partida') as String,
-      status: (data['status'] ?? 'lobby') as String,
-    );
+    alive.sort((a, b) {
+      final x = a.at, y = b.at;
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return y.compareTo(x);
+    });
+
+    return [
+      for (final g in alive) (code: g.code, name: g.name, status: g.status),
+    ];
   }
 
   // ==========================================

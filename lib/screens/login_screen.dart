@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../widgets/password_field.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+import '../i18n/i18n.dart';
 
 final RegExp emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
 
@@ -94,15 +95,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.castle, size: 80, color: Colors.deepPurple),
+                    Image.asset('assets/icons/logo_app.png', width: 110, height: 110),
                     const SizedBox(height: 12),
-                    const Text(
+                    const Tx(
                       'D&D 5e',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    Tx(
                       'Inicia sesión para continuar',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey.shade600),
@@ -149,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Text('Iniciar sesión'),
+                            : const Tx('Iniciar sesión'),
                       ),
                     ),
                     Align(
@@ -163,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     builder: (_) => const ForgotPasswordScreen(),
                                   ),
                                 ),
-                        child: const Text('¿Olvidaste tu contraseña?'),
+                        child: const Tx('¿Olvidaste tu contraseña?'),
                       ),
                     ),
                     const Divider(),
@@ -173,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _loading ? null : _google,
                         icon: const Icon(Icons.g_mobiledata, size: 28),
-                        label: const Text('Continuar con Google'),
+                        label: const Tx('Continuar con Google'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -186,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   builder: (_) => const RegisterScreen(),
                                 ),
                               ),
-                      child: const Text('¿No tienes cuenta? Regístrate'),
+                      child: const Tx('¿No tienes cuenta? Regístrate'),
                     ),
                   ],
                 ),

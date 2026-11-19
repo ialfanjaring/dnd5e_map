@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../i18n/i18n.dart';
 
 /// Pantalla que se muestra hasta que el usuario confirma su correo.
 /// Sin correo verificado no se puede entrar en la app (y las reglas de
@@ -112,7 +113,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   color: Colors.deepPurple,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                const Tx(
                   'Verifica tu correo',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -131,7 +132,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _checking ? null : () => _check(),
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Ya lo he verificado'),
+                    label: const Tx('Ya lo he verificado'),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -158,7 +159,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => _auth.logout(),
-                  child: const Text('Usar otra cuenta'),
+                  child: const Tx('Usar otra cuenta'),
                 ),
               ],
             ),

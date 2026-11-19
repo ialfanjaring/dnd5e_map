@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/monster_api_service.dart';
 import 'creature_sheet_view.dart';
+import '../i18n/i18n.dart';
 
 /// Monstruos predeterminados (D&D 5e SRD API). Solo se pueden consultar:
 /// no se guardan ni se pueden editar. Para usarlos en una partida, el Master
@@ -87,7 +88,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            Tx(
                               'Monstruos predeterminados',
                               style: TextStyle(
                                 fontSize: 16,
@@ -95,7 +96,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                               ),
                             ),
                             SizedBox(height: 2),
-                            Text(
+                            Tx(
                               'De la API de D&D 5e (SRD, en inglés). Solo se '
                               'pueden consultar; para usarlos en una partida, '
                               'añádelos desde la sala del Master.',
@@ -131,11 +132,11 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                   const SizedBox(width: 12),
                   DropdownButton<String?>(
                     value: _crKey,
-                    hint: const Text('FP'),
+                    hint: const Tx('FP'),
                     items: [
                       const DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('Todos'),
+                        child: Tx('Todos'),
                       ),
                       for (final k in MonsterApiService.crFilters.keys)
                         DropdownMenuItem<String?>(
@@ -177,7 +178,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                             OutlinedButton.icon(
                               onPressed: _reload,
                               icon: const Icon(Icons.refresh),
-                              label: const Text('Reintentar'),
+                              label: const Tx('Reintentar'),
                             ),
                           ],
                         ),
@@ -193,7 +194,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
 
                   if (list.isEmpty) {
                     return Center(
-                      child: Text(
+                      child: Tx(
                         'No hay monstruos que mostrar.',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),

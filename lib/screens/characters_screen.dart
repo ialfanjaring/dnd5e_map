@@ -9,10 +9,15 @@ import 'class_info_screen.dart';
 import 'race_info_screen.dart';
 import '../widgets/avatars.dart';
 import '../widgets/resolved_character.dart';
+import '../i18n/i18n.dart';
+import '../widgets/options_button.dart';
 
 /// Apartado "Personajes": lista, crea, edita y elimina fichas.
 class CharactersScreen extends StatelessWidget {
-  const CharactersScreen({super.key});
+  /// true cuando se muestra como apartado de la pantalla principal
+  final bool embedded;
+
+  const CharactersScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
@@ -20,14 +25,14 @@ class CharactersScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: const Tx(
           'Mis personajes',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: 'Consultar razas',
+            tooltip: tr('Consultar razas'),
             icon: const Icon(Icons.diversity_3_outlined),
             onPressed: () => Navigator.push(
               context,
@@ -35,13 +40,14 @@ class CharactersScreen extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Consultar clases',
+            tooltip: tr('Consultar clases'),
             icon: const Icon(Icons.menu_book_outlined),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ClassesScreen()),
             ),
           ),
+          if (embedded) const OptionsButton(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -52,7 +58,7 @@ class CharactersScreen extends StatelessWidget {
           );
         },
         icon: const Icon(Icons.add),
-        label: const Text('Nuevo personaje'),
+        label: const Tx('Nuevo personaje'),
       ),
       body: StreamBuilder<List<Character>>(
         stream: service.myCharacters(),
@@ -88,7 +94,7 @@ class CharactersScreen extends StatelessWidget {
                       color: Colors.orange,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    const Tx(
                       'Aún no tienes personajes',
                       style: TextStyle(
                         fontSize: 20,
@@ -96,7 +102,7 @@ class CharactersScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
+                    Tx(
                       'Crea tu primera ficha de D&D 5e para poder '
                       'unirte a una partida.',
                       textAlign: TextAlign.center,
@@ -152,16 +158,16 @@ class CharactersScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Eliminar personaje'),
+        title: const Tx('Eliminar personaje'),
         content: Text('¿Seguro que quieres eliminar a "${c.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Eliminar'),
+            child: const Tx('Eliminar'),
           ),
         ],
       ),
@@ -229,9 +235,9 @@ class _CharacterTile extends StatelessWidget {
             }
           },
           itemBuilder: (_) => const [
-            PopupMenuItem(value: 'view', child: Text('Ver ficha')),
-            PopupMenuItem(value: 'edit', child: Text('Editar')),
-            PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+            PopupMenuItem(value: 'view', child: Tx('Ver ficha')),
+            PopupMenuItem(value: 'edit', child: Tx('Editar')),
+            PopupMenuItem(value: 'delete', child: Tx('Eliminar')),
           ],
         ),
       ),

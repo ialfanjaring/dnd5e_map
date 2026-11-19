@@ -342,6 +342,7 @@ class ApiSpell {
 /// La API solo ofrece los textos en inglés (también fr-FR y pt-BR), así que
 /// el contenido se muestra en inglés y las etiquetas de la app en español.
 class ClassApiService {
+
   static const String _base = 'https://www.dnd5eapi.co/api/2014';
 
   static final Map<String, ApiClass> _classCache = {};

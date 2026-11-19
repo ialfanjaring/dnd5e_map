@@ -15,6 +15,7 @@ import 'spell_picker_screen.dart';
 import '../models/equipment_effects.dart';
 import '../widgets/ability_grid.dart';
 import '../widgets/item_widgets.dart';
+import '../i18n/i18n.dart';
 
 /// Crear o editar un personaje con ficha de D&D 5e.
 class CharacterFormScreen extends StatefulWidget {
@@ -451,7 +452,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            const Text('Nivel', style: TextStyle(fontSize: 16)),
+            const Tx('Nivel', style: TextStyle(fontSize: 16)),
             const Spacer(),
             IconButton(
               onPressed: _level > 1 ? () => setState(() => _level--) : null,
@@ -504,12 +505,12 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             OutlinedButton.icon(
               onPressed: _rollAbilities,
               icon: const Icon(Icons.casino),
-              label: const Text('Tirar 4d6'),
+              label: const Tx('Tirar 4d6'),
             ),
             OutlinedButton.icon(
               onPressed: _applyStandardArray,
               icon: const Icon(Icons.format_list_numbered),
-              label: const Text('Array estándar'),
+              label: const Tx('Array estándar'),
             ),
           ],
         ),
@@ -544,7 +545,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               padding: const EdgeInsets.only(top: 6),
               child: OutlinedButton(
                 onPressed: _suggestHp,
-                child: const Text('Calcular PG'),
+                child: const Tx('Calcular PG'),
               ),
             ),
           ],
@@ -715,7 +716,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             items: [
               const DropdownMenuItem<String?>(
                 value: null,
-                child: Text('Sin subraza'),
+                child: Tx('Sin subraza'),
               ),
               for (final r in info.subraces)
                 DropdownMenuItem<String?>(
@@ -805,7 +806,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_spells.isEmpty)
-          Text(
+          Tx(
             'Aún no has elegido hechizos.',
             style: TextStyle(color: Colors.grey.shade600),
           )
@@ -823,7 +824,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        Text(
+        Tx(
           'Solo se guarda la lista; el texto de cada hechizo se consulta en '
           'la API.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -854,7 +855,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         Row(
           children: [
             const Expanded(
-              child: Text(
+              child: Tx(
                 'Objetos de la API',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
@@ -862,14 +863,14 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             OutlinedButton.icon(
               onPressed: _pickItems,
               icon: const Icon(Icons.add),
-              label: const Text('Añadir objetos'),
+              label: const Tx('Añadir objetos'),
             ),
           ],
         ),
         if (_items.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text(
+            child: Tx(
               'Sin objetos. Armaduras, escudos y armas se equipan en la ficha '
               'y cambian la CA y los ataques automáticamente.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),

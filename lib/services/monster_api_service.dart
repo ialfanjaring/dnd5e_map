@@ -23,6 +23,7 @@ class ApiMonsterRef {
 /// español), así que traducimos tamaño, tipo, alineamiento y etiquetas, y
 /// dejamos en inglés los nombres y las descripciones.
 class MonsterApiService {
+
   static const String _base = 'https://www.dnd5eapi.co/api/2014';
 
   // Caché en memoria de las listas ya descargadas (clave: filtro de FP)

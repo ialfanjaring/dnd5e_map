@@ -25,6 +25,8 @@ import '../widgets/game_board.dart';
 import '../widgets/game_creatures_section.dart';
 import '../widgets/game_sheet_widgets.dart';
 import '../widgets/initiative_panel.dart';
+import '../i18n/i18n.dart';
+import '../widgets/app_icon.dart';
 
 enum _Tool { move, paint, erase }
 
@@ -260,12 +262,12 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sesión terminada'),
-        content: const Text('El Master ha terminado la sesión.'),
+        title: const Tx('Sesión terminada'),
+        content: const Tx('El Master ha terminado la sesión.'),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Aceptar'),
+            child: const Tx('Aceptar'),
           ),
         ],
       ),
@@ -295,8 +297,8 @@ class _GameScreenState extends State<GameScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reiniciar la sala'),
-        content: const Text(
+        title: const Tx('Reiniciar la sala'),
+        content: const Tx(
           'Todos volverán a la sala de espera. Se quitarán las fichas del '
           'mapa, el combate y el registro de dados. Se conservan los '
           'jugadores, las criaturas y el mapa. Podrás cambiar de mapa e '
@@ -305,11 +307,11 @@ class _GameScreenState extends State<GameScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reiniciar'),
+            child: const Tx('Reiniciar'),
           ),
         ],
       ),
@@ -333,8 +335,8 @@ class _GameScreenState extends State<GameScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Terminar la sesión'),
-        content: const Text(
+        title: const Tx('Terminar la sesión'),
+        content: const Tx(
           'Se avisará a los jugadores y la partida se borrará por completo '
           '(mapa, fichas y criaturas). Tus personajes, bestiario y mapas '
           'guardados no se tocan.',
@@ -342,11 +344,11 @@ class _GameScreenState extends State<GameScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Terminar sesión'),
+            child: const Tx('Terminar sesión'),
           ),
         ],
       ),
@@ -365,7 +367,7 @@ class _GameScreenState extends State<GameScreen>
       );
       navigator.popUntil((r) => r.isFirst);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Sesión terminada y partida borrada.')),
+        const SnackBar(content: Tx('Sesión terminada y partida borrada.')),
       );
     } catch (e) {
       _ended = false;
@@ -624,6 +626,7 @@ class _GameScreenState extends State<GameScreen>
 
     return Material(
       color: mine ? Colors.green.shade200 : Colors.white.withAlpha(235),
+      textStyle: const TextStyle(color: Colors.black87),
       borderRadius: BorderRadius.circular(10),
       elevation: 3,
       child: InkWell(
@@ -657,7 +660,7 @@ class _GameScreenState extends State<GameScreen>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Código de la sala'),
+        title: const Tx('Código de la sala'),
         content: SelectableText(
           _code,
           textAlign: TextAlign.center,
@@ -674,11 +677,11 @@ class _GameScreenState extends State<GameScreen>
               Navigator.pop(ctx);
               _snack('Código copiado');
             },
-            child: const Text('Copiar'),
+            child: const Tx('Copiar'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
+            child: const Tx('Cerrar'),
           ),
         ],
       ),
@@ -749,12 +752,12 @@ class _GameScreenState extends State<GameScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             autofocus: true,
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmar'),
+            child: const Tx('Confirmar'),
           ),
         ],
       ),
@@ -854,7 +857,7 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: const Text('Nombre de la ficha'),
+        title: const Tx('Nombre de la ficha'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -866,11 +869,11 @@ class _GameScreenState extends State<GameScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Guardar'),
+            child: const Tx('Guardar'),
           ),
         ],
       ),
@@ -884,16 +887,16 @@ class _GameScreenState extends State<GameScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Quitar de la partida'),
+        title: const Tx('Quitar de la partida'),
         content: Text('¿Quitar "${_nameOf(t)}" de la partida y del mapa?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Quitar'),
+            child: const Tx('Quitar'),
           ),
         ],
       ),
@@ -917,16 +920,16 @@ class _GameScreenState extends State<GameScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Limpiar terreno'),
-        content: const Text('Se borrará todo lo pintado en el mapa.'),
+        title: const Tx('Limpiar terreno'),
+        content: const Tx('Se borrará todo lo pintado en el mapa.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Tx('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Limpiar'),
+            child: const Tx('Limpiar'),
           ),
         ],
       ),
@@ -952,14 +955,14 @@ class _GameScreenState extends State<GameScreen>
         centerTitle: true,
         actions: [
           IconButton(
-            tooltip: 'Ver código de la sala',
-            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: tr('Ver código de la sala'),
+            icon: const AppIcon('llave'),
             onPressed: _showCode,
           ),
           if (widget.isMaster)
             IconButton(
-              tooltip: 'Objetos (armas, armaduras...) para asignar',
-              icon: const Icon(Icons.inventory_2_outlined),
+              tooltip: tr('Objetos (armas, armaduras...) para asignar'),
+              icon: const AppIcon('cofre'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -969,18 +972,18 @@ class _GameScreenState extends State<GameScreen>
             ),
           if (widget.isMaster)
             IconButton(
-              tooltip: 'Reiniciar la sala (volver a la sala de espera)',
+              tooltip: tr('Reiniciar la sala (volver a la sala de espera)'),
               icon: const Icon(Icons.restart_alt),
               onPressed: _resetRoom,
             ),
           if (widget.isMaster)
             IconButton(
-              tooltip: 'Terminar la sesión (borra la partida)',
+              tooltip: tr('Terminar la sesión (borra la partida)'),
               icon: const Icon(Icons.stop_circle_outlined),
               onPressed: _endSession,
             ),
           IconButton(
-            tooltip: 'Salir del mapa',
+            tooltip: tr('Salir del mapa'),
             icon: const Icon(Icons.exit_to_app),
             onPressed: () => Navigator.pop(context),
           ),
@@ -1219,13 +1222,20 @@ class _GameScreenState extends State<GameScreen>
               '${r.name} · ${r.label}: ${r.resultText}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Text(
             r.headline,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
         ],
       ),
@@ -1235,7 +1245,8 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _buildToolbar() {
     return Material(
-      color: Colors.grey.shade200,
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 2,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1248,17 +1259,17 @@ class _GameScreenState extends State<GameScreen>
                   ButtonSegment(
                     value: _Tool.move,
                     icon: Icon(Icons.pan_tool_alt_outlined),
-                    label: Text('Mover'),
+                    label: Tx('Mover'),
                   ),
                   ButtonSegment(
                     value: _Tool.paint,
                     icon: Icon(Icons.brush),
-                    label: Text('Pintar'),
+                    label: Tx('Pintar'),
                   ),
                   ButtonSegment(
                     value: _Tool.erase,
                     icon: Icon(Icons.cleaning_services_outlined),
-                    label: Text('Borrar'),
+                    label: Tx('Borrar'),
                   ),
                 ],
                 selected: {_tool},
@@ -1277,12 +1288,12 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   ),
               IconButton(
-                tooltip: 'Tamaño del mapa',
+                tooltip: tr('Tamaño del mapa'),
                 icon: const Icon(Icons.grid_on),
                 onPressed: _gridSizeDialog,
               ),
               IconButton(
-                tooltip: 'Limpiar terreno',
+                tooltip: tr('Limpiar terreno'),
                 icon: const Icon(Icons.layers_clear),
                 onPressed: _confirmClearTerrain,
               ),
@@ -1290,7 +1301,7 @@ class _GameScreenState extends State<GameScreen>
             if (!widget.isMaster)
               Padding(
                 padding: const EdgeInsets.only(left: 4),
-                child: Text(
+                child: Tx(
                   'Toca tu ficha y luego una casilla para moverla',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
@@ -1328,7 +1339,7 @@ class _GameScreenState extends State<GameScreen>
             ),
             if (canOpenSheet)
               IconButton(
-                tooltip: 'Ver ficha',
+                tooltip: tr('Ver ficha'),
                 icon: const Icon(Icons.description_outlined),
                 onPressed: () => _openTokenSheet(t),
               ),
@@ -1344,7 +1355,7 @@ class _GameScreenState extends State<GameScreen>
                     .catchError(_onError),
               ),
               PopupMenuButton<int>(
-                tooltip: 'Tamaño de la ficha',
+                tooltip: tr('Tamaño de la ficha'),
                 icon: const Icon(Icons.open_in_full),
                 onSelected: (v) =>
                     _service.setTokenSpan(_code, t.id, v).catchError(_onError),
@@ -1357,12 +1368,12 @@ class _GameScreenState extends State<GameScreen>
                 ],
               ),
               IconButton(
-                tooltip: 'Cambiar nombre',
+                tooltip: tr('Cambiar nombre'),
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _renameToken(t),
               ),
               IconButton(
-                tooltip: 'Quitar de la partida',
+                tooltip: tr('Quitar de la partida'),
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _removeCreature(t),
               ),
@@ -1502,7 +1513,7 @@ class _GridSizeDialogState extends State<_GridSizeDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Tamaño del mapa'),
+      title: const Tx('Tamaño del mapa'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1522,9 +1533,9 @@ class _GridSizeDialogState extends State<_GridSizeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
+          child: const Tx('Cancelar'),
         ),
-        ElevatedButton(onPressed: _apply, child: const Text('Aplicar')),
+        ElevatedButton(onPressed: _apply, child: const Tx('Aplicar')),
       ],
     );
   }

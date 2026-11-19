@@ -8,6 +8,7 @@ import 'character_sheet_view.dart';
 import 'avatars.dart';
 import 'resolved_character.dart';
 import '../models/character.dart';
+import '../i18n/i18n.dart';
 
 /// Ficha de un jugador en tiempo real: puntos de golpe y ficha completa.
 /// El jugador puede editar la suya; el Master puede ajustar los PG de cualquiera.
@@ -100,7 +101,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
         }
 
         if (player == null) {
-          return const Center(child: Text('Esta ficha ya no está en la partida.'));
+          return const Center(child: Tx('Esta ficha ya no está en la partida.'));
         }
 
         final p = player;
@@ -214,11 +215,11 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                           ),
                         ),
                         icon: const Icon(Icons.edit),
-                        label: const Text('Editar ficha'),
+                        label: const Tx('Editar ficha'),
                       ),
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(
+                        child: Tx(
                           'Los cambios se ven al instante en la partida y no '
                           'modifican tu personaje guardado.',
                           style: TextStyle(
@@ -331,7 +332,7 @@ class _PlayersPanelState extends State<PlayersPanel> {
 
         if (players.isEmpty) {
           return Center(
-            child: Text(
+            child: Tx(
               'Todavía no hay jugadores.',
               style: TextStyle(color: Colors.grey.shade600),
             ),
@@ -377,7 +378,7 @@ class _PlayersPanelState extends State<PlayersPanel> {
                     children: [
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'Quitar 1 PG',
+                        tooltip: tr('Quitar 1 PG'),
                         onPressed: p.currentHp > 0
                             ? () => _service.updatePlayerHp(
                                   widget.gameCode,
@@ -393,7 +394,7 @@ class _PlayersPanelState extends State<PlayersPanel> {
                       ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'Sumar 1 PG',
+                        tooltip: tr('Sumar 1 PG'),
                         onPressed: p.currentHp < p.character.maxHp
                             ? () => _service.updatePlayerHp(
                                   widget.gameCode,

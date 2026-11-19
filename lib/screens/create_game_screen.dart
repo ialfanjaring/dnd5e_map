@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/game_service.dart';
 import 'master_room_screen.dart';
+import '../i18n/i18n.dart';
 
 /// Pantalla completa para crear una partida (más fiable que un diálogo en
 /// móviles en horizontal, donde el teclado ocupa casi toda la pantalla).
@@ -29,7 +30,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
     final name = _name.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Escribe un nombre para la partida')),
+        const SnackBar(content: Tx('Escribe un nombre para la partida')),
       );
       return;
     }
@@ -56,7 +57,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear partida')),
+      appBar: AppBar(title: const Tx('Crear partida')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -91,7 +92,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.add),
-                      label: const Text('Crear'),
+                      label: const Tx('Crear'),
                     ),
                   ),
                 ],

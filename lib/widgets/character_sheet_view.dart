@@ -8,6 +8,7 @@ import 'item_widgets.dart';
 import '../screens/class_info_screen.dart';
 import '../screens/race_info_screen.dart';
 import 'spell_widgets.dart';
+import '../i18n/i18n.dart';
 
 /// Pantalla completa con la ficha de un personaje (solo lectura).
 class CharacterSheetScreen extends StatelessWidget {
@@ -441,7 +442,7 @@ class _ApiTextTile extends StatelessWidget {
               );
             }
             if (snap.hasError) {
-              return const Text('No se pudo cargar la descripción.');
+              return const Tx('No se pudo cargar la descripción.');
             }
             return Text(snap.data!.join('\n\n'));
           },
@@ -472,10 +473,10 @@ class _RaceTraits extends StatelessWidget {
           return const LinearProgressIndicator();
         }
         if (snap.hasError) {
-          return const Text('No se pudieron cargar los rasgos (sin conexión).');
+          return const Tx('No se pudieron cargar los rasgos (sin conexión).');
         }
         final traits = snap.data!;
-        if (traits.isEmpty) return const Text('Esta raza no tiene rasgos.');
+        if (traits.isEmpty) return const Tx('Esta raza no tiene rasgos.');
         return Column(
           children: [
             for (final t in traits)
@@ -506,10 +507,10 @@ class _Subclasses extends StatelessWidget {
           return const LinearProgressIndicator();
         }
         if (snap.hasError) {
-          return const Text('No se pudieron cargar las subclases.');
+          return const Tx('No se pudieron cargar las subclases.');
         }
         final subs = snap.data!.subclasses;
-        if (subs.isEmpty) return const Text('Sin subclases en el SRD.');
+        if (subs.isEmpty) return const Tx('Sin subclases en el SRD.');
         return Column(
           children: [
             for (final sc in subs)

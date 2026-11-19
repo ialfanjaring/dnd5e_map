@@ -9,6 +9,7 @@ import '../services/creature_service.dart';
 import '../widgets/ability_grid.dart';
 import '../widgets/spell_widgets.dart';
 import 'spell_picker_screen.dart';
+import '../i18n/i18n.dart';
 
 /// Crear o editar un monstruo o NPC.
 class CreatureFormScreen extends StatefulWidget {
@@ -241,12 +242,12 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
             segments: const [
               ButtonSegment(
                 value: 'monster',
-                label: Text('Monstruo'),
+                label: Tx('Monstruo'),
                 icon: Icon(Icons.pets),
               ),
               ButtonSegment(
                 value: 'npc',
-                label: Text('NPC'),
+                label: Tx('NPC'),
                 icon: Icon(Icons.person),
               ),
             ],
@@ -379,7 +380,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_spells.isEmpty)
-          Text(
+          Tx(
             'Este NPC no tiene hechizos.',
             style: TextStyle(color: Colors.grey.shade600),
           )
@@ -395,7 +396,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
           label: Text(_spells.isEmpty ? 'Elegir hechizos' : 'Editar hechizos'),
         ),
         const SizedBox(height: 6),
-        Text(
+        Tx(
           'Solo se guarda la lista; el texto de cada hechizo se consulta en '
           'la API.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),

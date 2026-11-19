@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
+import '../i18n/i18n.dart';
 
 class _PickerData {
   /// Hechizos entre los que se puede elegir
@@ -148,7 +149,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                         _future = _load();
                       }),
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar'),
+                      label: const Tx('Reintentar'),
                     ),
                   ],
                 ),
@@ -218,7 +219,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: ChoiceChip(
-                  label: const Text('Todos'),
+                  label: const Tx('Todos'),
                   selected: _levelFilter == null,
                   onSelected: (_) => setState(() => _levelFilter = null),
                 ),
@@ -263,7 +264,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                     return Padding(
                       padding: const EdgeInsets.all(24),
                       child: Center(
-                        child: Text(
+                        child: Tx(
                           'No hay hechizos que mostrar.',
                           style: TextStyle(color: Colors.grey.shade600),
                         ),
@@ -317,7 +318,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
     // NPC: sin clase, solo se explica qué se guarda
     if (widget.classIndex == null) {
       return [
-        const Text(
+        const Tx(
           'Elige los hechizos que puede usar. Los datos de cada hechizo se '
           'consultan siempre en la API; solo se guarda la lista.',
         ),
@@ -386,7 +387,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
         ),
         subtitle: Text(s.level == null ? '' : spellLevelLabel(s.level!)),
         trailing: IconButton(
-          tooltip: 'Ver hechizo',
+          tooltip: tr('Ver hechizo'),
           icon: const Icon(Icons.info_outline),
           onPressed: () => showSpellDetail(context, s.index, s.name),
         ),
