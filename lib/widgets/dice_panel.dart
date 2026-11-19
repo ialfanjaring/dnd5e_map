@@ -83,20 +83,21 @@ class _DicePanelState extends State<DicePanel> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _controls() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // SELECCIÓN DE DADO
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
           child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
+            spacing: 4,
+            runSpacing: 0,
             children: [
               for (final d in DiceRoll.dice)
                 ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(DiceRoll.dieName(d)),
                   selected: _die == d,
                   onSelected: (_) => setState(() => _die = d),
@@ -107,7 +108,7 @@ class _DicePanelState extends State<DicePanel> {
 
         // CANTIDAD Y OCULTA
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
               const Text('Cantidad'),
@@ -127,28 +128,23 @@ class _DicePanelState extends State<DicePanel> {
               ),
               const Spacer(),
               const Text('Oculta'),
-              Switch(
-                value: _hidden,
-                onChanged: (v) => setState(() => _hidden = v),
+              Transform.scale(
+                scale: 0.85,
+                child: Switch(
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  value: _hidden,
+                  onChanged: (v) => setState(() => _hidden = v),
+                ),
               ),
             ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-          child: Text(
-            _hidden
-                ? 'Solo verás tú el resultado.'
-                : 'El resultado se publica en el registro para todos.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ),
 
         // BOTÓN TIRAR
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
           child: SizedBox(
-            height: 46,
+            height: 40,
             child: ElevatedButton.icon(
               onPressed: _rolling ? null : _roll,
               icon: Icon(_hidden ? Icons.visibility_off : Icons.casino),
@@ -160,62 +156,73 @@ class _DicePanelState extends State<DicePanel> {
             ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: Text(
+            _hidden
+                ? 'Solo verás tú el resultado.'
+                : 'El resultado se publica en el registro para todos.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+        ),
         const Divider(height: 1),
+      ],
+    );
+  }
 
-        // REGISTRO
-        Expanded(
-          child: ValueListenableBuilder<List<DiceRoll>>(
-            valueListenable: widget.hiddenRolls,
-            builder: (context, hidden, _) {
-              return StreamBuilder<List<DiceRoll>>(
-                stream: _rollsStream,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'No se pudo cargar el registro.\n${snapshot.error}',
-                      ),
-                    );
-                  }
+  @override
+  Widget build(BuildContext context) {
+    // Controles y registro en una sola lista: en horizontal también se
+    // puede desplazar para ver todas las tiradas.
+    return ValueListenableBuilder<List<DiceRoll>>(
+      valueListenable: widget.hiddenRolls,
+      builder: (context, hidden, _) {
+        return StreamBuilder<List<DiceRoll>>(
+          stream: _rollsStream,
+          builder: (context, snapshot) {
+            final shared = snapshot.data ?? const <DiceRoll>[];
 
-                  final shared = snapshot.data ?? const <DiceRoll>[];
-
-                  if (hidden.isEmpty && shared.isEmpty) {
-                    return Center(
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _controls(),
+                if (snapshot.hasError)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No se pudo cargar el registro.\n${snapshot.error}',
+                    ),
+                  )
+                else if (hidden.isEmpty && shared.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
                       child: Text(
                         'Todavía no hay tiradas.',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
-                    );
-                  }
-
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    children: [
-                      if (hidden.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(12, 8, 12, 2),
-                          child: Text(
-                            'Mis tiradas ocultas (solo tú)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        for (final r in hidden) _RollTile(roll: r, isHidden: true),
-                        const Divider(),
-                      ],
-                      for (final r in shared) _RollTile(roll: r),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+                    ),
+                  ),
+                if (hidden.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(12, 8, 12, 2),
+                    child: Text(
+                      'Mis tiradas ocultas (solo tú)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  for (final r in hidden) _RollTile(roll: r, isHidden: true),
+                  const Divider(),
+                ],
+                for (final r in shared) _RollTile(roll: r),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

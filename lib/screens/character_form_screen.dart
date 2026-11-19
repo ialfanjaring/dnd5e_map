@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/character.dart';
 import '../services/character_service.dart';
@@ -12,6 +13,7 @@ import 'items_screen.dart';
 import 'race_info_screen.dart';
 import 'spell_picker_screen.dart';
 import '../models/equipment_effects.dart';
+import '../widgets/ability_grid.dart';
 import '../widgets/item_widgets.dart';
 
 /// Crear o editar un personaje con ficha de D&D 5e.
@@ -512,66 +514,12 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final k in DndData.abilityKeys) _abilityBox(k),
-          ],
+        AbilityGrid(
+          abilities: _abilities,
+          racial: _racial,
+          onChanged: (k, v) => setState(() => _abilities[k] = v),
         ),
       ],
-    );
-  }
-
-  Widget _abilityBox(String key) {
-    final score = _abilities[key]!;
-    final racial = _racial[key] ?? 0;
-    final mod = Character.modifier(score + racial);
-
-    return Container(
-      width: 190,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            DndData.abilityNames[key]!,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Text(
-            Character.signed(mod),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: score > 1
-                    ? () => setState(() => _abilities[key] = score - 1)
-                    : null,
-                icon: const Icon(Icons.remove),
-              ),
-              Text(
-                racial == 0
-                    ? '$score'
-                    : '$score ${Character.signed(racial)} = ${score + racial}',
-                style: const TextStyle(fontSize: 16),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: score < 30
-                    ? () => setState(() => _abilities[key] = score + 1)
-                    : null,
-                icon: const Icon(Icons.add),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -624,6 +572,11 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     return TextFormField(
       controller: ctrl,
       keyboardType: TextInputType.number,
+      // Solo cifras (sin símbolos) y como máximo 4 dígitos
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

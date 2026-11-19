@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/character.dart';
 import '../models/combat.dart';
@@ -57,11 +57,16 @@ class InitiativePanel extends StatelessWidget {
     final value = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: Text('Iniciativa de ${e.name}'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(signed: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
+            LengthLimitingTextInputFormatter(4),
+          ],
           decoration: const InputDecoration(
             labelText: 'Resultado final',
             border: OutlineInputBorder(),

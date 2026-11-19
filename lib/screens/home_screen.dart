@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../widgets/blocking_progress.dart';
+
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import 'characters_screen.dart';
@@ -270,6 +272,7 @@ class HomeScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (innerContext, setState) {
             return AlertDialog(
+              scrollable: true,
               title: const Text('Crear nueva partida'),
 
               content: TextField(
@@ -480,7 +483,12 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
   Future<({String code, String name, String status})?> _load() =>
       GameService().cleanupAndFindMyGame().catchError((_) => null);
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    final next = _load();
+    setState(() {
+      _future = next;
+    });
+  }
 
   Future<void> _resume(({String code, String name, String status}) g) async {
     await Navigator.push(
@@ -517,7 +525,11 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     // El aviso desaparece al instante; la partida se borra en segundo plano
     setState(() => _dismissed.add(g.code));
     try {
-      await GameService().endGame(g.code);
+      await runBlocking(
+        context,
+        'Terminando la sesión…',
+        () => GameService().endGame(g.code),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _dismissed.remove(g.code));

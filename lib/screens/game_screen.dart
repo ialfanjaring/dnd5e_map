@@ -18,6 +18,7 @@ import 'items_screen.dart';
 import 'player_room_screen.dart';
 import '../services/monster_api_service.dart';
 import '../widgets/avatars.dart';
+import '../widgets/blocking_progress.dart';
 import '../widgets/creature_sheet_view.dart';
 import '../widgets/dice_panel.dart';
 import '../widgets/game_board.dart';
@@ -131,9 +132,9 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
-    // Master: Dados, Iniciativa, Jugadores, Criaturas, Fuera del mapa
+    // Master: Dados, Iniciativa, Jugadores, Criaturas
     // Jugador: Dados, Iniciativa, Mi ficha
-    _tabs = TabController(length: widget.isMaster ? 5 : 3, vsync: this);
+    _tabs = TabController(length: widget.isMaster ? 4 : 3, vsync: this);
     _listen();
 
     // Marca la partida como activa mientras el mapa está abierto
@@ -296,7 +297,11 @@ class _GameScreenState extends State<GameScreen>
     if (ok != true || !mounted) return;
 
     try {
-      await _service.resetRoom(_code);
+      await runBlocking(
+        context,
+        'Reiniciando la sala…',
+        () => _service.resetRoom(_code),
+      );
       // La propia suscripción al estado nos devuelve a la sala
     } catch (e) {
       _snack('No se pudo reiniciar la sala: $e');
@@ -333,7 +338,11 @@ class _GameScreenState extends State<GameScreen>
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await _service.endGame(_code);
+      await runBlocking(
+        context,
+        'Terminando la sesión…',
+        () => _service.endGame(_code),
+      );
       navigator.popUntil((r) => r.isFirst);
       messenger.showSnackBar(
         const SnackBar(content: Text('Sesión terminada y partida borrada.')),
@@ -792,6 +801,7 @@ class _GameScreenState extends State<GameScreen>
     final value = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('Nombre de la ficha'),
         content: TextField(
           controller: ctrl,
@@ -843,69 +853,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _gridSizeDialog() async {
-    final colsCtrl = TextEditingController(text: '$_cols');
-    final rowsCtrl = TextEditingController(text: '$_rows');
-    const minSize = 5;
-    const maxSize = 60;
-
     final result = await showDialog<(int, int)>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tamaño del mapa'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _sizeField('Columnas', colsCtrl),
-            const SizedBox(height: 12),
-            _sizeField('Filas', rowsCtrl),
-            const SizedBox(height: 8),
-            const Text(
-              'Entre $minSize y $maxSize. Las fichas que queden fuera se '
-              'acercarán al borde.',
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final c = int.tryParse(colsCtrl.text.trim()) ?? _cols;
-              final r = int.tryParse(rowsCtrl.text.trim()) ?? _rows;
-              Navigator.pop(
-                ctx,
-                (
-                  c.clamp(minSize, maxSize).toInt(),
-                  r.clamp(minSize, maxSize).toInt(),
-                ),
-              );
-            },
-            child: const Text('Aplicar'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _GridSizeDialog(cols: _cols, rows: _rows),
     );
-
-    colsCtrl.dispose();
-    rowsCtrl.dispose();
     if (result == null) return;
     _service.setGridSize(_code, result.$1, result.$2).catchError(_onError);
-  }
-
-  Widget _sizeField(String label, TextEditingController ctrl) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-      ),
-    );
   }
 
   Future<void> _confirmClearTerrain() async {
@@ -981,6 +934,8 @@ class _GameScreenState extends State<GameScreen>
         builder: (context, constraints) {
           final w = constraints.maxWidth;
           final h = constraints.maxHeight;
+          // En horizontal el móvil puede tener barras de sistema a los lados
+          final pad = MediaQuery.of(context).padding;
           final panelW = min(380.0, w * 0.9);
           const anim = Duration(milliseconds: 220);
 
@@ -993,9 +948,9 @@ class _GameScreenState extends State<GameScreen>
 
               // Arriba a la izquierda: avisos, turno y última tirada
               Positioned(
-                left: 8,
+                left: 8 + pad.left,
                 top: 8,
-                width: min(340.0, w - 64),
+                width: min(340.0, w - 64 - pad.left - pad.right),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1033,9 +988,9 @@ class _GameScreenState extends State<GameScreen>
               AnimatedPositioned(
                 duration: anim,
                 curve: Curves.easeOut,
-                left: 0,
-                bottom: 0,
-                right: _panelOpen ? panelW : 0,
+                left: pad.left,
+                bottom: pad.bottom,
+                right: _panelOpen ? panelW + pad.right : pad.right,
                 child: _buildBottomOverlay(h),
               ),
 
@@ -1045,12 +1000,18 @@ class _GameScreenState extends State<GameScreen>
                 curve: Curves.easeOut,
                 top: 0,
                 bottom: 0,
-                width: panelW,
-                right: _panelOpen ? 0 : -panelW,
+                width: panelW + pad.right,
+                right: _panelOpen ? 0 : -(panelW + pad.right),
                 child: Material(
                   elevation: 10,
                   color: Theme.of(context).colorScheme.surface,
-                  child: _buildRightPanel(),
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: pad.right,
+                      bottom: pad.bottom,
+                    ),
+                    child: _buildRightPanel(),
+                  ),
                 ),
               ),
 
@@ -1060,7 +1021,7 @@ class _GameScreenState extends State<GameScreen>
                 curve: Curves.easeOut,
                 top: 0,
                 bottom: 0,
-                right: _panelOpen ? panelW : 0,
+                right: _panelOpen ? panelW + pad.right : pad.right,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Material(
@@ -1164,83 +1125,6 @@ class _GameScreenState extends State<GameScreen>
                     _buildSelectedBar(),
                   ],
                 ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Pestaña «Fuera del mapa» (solo Master): fichas ocultas que los
-  /// jugadores no ven. Desde aquí se colocan en el mapa o se quitan.
-  Widget _offMapPanel() {
-    final off = _offMap;
-    if (off.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'No hay fichas fuera del mapa. Las criaturas nuevas aparecen aquí '
-            'y los jugadores no las ven.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-          child: Text(
-            'Pulsa «Colocar» para ponerla en el mapa, o toca el nombre y luego '
-            'la casilla donde quieras dejarla.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-          ),
-        ),
-        for (final t in off)
-          Card(
-            color: t.id == _selectedId ? Colors.amber.shade100 : null,
-            child: ListTile(
-              dense: true,
-              leading: CircleAvatar(
-                radius: 16,
-                backgroundColor: _colorOf(t),
-                child: Icon(_iconOf(t), size: 18, color: Colors.white),
-              ),
-              title: Text(
-                _nameOf(t),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              onTap: () => setState(() {
-                final selecting = t.id != _selectedId;
-                _selectedId = selecting ? t.id : null;
-                if (selecting) {
-                  // Se cierra el panel para poder tocar el mapa
-                  _panelOpen = false;
-                  _bottomOpen = true;
-                }
-              }),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Colocar en el mapa',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.login),
-                    onPressed: () => _service
-                        .placeTokenOnMap(_code, t.id)
-                        .catchError(_onError),
-                  ),
-                  IconButton(
-                    tooltip: 'Quitar de la partida',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _removeCreature(t),
-                  ),
-                ],
               ),
             ),
           ),
@@ -1437,9 +1321,23 @@ class _GameScreenState extends State<GameScreen>
       ? PlayersPanel(gameCode: _code)
       : PlayerLiveSheet(gameCode: _code, uid: _uid, canEdit: true);
 
+  /// Criaturas de la partida: lista única con las que están en el mapa y
+  /// las que esperan fuera de él, y el botón para añadir nuevas.
   Widget _creaturesPanel() => ListView(
         padding: const EdgeInsets.all(12),
-        children: [GameCreaturesSection(gameCode: _code)],
+        children: [
+          GameCreaturesSection(
+            gameCode: _code,
+            tokens: _tokens,
+            selectedId: _selectedId,
+            onLocate: (id) => setState(() {
+              // Se cierra el panel para poder tocar el mapa
+              _selectedId = id;
+              _panelOpen = false;
+              _bottomOpen = true;
+            }),
+          ),
+        ],
       );
 
   Widget _initiativePanel() => InitiativePanel(
@@ -1461,7 +1359,6 @@ class _GameScreenState extends State<GameScreen>
       const Tab(text: 'Iniciativa'),
       Tab(text: widget.isMaster ? 'Jugadores' : 'Mi ficha'),
       if (widget.isMaster) const Tab(text: 'Criaturas'),
-      if (widget.isMaster) Tab(text: 'Fuera (${_offMap.length})'),
     ];
 
     return Column(
@@ -1475,10 +1372,92 @@ class _GameScreenState extends State<GameScreen>
               _initiativePanel(),
               _sheetPanel(),
               if (widget.isMaster) _creaturesPanel(),
-              if (widget.isMaster) _offMapPanel(),
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+
+/// Diálogo del tamaño del mapa. Es un widget propio para que los campos de
+/// texto se liberen con el diálogo (no antes de que termine su animación) y
+/// con scroll, para que quepa en horizontal con el teclado abierto.
+class _GridSizeDialog extends StatefulWidget {
+  final int cols;
+  final int rows;
+
+  const _GridSizeDialog({required this.cols, required this.rows});
+
+  @override
+  State<_GridSizeDialog> createState() => _GridSizeDialogState();
+}
+
+class _GridSizeDialogState extends State<_GridSizeDialog> {
+  static const int _min = 5;
+  static const int _max = 60;
+
+  late final TextEditingController _colsCtrl =
+      TextEditingController(text: '${widget.cols}');
+  late final TextEditingController _rowsCtrl =
+      TextEditingController(text: '${widget.rows}');
+
+  @override
+  void dispose() {
+    _colsCtrl.dispose();
+    _rowsCtrl.dispose();
+    super.dispose();
+  }
+
+  void _apply() {
+    final c = int.tryParse(_colsCtrl.text.trim()) ?? widget.cols;
+    final r = int.tryParse(_rowsCtrl.text.trim()) ?? widget.rows;
+    Navigator.pop(
+      context,
+      (c.clamp(_min, _max).toInt(), r.clamp(_min, _max).toInt()),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Tamaño del mapa'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _field('Columnas', _colsCtrl),
+            const SizedBox(height: 12),
+            _field('Filas', _rowsCtrl),
+            const SizedBox(height: 8),
+            const Text(
+              'Entre $_min y $_max. Las fichas que queden fuera se acercarán '
+              'al borde.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(onPressed: _apply, child: const Text('Aplicar')),
       ],
     );
   }

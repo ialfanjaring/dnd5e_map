@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/creature.dart';
+import '../models/game_models.dart';
 import '../screens/creature_picker_screen.dart';
 import '../services/game_service.dart';
 import '../services/monster_api_service.dart';
@@ -14,7 +15,21 @@ import 'avatars.dart';
 class GameCreaturesSection extends StatelessWidget {
   final String gameCode;
 
-  const GameCreaturesSection({super.key, required this.gameCode});
+  /// Fichas del mapa (si se indican, cada criatura muestra si está en el
+  /// mapa o fuera de él y permite colocarla, sacarla o seleccionarla).
+  final List<GameToken> tokens;
+  final String? selectedId;
+
+  /// Selecciona la ficha de la criatura en el mapa.
+  final void Function(String tokenId)? onLocate;
+
+  const GameCreaturesSection({
+    super.key,
+    required this.gameCode,
+    this.tokens = const [],
+    this.selectedId,
+    this.onLocate,
+  });
 
   Future<void> _addCreatures(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -101,6 +116,9 @@ class GameCreaturesSection extends StatelessWidget {
                 gameCode: gameCode,
                 gc: gc,
                 numbered: gc.isApi && (apiCounts[gc.apiIndex] ?? 0) > 1,
+                token: tokens.where((t) => t.id == gc.id).firstOrNull,
+                selected: selectedId == gc.id,
+                onLocate: onLocate,
               ),
           ],
         );
@@ -115,11 +133,17 @@ class _GameCreatureTile extends StatelessWidget {
   final String gameCode;
   final GameCreature gc;
   final bool numbered;
+  final GameToken? token;
+  final bool selected;
+  final void Function(String tokenId)? onLocate;
 
   const _GameCreatureTile({
     required this.gameCode,
     required this.gc,
     required this.numbered,
+    this.token,
+    this.selected = false,
+    this.onLocate,
   });
 
   @override
@@ -175,61 +199,123 @@ class _GameCreatureTile extends StatelessWidget {
         final lost = gc.damage > c.maxHp ? c.maxHp : gc.damage;
         final current = c.maxHp - lost;
 
+        final t = token;
+        final hp = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Quitar 1 PG',
+              onPressed: current > 0
+                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost + 1)
+                  : null,
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            Text(
+              '$current/${c.maxHp} PG',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Sumar 1 PG',
+              onPressed: lost > 0
+                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost - 1)
+                  : null,
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ],
+        );
+
         return Card(
-          child: ListTile(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreatureSheetScreen(creature: c, title: label),
-              ),
-            ),
-            leading: EntityAvatar.creature(
-              isNpc: !c.isMonster,
-              type: c.creatureType,
-            ),
-            title: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                decoration: current == 0 ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            subtitle: Text(
-              'CA ${c.armorClass} · '
-              '${current == 0 ? 'Derrotado' : 'FP ${c.challengeRating}'}',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+          color: selected ? Colors.amber.shade100 : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Quitar 1 PG',
-                  onPressed: current > 0
-                      ? () => service.updateCreatureDamage(
-                            gameCode,
-                            gc.id,
-                            lost + 1,
-                          )
-                      : null,
-                  icon: const Icon(Icons.remove_circle_outline),
+                // Cabecera: toca para abrir la ficha
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CreatureSheetScreen(creature: c, title: label),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      EntityAvatar.creature(
+                        isNpc: !c.isMonster,
+                        type: c.creatureType,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                decoration: current == 0
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            Text(
+                              'CA ${c.armorClass} · '
+                              '${current == 0 ? 'Derrotado' : 'FP ${c.challengeRating}'}'
+                              '${t == null ? '' : (t.hidden ? ' · Fuera del mapa' : ' · En el mapa')}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: t != null && t.hidden
+                                    ? Colors.deepOrange
+                                    : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.description_outlined, size: 20),
+                    ],
+                  ),
                 ),
-                Text(
-                  '$current/${c.maxHp}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                // Acciones
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    hp,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (t != null) ...[
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: t.hidden
+                                ? 'Colocar en el mapa'
+                                : 'Sacar del mapa (oculta a los jugadores)',
+                            icon: Icon(t.hidden ? Icons.login : Icons.logout),
+                            onPressed: () => (t.hidden
+                                ? service.placeTokenOnMap(gameCode, t.id)
+                                : service.setTokenHidden(gameCode, t.id, true)),
+                          ),
+                          if (onLocate != null)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Seleccionar en el mapa',
+                              icon: const Icon(Icons.my_location),
+                              onPressed: () => onLocate!(t.id),
+                            ),
+                        ],
+                        removeButton,
+                      ],
+                    ),
+                  ],
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Sumar 1 PG',
-                  onPressed: lost > 0
-                      ? () => service.updateCreatureDamage(
-                            gameCode,
-                            gc.id,
-                            lost - 1,
-                          )
-                      : null,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-                removeButton,
               ],
             ),
           ),

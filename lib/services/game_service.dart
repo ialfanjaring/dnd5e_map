@@ -667,9 +667,14 @@ class GameService {
   /// Borra la partida y todo lo que cuelga de ella (solo el Master).
   Future<void> deleteGameData(String code) async {
     final game = _games.doc(code);
-    for (final name in ['players', 'creatures', 'tokens', 'rolls', 'map', 'combat']) {
+    for (final name in ['players', 'creatures', 'tokens', 'rolls', 'map']) {
       await _deleteCollection(game.collection(name));
     }
+    // El combate se añadió después: si las reglas de Firestore aún no lo
+    // permiten, no debe impedir terminar la sesión.
+    try {
+      await _deleteCollection(game.collection('combat'));
+    } catch (_) {}
     await game.delete();
   }
 
@@ -684,7 +689,9 @@ class GameService {
       'lastActivity': FieldValue.serverTimestamp(),
     });
     await _deleteCollection(game.collection('tokens'));
-    await _deleteCollection(game.collection('combat'));
+    try {
+      await _deleteCollection(game.collection('combat'));
+    } catch (_) {}
     await _deleteCollection(game.collection('rolls'));
   }
 

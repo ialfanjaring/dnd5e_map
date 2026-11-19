@@ -1,10 +1,12 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/character.dart';
 import '../models/creature.dart';
 import '../services/creature_service.dart';
+import '../widgets/ability_grid.dart';
 import '../widgets/spell_widgets.dart';
 import 'spell_picker_screen.dart';
 
@@ -293,57 +295,9 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
   }
 
   Widget _buildAbilities() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final k in DndData.abilityKeys) _abilityBox(k),
-      ],
-    );
-  }
-
-  Widget _abilityBox(String key) {
-    final score = _abilities[key]!;
-
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            DndData.abilityNames[key]!,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Text(
-            Character.signed(Character.modifier(score)),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: score > 1
-                    ? () => setState(() => _abilities[key] = score - 1)
-                    : null,
-                icon: const Icon(Icons.remove),
-              ),
-              Text('$score', style: const TextStyle(fontSize: 16)),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: score < 30
-                    ? () => setState(() => _abilities[key] = score + 1)
-                    : null,
-                icon: const Icon(Icons.add),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return AbilityGrid(
+      abilities: _abilities,
+      onChanged: (k, v) => setState(() => _abilities[k] = v),
     );
   }
 
@@ -351,6 +305,11 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
     return TextFormField(
       controller: ctrl,
       keyboardType: TextInputType.number,
+      // Solo cifras (sin símbolos) y como máximo 4 dígitos
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

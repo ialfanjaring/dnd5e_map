@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/custom_item_service.dart';
 import '../services/equipment_api_service.dart';
@@ -264,6 +265,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     TextFormField(
                       controller: _range,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
                         labelText: 'Alcance normal (pies)',
                         border: OutlineInputBorder(),
@@ -307,6 +309,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   TextFormField(
                     controller: _ac,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       labelText: isShield ? 'Bonificador a la CA' : 'CA base',
                       border: const OutlineInputBorder(),
@@ -330,6 +333,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       TextFormField(
                         controller: _maxDex,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: const InputDecoration(
                           labelText: 'Máximo de Destreza',
                           border: OutlineInputBorder(),
@@ -339,6 +343,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     TextFormField(
                       controller: _strMin,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
                         labelText: 'Fuerza mínima (0 = sin requisito)',
                         border: OutlineInputBorder(),
@@ -411,6 +416,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       child: TextFormField(
                         controller: _weight,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                        ],
                         decoration: const InputDecoration(
                           labelText: 'Peso (lb)',
                           border: OutlineInputBorder(),

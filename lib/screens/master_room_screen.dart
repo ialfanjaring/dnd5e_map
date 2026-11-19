@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/blocking_progress.dart';
 import 'package:flutter/services.dart';
 
 import '../services/game_service.dart';
@@ -302,7 +304,11 @@ class MasterRoomScreen extends StatelessWidget {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await GameService().endGame(gameCode);
+      await runBlocking(
+        context,
+        'Terminando la sesión…',
+        () => GameService().endGame(gameCode),
+      );
       navigator.popUntil((r) => r.isFirst);
       messenger.showSnackBar(
         const SnackBar(content: Text('Sesión terminada y partida borrada.')),

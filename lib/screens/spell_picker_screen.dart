@@ -144,7 +144,9 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: () => setState(() => _future = _load()),
+                      onPressed: () => setState(() {
+                        _future = _load();
+                      }),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Reintentar'),
                     ),
@@ -182,122 +184,110 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
       return true;
     }).toList();
 
+    // Cabecera (información, búsqueda y filtros) dentro de la propia lista:
+    // al desplazarse deja todo el espacio a los hechizos, también en horizontal.
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _infoLines(data),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _searchCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Buscar hechizo (en inglés)...',
+            prefixIcon: Icon(Icons.search),
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  label: const Text('Todos'),
+                  selected: _levelFilter == null,
+                  onSelected: (_) => setState(() => _levelFilter = null),
+                ),
+              ),
+              for (final level in presentLevels)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(level == 0 ? 'Trucos' : 'Nv. $level'),
+                    selected: _levelFilter == level,
+                    onSelected: (_) => setState(() => _levelFilter = level),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (maxLevel != null)
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text('Solo hasta nivel $maxLevel (los que puedes lanzar)'),
+            value: _onlyCastable,
+            onChanged: (v) => setState(() => _onlyCastable = v),
+          ),
+        const SizedBox(height: 4),
+      ],
+    );
+
     return Column(
       children: [
-        // INFORMACIÓN
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 700),
-              child: Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _infoLines(data),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // BÚSQUEDA Y FILTROS
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 700),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar hechizo (en inglés)...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (v) =>
-                        setState(() => _query = v.trim().toLowerCase()),
-                  ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: const Text('Todos'),
-                            selected: _levelFilter == null,
-                            onSelected: (_) =>
-                                setState(() => _levelFilter = null),
-                          ),
-                        ),
-                        for (final level in presentLevels)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: ChoiceChip(
-                              label: Text(level == 0 ? 'Trucos' : 'Nv. $level'),
-                              selected: _levelFilter == level,
-                              onSelected: (_) =>
-                                  setState(() => _levelFilter = level),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (maxLevel != null)
-                    SwitchListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Solo hasta nivel $maxLevel (los que puedes lanzar)',
-                      ),
-                      value: _onlyCastable,
-                      onChanged: (v) => setState(() => _onlyCastable = v),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // LISTA
         Expanded(
-          child: list.isEmpty
-              ? Center(
-                  child: Text(
-                    'No hay hechizos que mostrar.',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                )
-              : Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 700),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                      itemCount: list.length,
-                      itemBuilder: (context, i) => _tile(list[i]),
-                    ),
-                  ),
-                ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                // 0 = cabecera; si no hay resultados, un aviso
+                itemCount: list.isEmpty ? 2 : list.length + 1,
+                itemBuilder: (context, i) {
+                  if (i == 0) return header;
+                  if (list.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: Text(
+                          'No hay hechizos que mostrar.',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ),
+                    );
+                  }
+                  return _tile(list[i - 1]);
+                },
+              ),
+            ),
+          ),
         ),
 
         // CONFIRMAR
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 700),
                 child: SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 44,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       final result = _selected.toList()
@@ -379,7 +369,6 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
-        dense: true,
         onTap: () => setState(() {
           if (selected) {
             _selected.remove(s.index);
