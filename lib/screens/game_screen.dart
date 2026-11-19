@@ -40,7 +40,8 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen>
+    with SingleTickerProviderStateMixin {
   final _service = GameService();
   final _monsterApi = MonsterApiService();
   final List<StreamSubscription<dynamic>> _subs = [];
@@ -56,6 +57,12 @@ class _GameScreenState extends State<GameScreen> {
   final ValueNotifier<List<DiceRoll>> _hiddenRolls =
       ValueNotifier<List<DiceRoll>>([]);
   Object? _error;
+
+  // Paneles desplegables que se superponen al mapa
+  late final TabController _tabs;
+  bool _panelOpen = false;
+  bool _bottomOpen = false;
+  static const int _tabInitiative = 1;
 
   // Iniciativa y turnos
   CombatState? _combat;
@@ -124,6 +131,9 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    // Master: Dados, Iniciativa, Jugadores, Criaturas, Fuera del mapa
+    // Jugador: Dados, Iniciativa, Mi ficha
+    _tabs = TabController(length: widget.isMaster ? 5 : 3, vsync: this);
     _listen();
 
     // Marca la partida como activa mientras el mapa está abierto
@@ -149,6 +159,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_paintBuffer.isNotEmpty) {
       _service.paintCells(_code, Map<String, String?>.from(_paintBuffer));
     }
+    _tabs.dispose();
     _hiddenRolls.dispose();
     _visibleIds.dispose();
     super.dispose();
@@ -556,20 +567,10 @@ class _GameScreenState extends State<GameScreen> {
     ];
   }
 
+  /// Abre el panel de la derecha en la pestaña de iniciativa.
   void _openInitiative() {
-    _openSheet(
-      'Iniciativa',
-      InitiativePanel(
-        gameCode: _code,
-        isMaster: widget.isMaster,
-        myUid: _uid,
-        service: _service,
-        visibleIds: _visibleIds,
-        onRollAll: _rollInitiative,
-        missing: _missingInCombat,
-        onAdd: _addToCombat,
-      ),
-    );
+    setState(() => _panelOpen = true);
+    _tabs.animateTo(_tabInitiative);
   }
 
   Future<void> _endTurn(CombatState st) async {
@@ -581,7 +582,8 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  /// Barra con el turno actual (visible para todos mientras hay combate).
+  /// Indicador del turno actual (se superpone al mapa; toca para abrir la
+  /// lista de iniciativa en el panel de la derecha).
   Widget _buildTurnBar() {
     final st = _combat;
     if (st == null || !st.active) return const SizedBox.shrink();
@@ -592,39 +594,31 @@ class _GameScreenState extends State<GameScreen> {
     final name = cur == null ? '—' : (visible ? cur.name : 'Algo en las sombras…');
 
     return Material(
-      color: mine ? Colors.green.shade100 : Colors.green.shade50,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Row(
-          children: [
-            const Icon(Icons.flag, size: 18, color: Color(0xFF00A040)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                mine
-                    ? '¡Tu turno! · Ronda ${st.round}'
-                    : 'Turno de $name · Ronda ${st.round}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            if (widget.isMaster || mine)
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+      color: mine ? Colors.green.shade200 : Colors.white.withAlpha(235),
+      borderRadius: BorderRadius.circular(10),
+      elevation: 3,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: _openInitiative,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.flag, size: 18, color: Color(0xFF00A040)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  mine
+                      ? '¡Tu turno! · Ronda ${st.round}'
+                      : 'Turno de $name · Ronda ${st.round}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                onPressed: () => _endTurn(st),
-                icon: const Icon(Icons.skip_next, size: 18),
-                label: const Text('Finalizar turno'),
               ),
-            IconButton(
-              tooltip: 'Ver la lista de iniciativa',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.format_list_numbered),
-              onPressed: _openInitiative,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -663,7 +657,10 @@ class _GameScreenState extends State<GameScreen> {
     // solo pueden seleccionar la suya; el Master, cualquiera.
     if (hit != null) {
       if (!_canMove(hit)) return;
-      setState(() => _selectedId = hit.id == _selectedId ? null : hit.id);
+      setState(() {
+        _selectedId = hit.id == _selectedId ? null : hit.id;
+        if (_selectedId != null) _bottomOpen = true;
+      });
       return;
     }
 
@@ -979,25 +976,122 @@ class _GameScreenState extends State<GameScreen> {
           ),
         ],
       ),
+      // El mapa ocupa todo el espacio; los paneles se superponen
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 900;
-          final board = _buildBoardArea();
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
+          final panelW = min(380.0, w * 0.9);
+          const anim = Duration(milliseconds: 220);
 
-          if (wide) {
-            return Row(
-              children: [
-                Expanded(child: board),
-                const VerticalDivider(width: 1),
-                SizedBox(width: 380, child: _buildSidePanel()),
-              ],
-            );
-          }
+          final myTurn =
+              (_combat?.active ?? false) && _combat!.current == 'p_$_uid';
 
-          return Column(
+          return Stack(
             children: [
-              Expanded(child: board),
-              _buildBottomBar(),
+              Positioned.fill(child: _buildBoard()),
+
+              // Arriba a la izquierda: avisos, turno y última tirada
+              Positioned(
+                left: 8,
+                top: 8,
+                width: min(340.0, w - 64),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null)
+                      Card(
+                        color: Colors.red.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Problema con la partida: $_error\n'
+                                  'Si es un error de permisos, publica las '
+                                  'reglas de Firestore más recientes.',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () => setState(() => _error = null),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    _buildTurnBar(),
+                    const SizedBox(height: 6),
+                    _buildLastRoll(),
+                  ],
+                ),
+              ),
+
+              // Abajo: herramientas y ficha seleccionada (desplegable)
+              AnimatedPositioned(
+                duration: anim,
+                curve: Curves.easeOut,
+                left: 0,
+                bottom: 0,
+                right: _panelOpen ? panelW : 0,
+                child: _buildBottomOverlay(h),
+              ),
+
+              // Derecha: panel con pestañas (desplegable)
+              AnimatedPositioned(
+                duration: anim,
+                curve: Curves.easeOut,
+                top: 0,
+                bottom: 0,
+                width: panelW,
+                right: _panelOpen ? 0 : -panelW,
+                child: Material(
+                  elevation: 10,
+                  color: Theme.of(context).colorScheme.surface,
+                  child: _buildRightPanel(),
+                ),
+              ),
+
+              // Pestaña para abrir/cerrar el panel de la derecha
+              AnimatedPositioned(
+                duration: anim,
+                curve: Curves.easeOut,
+                top: 0,
+                bottom: 0,
+                right: _panelOpen ? panelW : 0,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Material(
+                    color: myTurn && !_panelOpen
+                        ? Colors.green
+                        : Theme.of(context).colorScheme.primary,
+                    elevation: 4,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(12),
+                    ),
+                    child: InkWell(
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(12),
+                      ),
+                      onTap: () => setState(() => _panelOpen = !_panelOpen),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 18,
+                        ),
+                        child: Icon(
+                          _panelOpen
+                              ? Icons.chevron_right
+                              : (myTurn ? Icons.flag : Icons.chevron_left),
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -1005,156 +1099,152 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildBoardArea() {
+  Widget _buildBoard() {
+    return GameBoard(
+      cols: _cols,
+      rows: _rows,
+      terrain: _displayTerrain,
+      tokens: _onMap,
+      selectedId: _selectedId,
+      colorOf: _colorOf,
+      nameOf: _nameOf,
+      iconOf: _iconOf,
+      paintMode: widget.isMaster && _tool != _Tool.move,
+      fitSignal: _fitSignal,
+      onCellTap: _onCellTap,
+      onCellPaint: _onCellPaint,
+      reachable: _reach,
+      turnId: (_combat?.active ?? false) ? _combat!.current : null,
+    );
+  }
+
+  /// Barra inferior desplegable: herramientas del Master y ficha seleccionada.
+  Widget _buildBottomOverlay(double maxHeight) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (_error != null)
-          MaterialBanner(
-            content: Text(
-              'Problema con la partida: $_error\n'
-              'Si es un error de permisos, publica las reglas de Firestore '
-              'más recientes.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => setState(() => _error = null),
-                child: const Text('Cerrar'),
+        Material(
+          color: Theme.of(context).colorScheme.primary,
+          elevation: 4,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          child: InkWell(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            onTap: () => setState(() => _bottomOpen = !_bottomOpen),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _bottomOpen
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_up,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.isMaster ? 'Herramientas' : 'Mi ficha en el mapa',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
               ),
-            ],
-          ),
-        _buildLastRoll(),
-        _buildTurnBar(),
-        _buildToolbar(),
-        Expanded(
-          child: GameBoard(
-            cols: _cols,
-            rows: _rows,
-            terrain: _displayTerrain,
-            tokens: _onMap,
-            selectedId: _selectedId,
-            colorOf: _colorOf,
-            nameOf: _nameOf,
-            iconOf: _iconOf,
-            paintMode: widget.isMaster && _tool != _Tool.move,
-            fitSignal: _fitSignal,
-            onCellTap: _onCellTap,
-            onCellPaint: _onCellPaint,
-            reachable: _reach,
-            turnId: (_combat?.active ?? false) ? _combat!.current : null,
+            ),
           ),
         ),
-        _buildOffMapTray(),
-        _buildSelectedBar(),
+        if (_bottomOpen)
+          Material(
+            elevation: 6,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight * 0.5),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildToolbar(),
+                    _buildSelectedBar(),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  /// Zona fuera del mapa (solo Master): fichas ocultas que los jugadores
-  /// no ven. Desde aquí se colocan en el mapa o se quitan de la partida.
-  Widget _buildOffMapTray() {
-    if (!widget.isMaster) return const SizedBox.shrink();
+  /// Pestaña «Fuera del mapa» (solo Master): fichas ocultas que los
+  /// jugadores no ven. Desde aquí se colocan en el mapa o se quitan.
+  Widget _offMapPanel() {
     final off = _offMap;
-    if (off.isEmpty) return const SizedBox.shrink();
-
-    return Material(
-      color: Colors.blueGrey.shade50,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.visibility_off, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  'Fuera del mapa (${off.length}) · los jugadores no lo ven',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 52,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: off.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final t = off[i];
-                  final selected = t.id == _selectedId;
-
-                  return Material(
-                    color: selected ? Colors.amber.shade100 : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(
-                        color: selected ? Colors.amber : Colors.grey.shade400,
-                      ),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () => setState(
-                        () => _selectedId = selected ? null : t.id,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: _colorOf(t),
-                              child: Icon(
-                                _iconOf(t),
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 130),
-                              child: Text(
-                                _nameOf(t),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Colocar en el mapa',
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.login, size: 20),
-                              onPressed: () => _service
-                                  .placeTokenOnMap(_code, t.id)
-                                  .catchError(_onError),
-                            ),
-                            IconButton(
-                              tooltip: 'Quitar de la partida',
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.delete_outline, size: 20),
-                              onPressed: () => _removeCreature(t),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (_selected?.hidden == true)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  'Toca una casilla del mapa para colocar la ficha elegida.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                ),
-              ),
-          ],
+    if (off.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No hay fichas fuera del mapa. Las criaturas nuevas aparecen aquí '
+            'y los jugadores no las ven.',
+            textAlign: TextAlign.center,
+          ),
         ),
-      ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+          child: Text(
+            'Pulsa «Colocar» para ponerla en el mapa, o toca el nombre y luego '
+            'la casilla donde quieras dejarla.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ),
+        for (final t in off)
+          Card(
+            color: t.id == _selectedId ? Colors.amber.shade100 : null,
+            child: ListTile(
+              dense: true,
+              leading: CircleAvatar(
+                radius: 16,
+                backgroundColor: _colorOf(t),
+                child: Icon(_iconOf(t), size: 18, color: Colors.white),
+              ),
+              title: Text(
+                _nameOf(t),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: () => setState(() {
+                final selecting = t.id != _selectedId;
+                _selectedId = selecting ? t.id : null;
+                if (selecting) {
+                  // Se cierra el panel para poder tocar el mapa
+                  _panelOpen = false;
+                  _bottomOpen = true;
+                }
+              }),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Colocar en el mapa',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.login),
+                    onPressed: () => _service
+                        .placeTokenOnMap(_code, t.id)
+                        .catchError(_onError),
+                  ),
+                  IconButton(
+                    tooltip: 'Quitar de la partida',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => _removeCreature(t),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1164,9 +1254,13 @@ class _GameScreenState extends State<GameScreen> {
 
     final r = _rolls.first;
     return Container(
-      width: double.infinity,
-      color: Color(r.color).withAlpha(40),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(235),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Color(r.color), width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(
         children: [
           CircleAvatar(radius: 8, backgroundColor: Color(r.color)),
@@ -1197,12 +1291,6 @@ class _GameScreenState extends State<GameScreen> {
         child: Row(
           children: [
             if (widget.isMaster) ...[
-              FilledButton.tonalIcon(
-                onPressed: _openInitiative,
-                icon: const Icon(Icons.format_list_numbered),
-                label: const Text('Iniciativa'),
-              ),
-              const SizedBox(width: 8),
               SegmentedButton<_Tool>(
                 showSelectedIcon: false,
                 segments: const [
@@ -1354,90 +1442,44 @@ class _GameScreenState extends State<GameScreen> {
         children: [GameCreaturesSection(gameCode: _code)],
       );
 
-  /// Panel lateral (pantallas anchas).
-  Widget _buildSidePanel() {
+  Widget _initiativePanel() => InitiativePanel(
+        gameCode: _code,
+        isMaster: widget.isMaster,
+        myUid: _uid,
+        service: _service,
+        visibleIds: _visibleIds,
+        onRollAll: _rollInitiative,
+        missing: _missingInCombat,
+        onAdd: _addToCombat,
+      );
+
+  /// Panel de la derecha, con pestañas: dados, iniciativa, jugadores y,
+  /// para el Master, criaturas y fichas fuera del mapa.
+  Widget _buildRightPanel() {
     final tabs = <Tab>[
       const Tab(text: 'Dados'),
+      const Tab(text: 'Iniciativa'),
       Tab(text: widget.isMaster ? 'Jugadores' : 'Mi ficha'),
       if (widget.isMaster) const Tab(text: 'Criaturas'),
+      if (widget.isMaster) Tab(text: 'Fuera (${_offMap.length})'),
     ];
 
-    return DefaultTabController(
-      length: tabs.length,
-      child: Column(
-        children: [
-          TabBar(tabs: tabs),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _dicePanel(),
-                _sheetPanel(),
-                if (widget.isMaster) _creaturesPanel(),
-              ],
-            ),
+    return Column(
+      children: [
+        TabBar(controller: _tabs, isScrollable: true, tabs: tabs),
+        Expanded(
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              _dicePanel(),
+              _initiativePanel(),
+              _sheetPanel(),
+              if (widget.isMaster) _creaturesPanel(),
+              if (widget.isMaster) _offMapPanel(),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  /// Barra inferior (pantallas estrechas): abre los paneles como hojas.
-  Widget _buildBottomBar() {
-    return Material(
-      elevation: 8,
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            TextButton.icon(
-              onPressed: () => _openSheet('Dados y registro', _dicePanel()),
-              icon: const Icon(Icons.casino),
-              label: const Text('Dados'),
-            ),
-            TextButton.icon(
-              onPressed: () => _openSheet(
-                widget.isMaster ? 'Jugadores' : 'Mi ficha',
-                _sheetPanel(),
-              ),
-              icon: Icon(widget.isMaster ? Icons.groups : Icons.badge_outlined),
-              label: Text(widget.isMaster ? 'Jugadores' : 'Mi ficha'),
-            ),
-            if (widget.isMaster)
-              TextButton.icon(
-                onPressed: () => _openSheet('Criaturas', _creaturesPanel()),
-                icon: const Icon(Icons.pets),
-                label: const Text('Criaturas'),
-              ),
-          ],
         ),
-      ),
-    );
-  }
-
-  void _openSheet(String title, Widget child) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.85,
-        child: Column(
-          children: [
-            ListTile(
-              title: Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(ctx),
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(child: child),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
