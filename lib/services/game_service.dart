@@ -225,11 +225,11 @@ class GameService {
       'cols': cols,
       'rows': rows,
     });
-    batch.set(
-      _terrainDoc(code),
-      {'cells': <String, dynamic>{}},
-      SetOptions(merge: true),
-    );
+    // Solo se crea el terreno si no existe: así no se borra el mapa elegido.
+    final terrainSnap = await _terrainDoc(code).get();
+    if (!terrainSnap.exists) {
+      batch.set(_terrainDoc(code), {'cells': <String, dynamic>{}});
+    }
 
     await batch.commit();
   }

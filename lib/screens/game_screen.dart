@@ -55,6 +55,9 @@ class _GameScreenState extends State<GameScreen>
   List<GameToken> _tokens = [];
   Map<String, String> _terrain = {};
   List<DiceRoll> _rolls = [];
+  String? _dismissedRollId;
+  bool _rollsLoaded = false;
+  Timer? _rollTimer;
   final ValueNotifier<List<DiceRoll>> _hiddenRolls =
       ValueNotifier<List<DiceRoll>>([]);
   Object? _error;
@@ -153,6 +156,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void dispose() {
     _heartbeat?.cancel();
+    _rollTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
@@ -224,7 +228,23 @@ class _GameScreenState extends State<GameScreen>
 
     _subs.add(_service.rolls(_code).listen((r) {
       if (!mounted) return;
-      setState(() => _rolls = r);
+      final firstLoad = !_rollsLoaded;
+      _rollsLoaded = true;
+      setState(() {
+        _rolls = r;
+        if (r.isNotEmpty) {
+          if (firstLoad) {
+            // Tirada anterior a la entrada: no se muestra.
+            _dismissedRollId = r.first.id;
+          } else if (r.first.id != _dismissedRollId) {
+            _rollTimer?.cancel();
+            final id = r.first.id;
+            _rollTimer = Timer(const Duration(seconds: 3), () {
+              if (mounted) setState(() => _dismissedRollId = id);
+            });
+          }
+        }
+      });
     }, onError: _onError));
   }
 
@@ -619,8 +639,8 @@ class _GameScreenState extends State<GameScreen>
               Flexible(
                 child: Text(
                   mine
-                      ? '¡Tu turno! · Ronda ${st.round}'
-                      : 'Turno de $name · Ronda ${st.round}',
+                      ? '¡Tu turno!'
+                      : 'Turno: $name',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -629,6 +649,38 @@ class _GameScreenState extends State<GameScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showCode() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Código de la sala'),
+        content: SelectableText(
+          _code,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: _code));
+              Navigator.pop(ctx);
+              _snack('Código copiado');
+            },
+            child: const Text('Copiar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
   }
@@ -899,6 +951,11 @@ class _GameScreenState extends State<GameScreen>
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Ver código de la sala',
+            icon: const Icon(Icons.vpn_key_outlined),
+            onPressed: _showCode,
+          ),
           if (widget.isMaster)
             IconButton(
               tooltip: 'Objetos (armas, armaduras...) para asignar',
@@ -950,9 +1007,9 @@ class _GameScreenState extends State<GameScreen>
               Positioned(
                 left: 8 + pad.left,
                 top: 8,
-                width: min(340.0, w - 64 - pad.left - pad.right),
+                width: min(300.0, w - 64 - pad.left - pad.right),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_error != null)
                       Card(
@@ -1132,12 +1189,19 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Última tirada descubierta, siempre visible.
+  /// Última tirada: se oculta sola a los 3 s o al tocarla.
   Widget _buildLastRoll() {
-    if (_rolls.isEmpty) return const SizedBox.shrink();
+    if (_rolls.isEmpty || _rolls.first.id == _dismissedRollId) {
+      return const SizedBox.shrink();
+    }
 
     final r = _rolls.first;
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        _rollTimer?.cancel();
+        setState(() => _dismissedRollId = r.id);
+      },
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(235),
         borderRadius: BorderRadius.circular(10),
@@ -1146,10 +1210,11 @@ class _GameScreenState extends State<GameScreen>
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(radius: 8, backgroundColor: Color(r.color)),
           const SizedBox(width: 8),
-          Expanded(
+          Flexible(
             child: Text(
               '${r.name} · ${r.label}: ${r.resultText}',
               maxLines: 1,
@@ -1157,12 +1222,14 @@ class _GameScreenState extends State<GameScreen>
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             r.headline,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ],
       ),
+    ),
     );
   }
 

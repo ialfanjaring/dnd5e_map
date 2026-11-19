@@ -6,6 +6,7 @@ import '../widgets/blocking_progress.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import 'characters_screen.dart';
+import 'create_game_screen.dart';
 import 'creatures_screen.dart';
 import 'items_screen.dart';
 import 'join_game_screen.dart';
@@ -121,7 +122,12 @@ class HomeScreen extends StatelessWidget {
                           buttonText: 'Crear partida',
                           color: Colors.deepPurple,
                           onTap: () {
-                            _showCreateGameDialog(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const CreateGameScreen(),
+                              ),
+                            );
                           },
                         ),
                       ),
@@ -178,8 +184,7 @@ class HomeScreen extends StatelessWidget {
                           title: 'NPC y Monstruos',
                           description:
                               'Crea tus propios monstruos y NPC para usarlos '
-                              'en tus partidas. Los de la API de D&D 5e los '
-                              'añade el Master desde su sala.',
+                              'en tus partidas.',
                           buttonText: 'Bestiario',
                           color: Colors.red.shade800,
                           onTap: () {
