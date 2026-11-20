@@ -14,7 +14,7 @@ class AppIcon extends StatelessWidget {
       'assets/icons/$name.png',
       width: size,
       height: size,
-      filterQuality: FilterQuality.medium,
+      filterQuality: FilterQuality.high,
       errorBuilder: (_, __, ___) => Icon(Icons.image_not_supported, size: size),
     );
   }

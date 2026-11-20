@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart' as mobile_google;
-import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart'
-    as desktop_google;
+
+import 'google_desktop_auth.dart';
 
 /// Excepción con mensajes legibles para la UI.
 class AuthException implements Exception {
@@ -16,7 +16,9 @@ class AuthException implements Exception {
 /// Servicio de autenticación (versión sencilla).
 class AuthService {
   AuthService._();
+
   static final AuthService _instance = AuthService._();
+
   factory AuthService() => _instance;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -28,25 +30,16 @@ class AuthService {
   // Credenciales OAuth de escritorio (Windows), escritas directamente aquí.
   // Rellena los dos valores con los de tu cliente OAuth de tipo "Escritorio".
   // El ID tiene la forma 1234567890-abc123.apps.googleusercontent.com
-  static const String _desktopClientId = 'proyectodnd5e-514516';
-  static const String _desktopClientSecret = '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';
+  static const String _desktopClientId = '553630619928-iegivq87k1tb8gc5orekd25lirvtr50g.apps.googleusercontent.com';
+  static const String _desktopClientSecret = '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';
   static const int _redirectPort = 61797;
 
-  // Se crea una sola vez y solo cuando se necesita (Windows).
-  static desktop_google.GoogleSignIn? _desktopGoogleSignIn;
-  desktop_google.GoogleSignIn get _desktop =>
-      _desktopGoogleSignIn ??= desktop_google.GoogleSignIn(
-        params: const desktop_google.GoogleSignInParams(
-          clientId: _desktopClientId,
-          clientSecret: _desktopClientSecret,
-          redirectPort: _redirectPort,
-          scopes: ['openid', 'profile', 'email'],
-        ),
-      );
-
   User? get currentUser => _auth.currentUser;
+
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
   Stream<User?> get userChanges => _auth.userChanges();
+
   bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
 
   bool get _isWindows =>
@@ -55,7 +48,10 @@ class AuthService {
   int get resendCooldownSeconds {
     if (_lastVerificationSent == null) return 0;
     final elapsed =
-        DateTime.now().difference(_lastVerificationSent!).inSeconds;
+        DateTime
+            .now()
+            .difference(_lastVerificationSent!)
+            .inSeconds;
     final left = _cooldownDuration - elapsed;
     return left > 0 ? left : 0;
   }
@@ -78,13 +74,14 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
         case 'too-many-requests':
-          throw const AuthException('Demasiados intentos. Inténtalo más tarde.');
+          throw const AuthException(
+              'Demasiados intentos. Inténtalo más tarde.');
         case 'network-request-failed':
           throw const AuthException('Sin conexión con el servidor.');
         case 'user-disabled':
           throw const AuthException('Esta cuenta está deshabilitada.');
         default:
-          // Mensaje genérico: no revela si el correo existe.
+        // Mensaje genérico: no revela si el correo existe.
           throw const AuthException('Correo o contraseña incorrectos.');
       }
     }
@@ -152,7 +149,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       final msg = switch (e.code) {
         'too-many-requests' =>
-          'Has solicitado demasiados correos. Espera unos minutos.',
+        'Has solicitado demasiados correos. Espera unos minutos.',
         'network-request-failed' => 'Revisa tu conexión a internet.',
         _ => 'Error al reenviar el correo.',
       };
@@ -168,26 +165,32 @@ class AuthService {
       }
 
       if (_isWindows) {
+        debugPrint('GOOGLE client_id en uso: $_desktopClientId');
+
         if (_desktopClientId.startsWith('PEGA_AQUI') ||
-            _desktopClientSecret.startsWith('PEGA_AQUI')) {
+            _desktopClientSecret.startsWith('PEGA_AQUI'))
+        {
+
           throw const AuthException(
               'Faltan el Client ID y el Client Secret de Google en '
-              'auth_service.dart.');
+                  'auth_service.dart.');
         }
-        final credentials = await _desktop.signIn();
-        if (credentials == null) {
-          throw const AuthException('Inicio de sesión cancelado.');
-        }
+        // Flujo propio: navegador + localhost, sin librerías de terceros.
+        final tokens = await GoogleDesktopAuth.signIn(
+          clientId: _desktopClientId,
+          clientSecret: _desktopClientSecret,
+          port: _redirectPort,
+        );
         return await _auth.signInWithCredential(
           GoogleAuthProvider.credential(
-            idToken: credentials.idToken,
-            accessToken: credentials.accessToken,
+            idToken: tokens.idToken,
+            accessToken: tokens.accessToken,
           ),
         );
       }
 
       final googleUser =
-          await mobile_google.GoogleSignIn.instance.authenticate();
+      await mobile_google.GoogleSignIn.instance.authenticate();
       return await _auth.signInWithCredential(
         GoogleAuthProvider.credential(
             idToken: googleUser.authentication.idToken),
@@ -195,18 +198,20 @@ class AuthService {
     } on AuthException {
       rethrow;
     } on FirebaseAuthException catch (e) {
+      debugPrint('GOOGLE LOGIN FIREBASE ERROR: ${e.code} ${e.message}');
       final msg = switch (e.code) {
         'account-exists-with-different-credential' =>
-          'Esta cuenta ya está registrada con otro método de acceso.',
+        'Esta cuenta ya está registrada con otro método de acceso.',
         'operation-not-allowed' =>
-          'El acceso con Google no está habilitado en Firebase.',
+        'El acceso con Google no está habilitado en Firebase.',
         'network-request-failed' => 'No se pudo conectar con Firebase.',
         'invalid-credential' => 'Las credenciales de Google no son válidas.',
         'user-disabled' => 'Esta cuenta está deshabilitada.',
         _ => 'No se pudo iniciar sesión con Google.',
       };
       throw AuthException(msg);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('GOOGLE LOGIN ERROR (${e.runtimeType}): $e\n$st');
       if (e.toString().toLowerCase().contains('cancel')) {
         throw const AuthException('Inicio de sesión cancelado.');
       }
@@ -218,9 +223,7 @@ class AuthService {
     await _auth.signOut();
     if (kIsWeb) return;
     try {
-      if (_isWindows) {
-        await _desktopGoogleSignIn?.signOut();
-      } else {
+      if (!_isWindows) {
         await mobile_google.GoogleSignIn.instance.signOut();
       }
     } catch (_) {}

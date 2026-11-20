@@ -1,5 +1,3 @@
-import 'dart:ui' show PlatformDispatcher;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,17 +5,8 @@ import 'package:flutter/material.dart';
 /// Preferencias de la app: idioma y tema. Se guardan en
 /// users/{uid}/prefs/app (son datos del usuario, no de la API).
 class AppSettings extends ChangeNotifier {
-  AppSettings._() {
-    final sys = PlatformDispatcher.instance.locale.languageCode;
-    _lang = switch (sys) {
-      'en' => 'en',
-      'fr' => 'fr',
-      'de' => 'de',
-      'it' => 'it',
-      'pt' => 'pt-BR',
-      _ => 'es',
-    };
-  }
+  // El idioma por defecto es español; se cambia en Opciones.
+  AppSettings._();
 
   static final AppSettings instance = AppSettings._();
 

@@ -159,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
           destinations: [
             for (final (title, asset) in _tabs)
               NavigationDestination(
-                icon: Opacity(opacity: 0.55, child: AppIcon(asset, size: 28)),
-                selectedIcon: AppIcon(asset, size: 32),
+                icon: Opacity(opacity: 0.7, child: AppIcon(asset, size: 30)),
+                selectedIcon: AppIcon(asset, size: 34),
                 label: tr(title),
               ),
           ],

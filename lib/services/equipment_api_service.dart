@@ -286,6 +286,26 @@ class EquipmentApiService {
     return _listCache[category] = list;
   }
 
+  static final Map<String, Set<String>> _setCache = {};
+
+  /// Índices de los objetos de una subcategoría de equipo (armas simples,
+  /// armaduras ligeras, instrumentos...). Si la API no la tiene, vacío.
+  Future<Set<String>> fetchIndexSet(String categoryKey) async {
+    final cached = _setCache[categoryKey];
+    if (cached != null) return cached;
+    try {
+      final data = await _getJson('/equipment-categories/$categoryKey')
+          as Map<String, dynamic>;
+      final set = ((data['equipment'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => (e['index'] ?? '').toString())
+          .toSet();
+      return _setCache[categoryKey] = set;
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
   ApiItem? cachedItem(String index) => _itemCache[index];
 
   // ---------- Objetos creados por el Master ----------

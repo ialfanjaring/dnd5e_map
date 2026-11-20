@@ -24,6 +24,15 @@ class GamePlayer {
   /// Espacios de conjuro gastados por nivel
   final Map<int, int> slotsUsed;
 
+  /// Avatar elegido por el jugador (vacío = el de su clase) y segundo color
+  final String avatar;
+  final int? color2;
+
+  /// Salvaciones de muerte (0-3 cada una) y personaje muerto
+  final int deathSuccess;
+  final int deathFail;
+  final bool dead;
+
   const GamePlayer({
     required this.uid,
     required this.email,
@@ -31,6 +40,11 @@ class GamePlayer {
     this.color,
     required this.currentHp,
     this.slotsUsed = const {},
+    this.avatar = '',
+    this.color2,
+    this.deathSuccess = 0,
+    this.deathFail = 0,
+    this.dead = false,
   });
 }
 
@@ -126,8 +140,17 @@ class GameService {
 
   /// El jugador entra (o cambia de personaje) en la sala.
   /// Se hace merge para no perder el color que ya tuviera asignado.
-  Future<void> joinWithCharacter(String code, Character c) {
+  Future<void> joinWithCharacter(
+    String code,
+    Character c, {
+    String? avatar,
+    int? color,
+    int? color2,
+  }) {
     return _playersCol(code).doc(_user.uid).set({
+      if (avatar != null) 'avatar': avatar,
+      if (color != null) 'color': color,
+      if (color2 != null) 'color2': color2,
       'playerUid': _user.uid,
       'playerEmail': _user.email ?? '',
       'characterId': c.id,
@@ -166,6 +189,11 @@ class GameService {
           color: (data['color'] as num?)?.toInt(),
           currentHp: ((data['currentHp'] ?? character.maxHp) as num).toInt(),
           slotsUsed: parseSlotMap(data['slotsUsed']),
+          avatar: (data['avatar'] ?? '') as String,
+          color2: (data['color2'] as num?)?.toInt(),
+          deathSuccess: ((data['deathSuccess'] ?? 0) as num).toInt(),
+          deathFail: ((data['deathFail'] ?? 0) as num).toInt(),
+          dead: data['dead'] == true,
         );
       }).toList();
       list.sort((a, b) => a.character.name.compareTo(b.character.name));
@@ -289,7 +317,43 @@ class GameService {
   // ==========================================
 
   Future<void> updatePlayerHp(String code, String uid, int hp) =>
-      _playersCol(code).doc(uid).update({'currentHp': hp < 0 ? 0 : hp});
+      _playersCol(code).doc(uid).update({
+        'currentHp': hp < 0 ? 0 : hp,
+        // Al recuperar PG se reinician las salvaciones y deja de estar muerto
+        if (hp > 0) ...{'deathSuccess': 0, 'deathFail': 0, 'dead': false},
+      });
+
+  /// Salvaciones de muerte y estado de muerto (modificables a mano).
+  Future<void> updateDeathSaves(
+    String code,
+    String uid, {
+    int? success,
+    int? fail,
+    bool? dead,
+  }) =>
+      _playersCol(code).doc(uid).update({
+        if (success != null) 'deathSuccess': success,
+        if (fail != null) 'deathFail': fail,
+        if (dead != null) 'dead': dead,
+      });
+
+  /// Aspecto de la ficha del jugador en el mapa: avatar y dos colores.
+  Future<void> updatePlayerLook(
+    String code,
+    String uid, {
+    String? avatar,
+    int? color,
+    int? color2,
+  }) =>
+      _playersCol(code).doc(uid).update({
+        if (avatar != null) 'avatar': avatar,
+        if (color != null) 'color': color,
+        if (color2 != null) 'color2': color2,
+      });
+
+  /// El Master permite o no que los jugadores seleccionen criaturas.
+  Future<void> setPlayersSelectCreatures(String code, bool value) =>
+      _games.doc(code).update({'playersSelectCreatures': value});
 
   /// Espacios de conjuro gastados por un jugador (él mismo o el Master).
   Future<void> updatePlayerSlots(String code, String uid, Map<int, int> used) =>
@@ -411,6 +475,7 @@ class GameService {
       // Empiezan ocultas: el Master las coloca y las muestra cuando quiere
       'hidden': true,
       'span': 1,
+      'hpPct': 100,
       if (apiIndex == null && creatureDoc['creature'] is Map)
         'icon': Avatars.tokenKey(
           isNpc: creatureDoc['creature']['kind'] == 'npc',
@@ -550,6 +615,10 @@ class GameService {
       'color': roll.color,
       'die': roll.die,
       'values': roll.values,
+      'mode': roll.mode,
+      'chosen': roll.chosen,
+      'title': roll.title,
+      'groups': roll.groups.map((g) => g.toMap()).toList(),
       'at': FieldValue.serverTimestamp(),
     });
   }
@@ -578,6 +647,10 @@ class GameService {
       'color': roll.color,
       'die': roll.die,
       'values': roll.values,
+      'mode': roll.mode,
+      'chosen': roll.chosen,
+      'title': roll.title,
+      'groups': roll.groups.map((g) => g.toMap()).toList(),
       'at': FieldValue.serverTimestamp(),
     });
   }
@@ -773,8 +846,24 @@ class GameService {
           'slotsMax': {for (final e in max.entries) '${e.key}': e.value},
       });
 
-  Future<void> updateCreatureDamage(String code, String creatureId, int damage) =>
-      _creaturesCol(code).doc(creatureId).update({'damageTaken': damage});
+  /// Si se indica [maxHp], se actualiza también la barra de salud de la
+  /// ficha del mapa (la que ven los jugadores).
+  Future<void> updateCreatureDamage(
+    String code,
+    String creatureId,
+    int damage, {
+    int? maxHp,
+  }) async {
+    await _creaturesCol(code).doc(creatureId).update({'damageTaken': damage});
+    if (maxHp != null && maxHp > 0) {
+      final left = (maxHp - damage).clamp(0, maxHp).toInt();
+      try {
+        await _tokensCol(code)
+            .doc(creatureId)
+            .update({'hpPct': ((left * 100) / maxHp).round()});
+      } catch (_) {}
+    }
+  }
 
   /// Quita la criatura de la partida y su ficha del mapa.
   Future<void> removeCreature(String code, String creatureId) async {

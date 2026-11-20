@@ -27,8 +27,12 @@ class GameCreaturesSection extends StatelessWidget {
   /// Piso en el que se colocan las criaturas al sacarlas al mapa
   final int floor;
 
+  /// Borde de color de las criaturas con hermanas iguales (id -> color)
+  final Color? Function(String creatureId)? ringOf;
+
   const GameCreaturesSection({
     super.key,
+    this.ringOf,
     required this.gameCode,
     this.tokens = const [],
     this.selectedId,
@@ -125,6 +129,7 @@ class GameCreaturesSection extends StatelessWidget {
                 selected: selectedId == gc.id,
                 onLocate: onLocate,
                 floor: floor,
+                ring: ringOf?.call(gc.id),
               ),
           ],
         );
@@ -143,8 +148,10 @@ class _GameCreatureTile extends StatelessWidget {
   final bool selected;
   final void Function(String tokenId)? onLocate;
   final int floor;
+  final Color? ring;
 
   const _GameCreatureTile({
+    this.ring,
     required this.gameCode,
     required this.gc,
     required this.numbered,
@@ -215,7 +222,7 @@ class _GameCreatureTile extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               tooltip: tr('Quitar 1 PG'),
               onPressed: current > 0
-                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost + 1)
+                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost + 1, maxHp: c.maxHp)
                   : null,
               icon: const Icon(Icons.remove_circle_outline),
             ),
@@ -227,7 +234,7 @@ class _GameCreatureTile extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               tooltip: tr('Sumar 1 PG'),
               onPressed: lost > 0
-                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost - 1)
+                  ? () => service.updateCreatureDamage(gameCode, gc.id, lost - 1, maxHp: c.maxHp)
                   : null,
               icon: const Icon(Icons.add_circle_outline),
             ),
@@ -235,6 +242,12 @@ class _GameCreatureTile extends StatelessWidget {
         );
 
         return Card(
+          shape: ring == null
+              ? null
+              : RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: ring!, width: 3),
+                ),
           color: selected ? Colors.amber.withOpacity(0.28) : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),

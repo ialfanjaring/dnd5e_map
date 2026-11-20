@@ -52,6 +52,44 @@ class Avatars {
     (names: ['no-muerto', 'undead'], icon: Icons.dangerous, color: Color(0xFF37474F)),
   ];
 
+  /// Avatares que puede elegir un jugador para su ficha en el mapa.
+  static const Map<String, IconData> tokenAvatars = {
+    'shield': Icons.shield,
+    'security': Icons.security,
+    'military': Icons.military_tech,
+    'castle': Icons.castle,
+    'wand': Icons.auto_fix_high,
+    'book': Icons.auto_stories,
+    'psychology': Icons.psychology,
+    'fire': Icons.local_fire_department,
+    'bolt': Icons.bolt,
+    'water': Icons.water_drop,
+    'sun': Icons.wb_sunny,
+    'moon': Icons.dark_mode,
+    'star': Icons.star,
+    'heart': Icons.favorite,
+    'diamond': Icons.diamond,
+    'music': Icons.music_note,
+    'church': Icons.church,
+    'leaf': Icons.eco,
+    'paw': Icons.pets,
+    'bird': Icons.flutter_dash,
+    'rabbit': Icons.cruelty_free,
+    'hiking': Icons.hiking,
+    'sail': Icons.sailing,
+    'eye': Icons.visibility,
+    'target': Icons.my_location,
+    'fitness': Icons.fitness_center,
+    'face': Icons.face,
+    'skull': Icons.dangerous,
+  };
+
+  static IconData? avatarIcon(String key) => tokenAvatars[key];
+
+  /// Colores monstruo: siempre rojo y negro.
+  static const Color monsterColor = Color(0xFFD32F2F);
+  static const Color monsterColor2 = Color(0xFF111111);
+
   static const IconData npcIcon = Icons.record_voice_over;
   static const Color npcColor = Color(0xFF00897B);
   static const IconData defaultIcon = Icons.help_outline;

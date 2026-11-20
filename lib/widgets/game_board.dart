@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_models.dart';
 import 'terrain_painter.dart';
+import 'death_saves_card.dart';
 
 /// Mapa de cuadrículas con terreno y fichas. Siempre está encajado y centrado:
 /// no admite zoom ni desplazamiento.
@@ -14,6 +15,15 @@ class GameBoard extends StatefulWidget {
   final List<GameToken> tokens;
   final String? selectedId;
   final Color Function(GameToken token) colorOf;
+
+  /// Segundo color (dibujo y borde); null = automático
+  final Color? Function(GameToken token)? color2Of;
+
+  /// Borde de color que distingue a criaturas iguales
+  final Color? Function(GameToken token)? ringOf;
+
+  /// Estado vital: 0 normal, 1 inconsciente (0 PG), 2 muerto
+  final int Function(GameToken token)? vitalOf;
   final String Function(GameToken token) nameOf;
 
   /// Imagen por defecto de la ficha (según clase, NPC o tipo de monstruo)
@@ -46,6 +56,9 @@ class GameBoard extends StatefulWidget {
     required this.tokens,
     required this.selectedId,
     required this.colorOf,
+    this.color2Of,
+    this.ringOf,
+    this.vitalOf,
     required this.nameOf,
     this.iconOf,
     required this.paintMode,
@@ -203,6 +216,9 @@ class _GameBoardState extends State<GameBoard> {
                             child: _TokenView(
                               token: t,
                               color: widget.colorOf(t),
+                              color2: widget.color2Of?.call(t),
+                              ring: widget.ringOf?.call(t),
+                              vital: widget.vitalOf?.call(t) ?? 0,
                               name: widget.nameOf(t),
               icon: widget.iconOf?.call(t),
                               selected: widget.selectedId == t.id,
@@ -335,6 +351,9 @@ class _GridPainter extends CustomPainter {
 class _TokenView extends StatelessWidget {
   final GameToken token;
   final Color color;
+  final Color? color2;
+  final Color? ring;
+  final int vital;
   final String name;
   final IconData? icon;
   final bool selected;
@@ -343,6 +362,9 @@ class _TokenView extends StatelessWidget {
   const _TokenView({
     required this.token,
     required this.color,
+    this.color2,
+    this.ring,
+    this.vital = 0,
     required this.name,
     required this.icon,
     required this.selected,
@@ -356,10 +378,11 @@ class _TokenView extends StatelessWidget {
         ? '?'
         : trimmed.substring(0, trimmed.length >= 2 ? 2 : 1).toUpperCase();
 
-    final textColor =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+    final textColor = color2 ??
+        (ThemeData.estimateBrightnessForColor(color) == Brightness.dark
             ? Colors.white
-            : Colors.black;
+            : Colors.black);
+    final edge = ring ?? color2 ?? Colors.white;
 
     return Padding(
       padding: const EdgeInsets.all(3),
@@ -367,7 +390,7 @@ class _TokenView extends StatelessWidget {
         children: [
           Positioned.fill(
             child: Opacity(
-              opacity: token.hidden ? 0.5 : 1,
+              opacity: token.hidden ? 0.5 : (vital == 2 ? 0.55 : 1),
               child: Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -375,11 +398,13 @@ class _TokenView extends StatelessWidget {
                   shape: token.isPlayer ? BoxShape.circle : BoxShape.rectangle,
                   borderRadius: token.isPlayer ? null : BorderRadius.circular(8),
                   border: Border.all(
-                    color: selected ? Colors.amber : Colors.white,
-                    width: selected ? 4 : 2,
+                    color: selected && ring == null ? Colors.amber : edge,
+                    width: selected || ring != null ? 4 : 2,
                   ),
                   boxShadow: [
                     const BoxShadow(color: Colors.black38, blurRadius: 3),
+                    if (selected && ring != null)
+                      const BoxShadow(color: Colors.amber, blurRadius: 6, spreadRadius: 3),
                     if (turn)
                       const BoxShadow(
                         color: Color(0xFF00E676),
@@ -405,6 +430,31 @@ class _TokenView extends StatelessWidget {
               ),
             ),
           ),
+          if (vital > 0)
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(vital == 2 ? 150 : 110),
+                    shape: token.isPlayer ? BoxShape.circle : BoxShape.rectangle,
+                  ),
+                  alignment: Alignment.center,
+                  child: FittedBox(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: CustomPaint(
+                        size: const Size(20, 26),
+                        painter: CrossPainter(
+                          vital == 2 ? const Color(0xFFB0B0B0) : Colors.white,
+                          outline: vital == 2 ? Colors.red.shade900 : Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (token.hidden)
             const Positioned(
               right: 0,

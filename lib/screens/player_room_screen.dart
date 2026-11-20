@@ -8,6 +8,7 @@ import '../services/character_service.dart';
 import '../services/game_service.dart';
 import '../widgets/character_sheet_view.dart';
 import '../widgets/spell_widgets.dart';
+import '../widgets/token_look_card.dart';
 import 'character_form_screen.dart';
 import 'game_screen.dart';
 import '../widgets/resolved_character.dart';
@@ -29,6 +30,12 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
 
   String? _selectedId;
   bool _saving = false;
+
+  // Aspecto de la ficha en el mapa (el avatar es obligatorio)
+  String _avatar = '';
+  int? _color;
+  int? _color2;
+  bool _lookLoaded = false;
 
   // Entrada automática al mapa cuando el Master inicia la partida
   StreamSubscription<Map<String, dynamic>?>? _gameSub;
@@ -89,7 +96,13 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
     setState(() => _saving = true);
 
     try {
-      await _gameService.joinWithCharacter(widget.gameCode, selected.first);
+      await _gameService.joinWithCharacter(
+        widget.gameCode,
+        selected.first,
+        avatar: _avatar,
+        color: _color,
+        color2: _color2,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Entras como ${selected.first.name}.')),
@@ -292,10 +305,35 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                   ),
                 ),
               const SizedBox(height: 10),
+              if (_selectedId != null)
+                TokenLookPicker(
+                  avatar: _avatar,
+                  color: _color,
+                  color2: _color2,
+                  characterClass: characters
+                          .where((c) => c.id == _selectedId)
+                          .firstOrNull
+                          ?.characterClass ??
+                      '',
+                  onChanged: ({avatar, color, color2}) => setState(() {
+                    if (avatar != null) _avatar = avatar;
+                    if (color != null) _color = color;
+                    if (color2 != null) _color2 = color2;
+                  }),
+                ),
+              if (_selectedId != null && _avatar.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Tx(
+                    'Debes elegir un avatar para tu ficha antes de confirmar.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 50,
                 child: ElevatedButton.icon(
-                  onPressed: (_selectedId == null || _saving)
+                  onPressed: (_selectedId == null || _avatar.isEmpty || _saving)
                       ? null
                       : () => _confirm(characters),
                   style: ElevatedButton.styleFrom(
@@ -349,6 +387,19 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
 
         // Si ya estoy en la sala, preselecciona mi personaje una sola vez
         final mine = players.where((p) => p.uid == _myUid).toList();
+
+        // Recupera el aspecto que ya elegí (una sola vez)
+        if (mine.isNotEmpty && !_lookLoaded) {
+          _lookLoaded = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() {
+              _avatar = mine.first.avatar;
+              _color = mine.first.color;
+              _color2 = mine.first.color2;
+            });
+          });
+        }
         if (_selectedId == null && mine.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _selectedId == null) {

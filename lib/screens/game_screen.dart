@@ -24,6 +24,7 @@ import '../widgets/dice_panel.dart';
 import '../widgets/game_board.dart';
 import '../widgets/game_creatures_section.dart';
 import '../widgets/combatant_dialog.dart';
+import '../widgets/death_saves_card.dart';
 import '../widgets/game_sheet_widgets.dart';
 import '../widgets/initiative_panel.dart';
 import '../i18n/i18n.dart';
@@ -152,7 +153,7 @@ class _GameScreenState extends State<GameScreen>
     AppOrientation.landscape();
     // Master: Dados, Iniciativa, Jugadores, Criaturas
     // Jugador: Dados, Iniciativa, Mi ficha
-    _tabs = TabController(length: widget.isMaster ? 4 : 3, vsync: this);
+    _tabs = TabController(length: widget.isMaster ? 5 : 3, vsync: this);
     _listen();
 
     // Marca la partida como activa mientras el mapa está abierto
@@ -496,8 +497,10 @@ class _GameScreenState extends State<GameScreen>
   /// Imagen por defecto de la ficha según clase, NPC o tipo de monstruo.
   IconData _iconOf(GameToken t) {
     if (t.isPlayer) {
-      final cls = _playerOf(t.refId)?.character.characterClass ?? '';
-      return Avatars.classIcon(cls);
+      final p = _playerOf(t.refId);
+      final chosen = p == null ? null : Avatars.avatarIcon(p.avatar);
+      if (chosen != null) return chosen;
+      return Avatars.classIcon(p?.character.characterClass ?? '');
     }
     if (t.icon.isNotEmpty) return Avatars.iconForTokenKey(t.icon);
 
@@ -514,8 +517,100 @@ class _GameScreenState extends State<GameScreen>
       final c = _playerOf(t.refId)?.color;
       return c == null ? Colors.grey : Color(c);
     }
-    return Color(_masterColor);
+    // NPC: verde azulado; monstruos: siempre rojo
+    return _isNpc(t) ? Avatars.npcColor : Avatars.monsterColor;
   }
+
+  /// 0 normal, 1 inconsciente (0 PG), 2 muerto (solo personajes)
+  int _vitalOf(GameToken t) {
+    if (!t.isPlayer) return 0;
+    final p = _playerOf(t.refId);
+    if (p == null) return 0;
+    if (p.dead) return 2;
+    return p.currentHp <= 0 ? 1 : 0;
+  }
+
+  /// En combate, si es el turno de un personaje a 0 PG: tarjeta con la
+  /// salvación de muerte (la ve el Master y el propio jugador).
+  Widget _deathPrompt() {
+    final st = _combat;
+    if (st == null || !st.inTurns) return const SizedBox.shrink();
+    final cur = st.current;
+    if (cur == null || !cur.startsWith('p_')) return const SizedBox.shrink();
+    final p = _playerOf(cur.substring(2));
+    if (p == null || !DeathSavesCard.needsSaves(p)) {
+      return const SizedBox.shrink();
+    }
+    final mine = p.uid == _uid;
+    if (!widget.isMaster && !mine) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      child: DeathSavesCard(
+        gameCode: _code,
+        player: p,
+        canEdit: true,
+        myTurn: true,
+      ),
+    );
+  }
+
+  /// Segundo color de la ficha (dibujo y borde)
+  Color? _color2Of(GameToken t) {
+    if (t.isPlayer) {
+      final c = _playerOf(t.refId)?.color2;
+      return c == null ? null : Color(c);
+    }
+    return _isNpc(t) ? Colors.white : Avatars.monsterColor2;
+  }
+
+  bool _isNpc(GameToken t) {
+    if (t.icon == 'npc') return true;
+    final api = t.apiIndex;
+    final c = api == null ? null : _monsterApi.cachedMonster(api);
+    return c != null && !c.isMonster;
+  }
+
+  String _groupKey(GameToken t) =>
+      t.apiIndex ??
+      t.label.replaceAll(RegExp(r'\s*\d+$'), '').trim().toLowerCase();
+
+  static const List<int> _ringPalette = [
+    0xFFFFEB3B, 0xFF00E5FF, 0xFF76FF03, 0xFFE040FB, 0xFFFF9100,
+    0xFF2979FF, 0xFFFFFFFF, 0xFFFF80AB, 0xFF1DE9B6, 0xFFB388FF,
+  ];
+
+  /// Borde de color de cada criatura que tiene hermanas iguales
+  /// (id de ficha -> color). Coincide con el borde de su tarjeta.
+  Map<String, Color> get _rings {
+    final groups = <String, List<GameToken>>{};
+    for (final t in _tokens) {
+      if (t.isPlayer) continue;
+      groups.putIfAbsent(_groupKey(t), () => []).add(t);
+    }
+    final out = <String, Color>{};
+    for (final g in groups.values) {
+      if (g.length < 2) continue;
+      g.sort((a, b) {
+        final c = a.number.compareTo(b.number);
+        return c != 0 ? c : a.id.compareTo(b.id);
+      });
+      for (var i = 0; i < g.length; i++) {
+        out[g[i].id] = Color(_ringPalette[i % _ringPalette.length]);
+      }
+    }
+    return out;
+  }
+
+  /// Nombre sin número (lo que ven los jugadores)
+  String _plainNameOf(GameToken t) =>
+      _nameOf(t).replaceAll(RegExp(r'\s*\d+$'), '').trim();
+
+  bool get _playersSelectCreatures =>
+      (_game['playersSelectCreatures'] ?? false) == true;
+
+  bool _canSelect(GameToken t) =>
+      _canMove(t) ||
+      (!widget.isMaster && !t.isPlayer && !t.hidden && _playersSelectCreatures);
 
   bool _canMove(GameToken t) =>
       widget.isMaster || (t.isPlayer && t.refId == _uid);
@@ -949,7 +1044,7 @@ class _GameScreenState extends State<GameScreen>
     // Tocar una ficha la selecciona (o la deselecciona). Los jugadores
     // solo pueden seleccionar la suya; el Master, cualquiera.
     if (hit != null) {
-      if (!_canMove(hit)) return;
+      if (!_canSelect(hit)) return;
       setState(() {
         _selectedId = hit.id == _selectedId ? null : hit.id;
         // El panel de herramientas se abre a mano (no tapa el mapa al elegir)
@@ -1287,17 +1382,6 @@ class _GameScreenState extends State<GameScreen>
           ),
           if (widget.isMaster)
             IconButton(
-              tooltip: tr('Objetos (armas, armaduras...) para asignar'),
-              icon: const AppIcon('cofre'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ItemsScreen(gameCode: _code),
-                ),
-              ),
-            ),
-          if (widget.isMaster)
-            IconButton(
               tooltip: tr('Reiniciar la sala (volver a la sala de espera)'),
               icon: const Icon(Icons.restart_alt),
               onPressed: _resetRoom,
@@ -1502,6 +1586,9 @@ class _GameScreenState extends State<GameScreen>
       tokens: _onFloor,
       selectedId: _selectedId,
       colorOf: _colorOf,
+      color2Of: _color2Of,
+      ringOf: (t) => _rings[t.id],
+      vitalOf: _vitalOf,
       nameOf: _nameOf,
       iconOf: _iconOf,
       paintMode: widget.isMaster && _tool != _Tool.move,
@@ -1814,6 +1901,52 @@ class _GameScreenState extends State<GameScreen>
 
     final canOpenSheet = widget.isMaster || (t.isPlayer && t.refId == _uid);
 
+    // Un jugador que mira una criatura: solo ve su nombre (sin número) y la
+    // barra de salud, sin cifras.
+    if (!_canMove(t)) {
+      final ratio = t.hpPct / 100.0;
+      final bar = ratio > 0.5
+          ? Colors.green
+          : (ratio > 0.25 ? Colors.orange : Colors.red);
+      return Material(
+        elevation: 6,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: _colorOf(t),
+                child: Icon(_iconOf(t), size: 14, color: _color2Of(t)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _plainNameOf(t),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: ratio.clamp(0.0, 1.0).toDouble(),
+                      minHeight: 10,
+                      color: bar,
+                      backgroundColor: Colors.grey.withAlpha(90),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Material(
       elevation: 6,
       child: Padding(
@@ -1929,8 +2062,20 @@ class _GameScreenState extends State<GameScreen>
   Widget _creaturesPanel() => ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: const Tx('Los jugadores pueden seleccionar criaturas'),
+            subtitle: const Tx('Verán su nombre y su barra de salud.'),
+            value: _playersSelectCreatures,
+            onChanged: (v) => _service
+                .setPlayersSelectCreatures(_code, v)
+                .catchError(_onError),
+          ),
+          const Divider(),
           GameCreaturesSection(
             gameCode: _code,
+            ringOf: (id) => _rings[id],
             tokens: _tokens,
             selectedId: _selectedId,
             floor: _floor,
@@ -2000,12 +2145,14 @@ class _GameScreenState extends State<GameScreen>
       const Tab(text: 'Dados'),
       const Tab(text: 'Iniciativa'),
       Tab(text: widget.isMaster ? 'Jugadores' : 'Mi ficha'),
+      if (widget.isMaster) const Tab(text: 'Objetos'),
       if (widget.isMaster) const Tab(text: 'Criaturas'),
     ];
 
     return Column(
       children: [
         _turnBanner(),
+        _deathPrompt(),
         TabBar(controller: _tabs, isScrollable: true, tabs: tabs),
         Expanded(
           child: TabBarView(
@@ -2014,6 +2161,8 @@ class _GameScreenState extends State<GameScreen>
               _dicePanel(),
               _initiativePanel(),
               _sheetPanel(),
+              if (widget.isMaster)
+                ItemsScreen(gameCode: _code, inPanel: true),
               if (widget.isMaster) _creaturesPanel(),
             ],
           ),

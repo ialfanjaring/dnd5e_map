@@ -269,6 +269,7 @@ class _CreatureBody extends StatelessWidget {
                       code,
                       g.id,
                       (lost - d).clamp(0, c.maxHp).toInt(),
+                      maxHp: c.maxHp,
                     ),
                   ),
                   SpellcastingPanel(

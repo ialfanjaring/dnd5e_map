@@ -38,6 +38,7 @@ class MyApp extends StatelessWidget {
   static const Color _seed = Color(0xFF6750A4);
 
   @override
+  @override
   Widget build(BuildContext context) {
     // Se reconstruye al cambiar el idioma o el tema en Opciones.
     return ListenableBuilder(

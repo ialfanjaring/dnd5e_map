@@ -6,6 +6,7 @@ import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import 'character_sheet_view.dart';
 import 'spellcasting_panel.dart';
+import 'death_saves_card.dart';
 import '../services/class_api_service.dart';
 import 'avatars.dart';
 import 'resolved_character.dart';
@@ -246,6 +247,14 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                 ),
               ),
             ),
+
+            // INCONSCIENTE / MUERTO
+            if (p.currentHp <= 0 || p.dead)
+              DeathSavesCard(
+                gameCode: widget.gameCode,
+                player: p,
+                canEdit: canManage,
+              ),
 
             // ESPACIOS DE CONJURO Y HECHIZOS
             FutureBuilder<Map<int, int>>(

@@ -326,6 +326,9 @@ class GameToken {
   /// Imagen por defecto: 'npc' o el tipo de criatura (vacío = se deduce)
   final String icon;
 
+  /// Salud restante de una criatura (0-100). Los jugadores solo ven la barra.
+  final int hpPct;
+
   const GameToken({
     required this.id,
     required this.kind,
@@ -339,6 +342,7 @@ class GameToken {
     this.span = 1,
     this.floor = 0,
     this.icon = '',
+    this.hpPct = 100,
   });
 
   bool get isPlayer => kind == 'player';
@@ -361,8 +365,106 @@ class GameToken {
       span: ((d['span'] ?? 1) as num).toInt().clamp(1, 4).toInt(),
       floor: ((d['floor'] ?? 0) as num).toInt(),
       icon: (d['icon'] ?? '') as String,
+      hpPct: ((d['hpPct'] ?? 100) as num).toInt().clamp(0, 100).toInt(),
     );
   }
+}
+
+/// Un grupo de dados dentro de una tirada compuesta: por ejemplo el d20 de
+/// ataque, los dados de daño cortante o los de daño de hielo, cada uno con
+/// su propio modificador.
+class DiceGroup {
+  /// Tipos de grupo que se pueden elegir. 'Ataque' es la tirada para
+  /// acertar y no cuenta en el daño total.
+  static const List<String> kinds = [
+    'Ataque',
+    'Cortante',
+    'Perforante',
+    'Contundente',
+    'Fuego',
+    'Hielo',
+    'Rayo',
+    'Trueno',
+    'Ácido',
+    'Veneno',
+    'Necrótico',
+    'Radiante',
+    'Psíquico',
+    'Fuerza',
+    'Otro',
+  ];
+
+  /// Color asociado a cada tipo (para teñir los dados).
+  static int colorOf(String kind) => switch (kind) {
+        'Ataque' => 0xFFE9C46A,
+        'Cortante' => 0xFFB0B7C3,
+        'Perforante' => 0xFF9AA5B1,
+        'Contundente' => 0xFFA1887F,
+        'Fuego' => 0xFFFF7043,
+        'Hielo' => 0xFF4FC3F7,
+        'Rayo' => 0xFFFFEE58,
+        'Trueno' => 0xFF7986CB,
+        'Ácido' => 0xFF9CCC65,
+        'Veneno' => 0xFF43A047,
+        'Necrótico' => 0xFF8E6BB5,
+        'Radiante' => 0xFFFFD54F,
+        'Psíquico' => 0xFFF06292,
+        'Fuerza' => 0xFF78909C,
+        _ => 0xFFE9C46A,
+      };
+
+  final String die;
+  final String label;
+  final int mod;
+  final String mode; // 'normal', 'adv', 'dis'
+  final int chosen;
+  final List<int> values;
+
+  const DiceGroup({
+    required this.die,
+    required this.values,
+    this.label = '',
+    this.mod = 0,
+    this.mode = 'normal',
+    this.chosen = 0,
+  });
+
+  bool get isAttack => label == 'Ataque';
+  bool get hasMode => (mode == 'adv' || mode == 'dis') && values.length == 2;
+  bool get isAdv => mode == 'adv' && values.length == 2;
+  int get tint => colorOf(label);
+
+  /// Suma de los dados (o el que cuenta con ventaja/desventaja) + modificador.
+  int get subtotal =>
+      (hasMode ? values[chosen == 1 ? 1 : 0] : values.fold(0, (a, b) => a + b)) +
+      mod;
+
+  /// "d20+5", "2d6+3", "d8"
+  String get formula {
+    final n = hasMode ? 1 : values.length;
+    final m = mod == 0 ? '' : (mod > 0 ? '+$mod' : '$mod');
+    return '${n > 1 ? n : ''}$die$m';
+  }
+
+  Map<String, dynamic> toMap() => {
+        'die': die,
+        'label': label,
+        'mod': mod,
+        'mode': mode,
+        'chosen': chosen,
+        'values': values,
+      };
+
+  factory DiceGroup.fromMap(Map<String, dynamic> m) => DiceGroup(
+        die: (m['die'] ?? 'd20') as String,
+        label: (m['label'] ?? '') as String,
+        mod: ((m['mod'] ?? 0) as num).toInt(),
+        mode: (m['mode'] ?? 'normal') as String,
+        chosen: ((m['chosen'] ?? 0) as num).toInt(),
+        values: ((m['values'] as List?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
+      );
 }
 
 /// Tirada de dados o de moneda.
@@ -394,6 +496,18 @@ class DiceRoll {
   final bool hidden;
   final DateTime? at;
 
+  /// 'normal', 'adv' (ventaja) o 'dis' (desventaja). En ventaja y
+  /// desventaja hay dos valores y [chosen] indica el que cuenta.
+  final String mode;
+  final int chosen;
+
+  /// Tirada compuesta (die == 'mix'): varios grupos de dados, cada uno con
+  /// su tipo y su modificador. Vacío en una tirada normal.
+  final List<DiceGroup> groups;
+
+  /// Nombre de la tirada compuesta ("Espada de hielo"), opcional.
+  final String title;
+
   const DiceRoll({
     this.id = '',
     required this.uid,
@@ -403,9 +517,37 @@ class DiceRoll {
     required this.values,
     this.hidden = false,
     this.at,
+    this.mode = 'normal',
+    this.chosen = 0,
+    this.groups = const [],
+    this.title = '',
   });
 
-  static int sides(String die) => die == 'coin' ? 2 : int.parse(die.substring(1));
+  bool get isMix => groups.isNotEmpty;
+
+  /// Los grupos de la tirada; una tirada simple cuenta como un solo grupo.
+  List<DiceGroup> get asGroups => isMix
+      ? groups
+      : [DiceGroup(die: die, values: values, mode: mode, chosen: chosen)];
+
+  /// Daño total: suma de todos los grupos que no son de ataque.
+  int get damageTotal =>
+      groups.where((g) => !g.isAttack).fold(0, (a, g) => a + g.subtotal);
+
+  bool get isAdv => mode == 'adv' && values.length == 2;
+  bool get isDis => mode == 'dis' && values.length == 2;
+  bool get hasMode => isAdv || isDis;
+
+  /// Índice del valor que cuenta en una tirada con ventaja o desventaja.
+  static int pickIndex(String mode, List<int> v) {
+    if (v.length != 2) return 0;
+    if (mode == 'adv') return v[1] > v[0] ? 1 : 0;
+    if (mode == 'dis') return v[1] < v[0] ? 1 : 0;
+    return 0;
+  }
+
+  static int sides(String die) =>
+      die == 'coin' ? 2 : (int.tryParse(die.substring(1)) ?? 20);
 
   static String dieName(String die) => die == 'coin' ? 'Moneda' : die.toUpperCase();
 
@@ -414,22 +556,39 @@ class DiceRoll {
     return List.generate(count, (_) => rnd.nextInt(s) + 1);
   }
 
-  int get total => values.fold(0, (a, b) => a + b);
+  int get total => isMix
+      ? (groups.any((g) => !g.isAttack) ? damageTotal : groups.first.subtotal)
+      : hasMode
+      ? values[chosen == 1 ? 1 : 0]
+      : values.fold(0, (a, b) => a + b);
 
   /// "d20", "3d6", "Moneda", "2 monedas"
   String get label {
+    if (isMix) {
+      return title.isNotEmpty ? title : groups.map((g) => g.formula).join(' + ');
+    }
     if (die == 'coin') {
       return values.length > 1 ? '${values.length} monedas' : 'Moneda';
     }
+    if (hasMode) return '$die ${isAdv ? 'con ventaja' : 'con desventaja'}';
     return values.length > 1 ? '${values.length}$die' : die;
   }
 
   /// Resultado en texto: "17", "4 + 2 + 6 = 12" o "Cara".
   String get resultText {
+    if (isMix) {
+      final parts = groups
+          .map((g) => '${g.label.isEmpty ? g.die : g.label} ${g.subtotal}')
+          .join(' · ');
+      return groups.any((g) => !g.isAttack) && groups.any((g) => g.isAttack)
+          ? '$parts · daño $damageTotal'
+          : parts;
+    }
     if (die == 'coin') {
       return values.map((v) => v == 1 ? 'Cara' : 'Cruz').join(', ');
     }
     if (values.length == 1) return '${values.first}';
+    if (hasMode) return '${values[0]} / ${values[1]} → $total';
     return '${values.join(' + ')} = $total';
   }
 
@@ -455,6 +614,12 @@ class DiceRoll {
           .map((e) => (e as num).toInt())
           .toList(),
       at: (d['at'] as Timestamp?)?.toDate(),
+      mode: (d['mode'] ?? 'normal') as String,
+      chosen: ((d['chosen'] ?? 0) as num).toInt(),
+      title: (d['title'] ?? '') as String,
+      groups: ((d['groups'] as List?) ?? const [])
+          .map((e) => DiceGroup.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList(),
     );
   }
 }
