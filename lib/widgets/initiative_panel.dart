@@ -19,14 +19,29 @@ class InitiativePanel extends StatelessWidget {
   /// Fichas que puede ver quien mira la lista (los jugadores no ven las ocultas).
   final ValueListenable<Set<String>> visibleIds;
 
-  /// Master: tira la iniciativa de todas las fichas y empieza el combate.
-  final Future<void> Function() onRollAll;
+  /// Master: abre la preparación del combate (fichas y grupos).
+  final Future<void> Function() onPrepare;
+
+  /// Tirar la iniciativa propia (jugador) y la de cualquier entrada (Master).
+  final Future<void> Function() onRollMine;
+  final Future<void> Function(InitEntry entry) onRollEntry;
+
+  /// Master: tira por todas las entradas que faltan (solo criaturas si
+  /// [onlyCreatures]).
+  final Future<void> Function({required bool onlyCreatures}) onRollPending;
+
+  /// Master: ordena por iniciativa y empieza los turnos.
+  final Future<void> Function(CombatState state) onStartTurns;
 
   /// Master: fichas del mapa que todavía no están en la lista.
   final List<({String id, String name})> Function(CombatState state) missing;
 
   /// Master: añade una ficha a la lista (tirando su iniciativa).
   final Future<void> Function(String tokenId, CombatState state) onAdd;
+
+  /// Abre la ventana del combatiente (PG y conjuros). Master: cualquiera;
+  /// jugador: solo el suyo.
+  final void Function(InitEntry entry) onOpenEntry;
 
   const InitiativePanel({
     super.key,
@@ -35,9 +50,14 @@ class InitiativePanel extends StatelessWidget {
     required this.myUid,
     required this.service,
     required this.visibleIds,
-    required this.onRollAll,
+    required this.onPrepare,
+    required this.onRollMine,
+    required this.onRollEntry,
+    required this.onRollPending,
+    required this.onStartTurns,
     required this.missing,
     required this.onAdd,
+    required this.onOpenEntry,
   });
 
   Future<void> _run(BuildContext context, Future<void> Function() f) async {
@@ -130,14 +150,14 @@ class InitiativePanel extends StatelessWidget {
     return _run(context, () => service.setTurn(gameCode, n.id, n.round));
   }
 
-  Future<void> _confirmReroll(BuildContext context) async {
+  Future<void> _confirmRestart(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Tx('Volver a tirar iniciativa'),
+        title: const Tx('Preparar un nuevo combate'),
         content: const Tx(
-          'Se tirará de nuevo para todas las fichas y se perderán los '
-          'cambios hechos a mano en la lista.',
+          'Se perderá el orden de iniciativa actual y se volverá a elegir '
+          'quién entra en el combate.',
         ),
         actions: [
           TextButton(
@@ -146,15 +166,49 @@ class InitiativePanel extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Tx('Tirar'),
+            child: const Tx('Continuar'),
           ),
         ],
       ),
     );
     if (ok == true && context.mounted) {
-      await _run(context, onRollAll);
+      await _run(context, onPrepare);
     }
   }
+
+  Future<void> _confirmStart(BuildContext context, CombatState st) async {
+    final pending = st.pending;
+    if (pending.isNotEmpty) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Tx('Faltan tiradas'),
+          content: Text(
+            '${tr('Todavía no han tirado')}: '
+            '${pending.map((e) => e.name).join(', ')}.\n'
+            '${tr('Se tirará su iniciativa automáticamente.')}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Tx('Esperar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Tx('Tirar y empezar'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+      await _run(context, () => onRollPending(onlyCreatures: false));
+    }
+    if (!context.mounted) return;
+    await _run(context, () => onStartTurns(st));
+  }
+
+  bool _canSee(InitEntry e, Set<String> visible) =>
+      visible.contains(e.id) || e.members.any(visible.contains);
 
   @override
   Widget build(BuildContext context) {
@@ -163,17 +217,25 @@ class InitiativePanel extends StatelessWidget {
       builder: (context, snap) {
         final st = snap.data;
         final active = st != null && st.active;
+        final rolling = st != null && st.rolling;
 
         return ValueListenableBuilder<Set<String>>(
           valueListenable: visibleIds,
           builder: (context, visible, _) {
-            final entries = !active
+            var entries = !active
                 ? <InitEntry>[]
                 : (isMaster
                     ? st.entries
-                    : st.entries.where((e) => visible.contains(e.id)).toList());
+                    : st.entries.where((e) => _canSee(e, visible)).toList());
 
-            final myTurn = active && st.current == 'p_$myUid';
+            // Durante las tiradas: primero los que ya tiraron, por resultado
+            if (rolling) {
+              final done = CombatState.sorted(
+                  entries.where((e) => e.rolled).toList());
+              entries = [...done, ...entries.where((e) => !e.rolled)];
+            }
+
+            final myTurn = active && st.inTurns && st.current == 'p_$myUid';
 
             return Column(
               children: [
@@ -184,16 +246,35 @@ class InitiativePanel extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        FilledButton.icon(
-                          onPressed: () => active
-                              ? _confirmReroll(context)
-                              : _run(context, onRollAll),
-                          icon: const AppIcon('d20_vacio', size: 22),
-                          label: Text(
-                            active ? 'Volver a tirar' : 'Tirar iniciativa (d20)',
+                        if (!active)
+                          FilledButton.icon(
+                            onPressed: () => _run(context, onPrepare),
+                            icon: const AppIcon('d20_vacio', size: 22),
+                            label: const Tx('Preparar combate'),
                           ),
-                        ),
-                        if (active)
+                        if (rolling) ...[
+                          FilledButton.icon(
+                            onPressed: () => _confirmStart(context, st),
+                            icon: const Icon(Icons.play_arrow),
+                            label: Text(
+                              st.pending.isEmpty
+                                  ? tr('Empezar combate')
+                                  : '${tr('Empezar combate')} '
+                                      '(${st.pending.length} ${tr('sin tirar')})',
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: st.pending.any((e) => !e.isPlayer)
+                                ? () => _run(
+                                      context,
+                                      () => onRollPending(onlyCreatures: true),
+                                    )
+                                : null,
+                            icon: const AppIcon('d20_vacio', size: 20),
+                            label: const Tx('Tirar por las criaturas'),
+                          ),
+                        ],
+                        if (st != null && st.inTurns)
                           PopupMenuButton<String>(
                             tooltip: tr('Añadir ficha a la lista'),
                             enabled: missing(st).isNotEmpty,
@@ -214,6 +295,12 @@ class InitiativePanel extends StatelessWidget {
                           ),
                         if (active)
                           OutlinedButton.icon(
+                            onPressed: () => _confirmRestart(context),
+                            icon: const Icon(Icons.replay),
+                            label: const Tx('Nuevo combate'),
+                          ),
+                        if (active)
+                          OutlinedButton.icon(
                             onPressed: () =>
                                 _run(context, () => service.endCombat(gameCode)),
                             icon: const Icon(Icons.flag_outlined),
@@ -229,10 +316,11 @@ class InitiativePanel extends StatelessWidget {
                         padding: const EdgeInsets.all(24),
                         child: Text(
                           isMaster
-                              ? 'No hay combate. Pulsa «Tirar iniciativa» para '
-                                  'que todas las fichas tiren un d20 con su '
-                                  'modificador.'
-                              : 'No hay combate en curso.',
+                              ? tr('No hay combate. Pulsa «Preparar combate» '
+                                  'para elegir qué criaturas entran y si van '
+                                  'en grupo. Después, cada jugador tira su '
+                                  'iniciativa.')
+                              : tr('No hay combate en curso.'),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -244,11 +332,13 @@ class InitiativePanel extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          'Ronda ${st.round}',
+                          rolling
+                              ? tr('Tiradas de iniciativa')
+                              : '${tr('Ronda')} ${st.round}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const Spacer(),
-                        if (isMaster || myTurn)
+                        if (!rolling && (isMaster || myTurn))
                           FilledButton.icon(
                             onPressed: () => _endTurn(context, st),
                             icon: const AppIcon('reloj_arena', size: 22),
@@ -257,17 +347,25 @@ class InitiativePanel extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isMaster)
+                  if (rolling && !isMaster)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Tx(
+                        'Pulsa «Tirar» en tu ficha para lanzar tu iniciativa.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  if (isMaster && !rolling)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Tx(
                         'Arrastra para cambiar el orden · toca el resultado '
                         'para editarlo.',
-                        style: TextStyle(fontSize: 11, color: Colors.black54),
+                        style: TextStyle(fontSize: 11),
                       ),
                     ),
                   Expanded(
-                    child: isMaster
+                    child: isMaster && !rolling
                         ? ReorderableListView.builder(
                             buildDefaultDragHandles: false,
                             itemCount: entries.length,
@@ -302,7 +400,9 @@ class InitiativePanel extends StatelessWidget {
     int index, {
     Key? key,
   }) {
-    final isCurrent = st.current == e.id;
+    final isCurrent = st.inTurns && st.current == e.id;
+    final rolling = st.rolling;
+    final mine = e.id == 'p_$myUid';
     final color = Color(e.color);
 
     return Container(
@@ -310,6 +410,7 @@ class InitiativePanel extends StatelessWidget {
       color: isCurrent ? Colors.green.withAlpha(40) : null,
       child: ListTile(
         dense: true,
+        onTap: (isMaster || mine) ? () => onOpenEntry(e) : null,
         leading: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -347,13 +448,31 @@ class InitiativePanel extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          'd20: ${e.roll} ${Character.signed(e.mod)}'
-          '${isCurrent ? ' · tiene el turno' : ''}',
+          !e.rolled
+              ? tr('Pendiente de tirar')
+              : 'd20: ${e.roll} ${Character.signed(e.mod)}'
+                  '${e.isGroup ? ' · ${e.members.length} ${tr('criaturas')}' : ''}'
+                  '${isCurrent ? ' · ${tr('tiene el turno')}' : ''}',
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isMaster)
+            if (rolling && !e.rolled)
+              if (mine)
+                FilledButton.icon(
+                  onPressed: () => _run(context, onRollMine),
+                  icon: const AppIcon('d20_vacio', size: 20),
+                  label: const Tx('Tirar'),
+                )
+              else if (isMaster)
+                IconButton(
+                  tooltip: tr('Tirar su iniciativa'),
+                  icon: const AppIcon('d20_vacio', size: 24),
+                  onPressed: () => _run(context, () => onRollEntry(e)),
+                )
+              else
+                const Icon(Icons.hourglass_empty, size: 18)
+            else if (isMaster && !rolling)
               TextButton(
                 onPressed: () => _editTotal(context, st, e),
                 child: Text(
@@ -372,7 +491,7 @@ class InitiativePanel extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            if (isMaster) ...[
+            if (isMaster && !rolling) ...[
               IconButton(
                 tooltip: tr('Dar el turno a esta ficha'),
                 visualDensity: VisualDensity.compact,

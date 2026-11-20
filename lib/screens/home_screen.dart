@@ -52,9 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Contenido centrado y con scroll de cada apartado.
   Widget _scrollPage(List<Widget> children) {
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: Column(
@@ -66,10 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _cardBox(Widget card) => ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: card,
-      );
 
   Widget _gamesPage(User? user) {
     return _scrollPage([
@@ -91,34 +88,24 @@ class _HomeScreenState extends State<HomeScreen> {
       const _ActiveGameBanner(),
 
       const SizedBox(height: 12),
-      Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 16,
-        runSpacing: 16,
-        children: [
-          _cardBox(
-            _MenuCard(
-              asset: 'castillo',
-              title: 'Crear partida',
-              description: 'Crea una nueva campaña, prepara el mapa '
-                  'y administra tu aventura como Master.',
-              buttonText: 'Crear partida',
-              color: Colors.deepPurple,
-              onTap: () => _open(const CreateGameScreen()),
-            ),
-          ),
-          _cardBox(
-            _MenuCard(
-              asset: 'llave',
-              title: 'Unirse a partida',
-              description: 'Introduce el código de una campaña '
-                  'para unirte a la aventura como jugador.',
-              buttonText: 'Unirse a partida',
-              color: Colors.teal,
-              onTap: () => _open(const JoinGameScreen()),
-            ),
-          ),
-        ],
+      _MenuCard(
+        asset: 'castillo',
+        title: 'Crear partida',
+        description: 'Crea una nueva campaña, prepara el mapa '
+            'y administra tu aventura como Master.',
+        buttonText: 'Crear partida',
+        color: Colors.deepPurple,
+        onTap: () => _open(const CreateGameScreen()),
+      ),
+      const SizedBox(height: 12),
+      _MenuCard(
+        asset: 'llave',
+        title: 'Unirse a partida',
+        description: 'Introduce el código de una campaña '
+            'para unirte a la aventura como jugador.',
+        buttonText: 'Unirse a partida',
+        color: Colors.teal,
+        onTap: () => _open(const JoinGameScreen()),
       ),
     ]);
   }
@@ -207,64 +194,51 @@ class _MenuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4,
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: color.withOpacity(0.10),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: color.withOpacity(0.45), width: 1.5),
       ),
-
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AppIcon(asset, size: 84),
-
-            const SizedBox(height: 18),
-
-            Text(
-              tr(title),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              tr(description),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-                height: 1.5,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onTap,
-
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 15,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              AppIcon(asset, size: 64),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr(title),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tr(description),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ),
-
-                child: Text(tr(buttonText)),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: color, size: 30),
+            ],
+          ),
         ),
       ),
     );
@@ -367,29 +341,54 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
         final games = (snap.data ?? const <_MyGame>[])
             .where((g) => !_dismissed.contains(g.code))
             .toList();
-        if (games.isEmpty) return const SizedBox.shrink();
+        final loading = snap.connectionState != ConnectionState.done;
 
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        games.isEmpty
+                            ? tr('No tienes partidas creadas.')
+                            : tr('Tus partidas'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  loading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          tooltip: tr('Actualizar partidas'),
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _refresh,
+                        ),
+                ],
+              ),
               for (final g in games)
                 Card(
-                  color: Colors.deepPurple.shade50,
+                  color: Colors.deepPurple.withOpacity(0.16),
                   child: ListTile(
                     leading: const AppIcon('castillo', size: 40),
                     title: Text(
                       g.name,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
                       '${tr('Código')} ${g.code} · '
                       '${g.status == 'playing' ? tr('en juego') : tr('en la sala')}',
-                      style: const TextStyle(color: Colors.black54),
                     ),
                     trailing: Wrap(
                       spacing: 4,

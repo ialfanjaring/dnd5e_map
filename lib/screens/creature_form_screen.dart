@@ -288,7 +288,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
           alignment: Alignment.centerLeft,
           child: Text(
             'Experiencia: ${CreatureData.challengeRatings[_cr] ?? 0} PX',
-            style: TextStyle(color: Colors.grey.shade700),
+            style: TextStyle(color: Colors.grey.shade600),
           ),
         ),
       ],

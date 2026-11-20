@@ -75,7 +75,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           'instrucciones para crear una contraseña nueva. Mira también la '
           'carpeta de spam.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 20),
         ElevatedButton(
@@ -95,7 +95,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Tx(
             'Escribe tu correo y te enviaremos un enlace para restablecer la '
             'contraseña.',
-            style: TextStyle(color: Colors.grey.shade700),
+            style: TextStyle(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 16),
           TextFormField(

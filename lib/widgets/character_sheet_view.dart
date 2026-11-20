@@ -128,7 +128,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
                 const SizedBox(height: 4),
                 Text(
                   c.summary,
-                  style: TextStyle(color: Colors.grey.shade700),
+                  style: TextStyle(color: Colors.grey.shade600),
                 ),
                 if (c.background.isNotEmpty || c.alignment.isNotEmpty)
                   Padding(
@@ -323,7 +323,7 @@ class _StatBox extends StatelessWidget {
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 4),
               Text(

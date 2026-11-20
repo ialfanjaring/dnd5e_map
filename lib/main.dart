@@ -1,25 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_wrapper.dart';
 import 'settings/app_settings.dart';
+import 'utils/orientation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Solo en móviles (Android/iOS): la app funciona únicamente en horizontal.
-  if (!kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS)) {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-  }
+  // En móviles la app va en vertical; la partida y el editor de mapas giran
+  // solos a horizontal (ver lib/utils/orientation.dart).
+  await AppOrientation.portrait();
 
   // Inicializar Firebase.
   await Firebase.initializeApp(

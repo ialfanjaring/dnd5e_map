@@ -124,7 +124,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   'Ábrelo para activar tu cuenta. Mira también la carpeta de '
                   'spam.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade700),
+                  style: TextStyle(color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -153,7 +153,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   Text(
                     _message!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade800),
+                    style: TextStyle(color: Colors.grey.shade600),
                   ),
                 ],
                 const SizedBox(height: 16),

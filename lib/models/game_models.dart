@@ -33,32 +33,260 @@ class GameColors {
   }
 }
 
+/// Regla de movimiento de una casilla.
+enum MoveRule {
+  /// Se camina con normalidad (5 pies por casilla)
+  normal,
+
+  /// Terreno difícil: cada casilla cuesta el doble
+  difficult,
+
+  /// No se puede cruzar ni colocar fichas (muros, pilares...)
+  blocked,
+}
+
+/// Aspecto con el que se dibuja un terreno.
+enum TerrainPattern {
+  plain,
+  grass,
+  dirt,
+  sand,
+  snow,
+  ice,
+  mud,
+  planks,
+  tiles,
+  cobble,
+  carpet,
+  rocks,
+  waves,
+  deepWaves,
+  stoneWall,
+  woodWall,
+  pillar,
+  trees,
+  door,
+  furniture,
+  lava,
+  fire,
+  marble,
+  checker,
+  royalCarpet,
+  palaceWall,
+  column,
+  throne,
+  fountain,
+  statue,
+  hedge,
+  flowers,
+  bars,
+  stairsUp,
+  stairsDown,
+  stairsBoth,
+  ladder,
+}
+
 /// Tipo de terreno que el Master puede pintar en el mapa.
 class TerrainType {
   final String id;
   final String name;
+
+  /// Grupo en el selector (suelos, naturaleza...)
+  final String group;
   final int color;
   final IconData icon;
+  final TerrainPattern pattern;
 
-  const TerrainType(this.id, this.name, this.color, this.icon);
+  /// Regla que trae por defecto (se puede cambiar casilla a casilla)
+  final MoveRule move;
+
+  const TerrainType(
+    this.id,
+    this.name,
+    this.group,
+    this.color,
+    this.icon,
+    this.pattern, [
+    this.move = MoveRule.normal,
+  ]);
+}
+
+/// Una casilla ya interpretada: terreno + regla de movimiento.
+class CellInfo {
+  final TerrainType? type;
+  final MoveRule rule;
+  const CellInfo(this.type, this.rule);
+
+  /// La regla es distinta de la que trae el terreno (se marca en el mapa)
+  bool get overridden => type != null && rule != type!.move;
 }
 
 class Terrains {
+  static const String gSuelos = 'Suelos';
+  static const String gNaturaleza = 'Naturaleza';
+  static const String gConstruccion = 'Construcción';
+  static const String gPalacio = 'Palacio';
+  static const String gEscaleras = 'Escaleras';
+  static const String gPeligros = 'Peligros';
+
+  static const List<String> groups = [
+    gSuelos,
+    gNaturaleza,
+    gConstruccion,
+    gPalacio,
+    gEscaleras,
+    gPeligros,
+  ];
+
   static const List<TerrainType> all = [
-    TerrainType('wall', 'Muro', 0xFF455A64, Icons.square),
-    TerrainType('water', 'Agua', 0xFF4FC3F7, Icons.water_drop),
-    TerrainType('forest', 'Bosque', 0xFF66BB6A, Icons.park),
-    TerrainType('rough', 'Terreno difícil', 0xFFBCAAA4, Icons.terrain),
-    TerrainType('door', 'Puerta', 0xFF8D6E63, Icons.door_front_door),
-    TerrainType('lava', 'Lava', 0xFFFF7043, Icons.local_fire_department),
+    // Suelos
+    TerrainType('stone', 'Suelo de piedra', gSuelos, 0xFF9E9E9E,
+        Icons.grid_view, TerrainPattern.tiles),
+    TerrainType('wood', 'Suelo de madera', gSuelos, 0xFFA1763F,
+        Icons.view_headline, TerrainPattern.planks),
+    TerrainType('cobble', 'Adoquines', gSuelos, 0xFF8D8D8D,
+        Icons.blur_on, TerrainPattern.cobble),
+    TerrainType('carpet', 'Alfombra', gSuelos, 0xFF9C2F3A,
+        Icons.crop_square, TerrainPattern.carpet),
+    TerrainType('dirt', 'Tierra', gSuelos, 0xFF8B6B47,
+        Icons.grain, TerrainPattern.dirt),
+    TerrainType('sand', 'Arena', gSuelos, 0xFFE6D08F,
+        Icons.beach_access, TerrainPattern.sand),
+    // Naturaleza
+    TerrainType('grass', 'Hierba', gNaturaleza, 0xFF6DAA57,
+        Icons.grass, TerrainPattern.grass),
+    TerrainType('forest', 'Bosque', gNaturaleza, 0xFF3F7F3F,
+        Icons.park, TerrainPattern.trees, MoveRule.difficult),
+    TerrainType('snow', 'Nieve', gNaturaleza, 0xFFEAF3F8,
+        Icons.ac_unit, TerrainPattern.snow, MoveRule.difficult),
+    TerrainType('ice', 'Hielo', gNaturaleza, 0xFFBFE6F2,
+        Icons.severe_cold, TerrainPattern.ice),
+    TerrainType('mud', 'Barro', gNaturaleza, 0xFF6B5237,
+        Icons.water_damage, TerrainPattern.mud, MoveRule.difficult),
+    TerrainType('rough', 'Escombros', gNaturaleza, 0xFFA89F91,
+        Icons.terrain, TerrainPattern.rocks, MoveRule.difficult),
+    TerrainType('water', 'Agua', gNaturaleza, 0xFF4FA8D8,
+        Icons.water_drop, TerrainPattern.waves, MoveRule.difficult),
+    TerrainType('deepwater', 'Agua profunda', gNaturaleza, 0xFF1F5F9C,
+        Icons.waves, TerrainPattern.deepWaves, MoveRule.blocked),
+    // Construcción
+    TerrainType('wall', 'Muro de piedra', gConstruccion, 0xFF566268,
+        Icons.view_module, TerrainPattern.stoneWall, MoveRule.blocked),
+    TerrainType('woodwall', 'Muro de madera', gConstruccion, 0xFF6B4A2B,
+        Icons.fence, TerrainPattern.woodWall, MoveRule.blocked),
+    TerrainType('pillar', 'Pilar', gConstruccion, 0xFF7A8084,
+        Icons.circle, TerrainPattern.pillar, MoveRule.blocked),
+    TerrainType('furniture', 'Mueble', gConstruccion, 0xFF7B5532,
+        Icons.table_restaurant, TerrainPattern.furniture, MoveRule.blocked),
+    TerrainType('door', 'Puerta', gConstruccion, 0xFF8D6E63,
+        Icons.door_front_door, TerrainPattern.door),
+    // Palacio
+    TerrainType('marble', 'Losa de piedra', gPalacio, 0xFFC9C8CC,
+        Icons.diamond_outlined, TerrainPattern.marble),
+    TerrainType('checker', 'Suelo ajedrezado', gPalacio, 0xFFD9D9DD,
+        Icons.grid_on, TerrainPattern.checker),
+    TerrainType('royalcarpet', 'Alfombra granate', gPalacio, 0xFF7A1F2B,
+        Icons.workspace_premium, TerrainPattern.royalCarpet),
+    TerrainType('palacewall', 'Muro de palacio', gPalacio, 0xFF8F8F97,
+        Icons.account_balance, TerrainPattern.palaceWall, MoveRule.blocked),
+    TerrainType('column', 'Columna', gPalacio, 0xFFC9C8CC,
+        Icons.view_column, TerrainPattern.column, MoveRule.blocked),
+    TerrainType('throne', 'Trono', gPalacio, 0xFFC9C8CC,
+        Icons.chair, TerrainPattern.throne, MoveRule.blocked),
+    TerrainType('fountain', 'Fuente', gPalacio, 0xFFB4B4BA,
+        Icons.water, TerrainPattern.fountain, MoveRule.blocked),
+    TerrainType('statue', 'Estatua', gPalacio, 0xFFC9C8CC,
+        Icons.emoji_events, TerrainPattern.statue, MoveRule.blocked),
+    TerrainType('hedge', 'Seto', gPalacio, 0xFF2F6B35,
+        Icons.grass, TerrainPattern.hedge, MoveRule.blocked),
+    TerrainType('flowers', 'Parterre de flores', gPalacio, 0xFF7DB45F,
+        Icons.local_florist, TerrainPattern.flowers, MoveRule.difficult),
+    TerrainType('bars', 'Reja', gPalacio, 0xFF3A3A3F,
+        Icons.border_vertical, TerrainPattern.bars, MoveRule.blocked),
+    // Escaleras: al pisarlas se puede cambiar de piso
+    TerrainType('stairsup', 'Escalera (sube)', gEscaleras, 0xFFB59A78,
+        Icons.arrow_upward, TerrainPattern.stairsUp),
+    TerrainType('stairsdown', 'Escalera (baja)', gEscaleras, 0xFFB59A78,
+        Icons.arrow_downward, TerrainPattern.stairsDown),
+    TerrainType('stairsboth', 'Escalera (sube y baja)', gEscaleras, 0xFFB59A78,
+        Icons.swap_vert, TerrainPattern.stairsBoth),
+    TerrainType('ladder', 'Escalera de mano', gEscaleras, 0xFF8D6E4C,
+        Icons.format_line_spacing, TerrainPattern.ladder, MoveRule.difficult),
+    // Peligros
+    TerrainType('lava', 'Lava', gPeligros, 0xFFE8561C,
+        Icons.local_fire_department, TerrainPattern.lava, MoveRule.difficult),
+    TerrainType('fire', 'Fuego', gPeligros, 0xFF4A3B32,
+        Icons.whatshot, TerrainPattern.fire, MoveRule.blocked),
   ];
 
   static TerrainType? byId(String id) {
+    // Terrenos antiguos que ya no existen
+    if (id == 'stairs' || id == 'spiral' || id == 'trapdoor') id = 'stairsboth';
     for (final t in all) {
       if (t.id == id) return t;
     }
     return null;
   }
+
+  /// Valores de una casilla: "id" (regla por defecto del terreno) o
+  /// "id+n" (libre), "id+d" (difícil), "id+b" (sin paso ni fichas).
+  static CellInfo parse(String? value) {
+    if (value == null || value.isEmpty) {
+      return const CellInfo(null, MoveRule.normal);
+    }
+    final parts = value.split('+');
+    final t = byId(parts.first);
+    var rule = t?.move ?? MoveRule.normal;
+    if (parts.length > 1) {
+      switch (parts[1]) {
+        case 'n':
+          rule = MoveRule.normal;
+        case 'd':
+          rule = MoveRule.difficult;
+        case 'b':
+          rule = MoveRule.blocked;
+      }
+    }
+    return CellInfo(t, rule);
+  }
+
+  /// Terrenos que comunican pisos (escaleras y escalera de mano)
+  static bool isLink(String? value) => linkDirection(value) != null;
+
+  /// Hacia dónde se puede cambiar de piso: 1 = solo arriba, -1 = solo abajo,
+  /// 0 = ambos; null si no es una escalera.
+  static int? linkDirection(String? value) {
+    if (value == null || value.isEmpty) return null;
+    switch (byId(idOf(value))?.pattern) {
+      case TerrainPattern.stairsUp:
+        return 1;
+      case TerrainPattern.stairsDown:
+        return -1;
+      case TerrainPattern.stairsBoth:
+      case TerrainPattern.ladder:
+        return 0;
+      default:
+        return null;
+    }
+  }
+
+  /// ¿Se puede ir de [from] a [to] desde esta casilla?
+  static bool canChangeFloor(String? value, int from, int to) {
+    final d = linkDirection(value);
+    if (d == null || from == to) return false;
+    return d == 0 || (d > 0 ? to > from : to < from);
+  }
+
+  static String idOf(String value) => value.split('+').first;
+
+  /// Sufijo de la regla elegida: null = la del terreno.
+  static String? flagOf(String value) {
+    final p = value.split('+');
+    return p.length > 1 && p[1].isNotEmpty ? p[1] : null;
+  }
+
+  static String encode(String id, String? flag) =>
+      flag == null ? id : '$id+$flag';
 }
 
 /// Ficha colocada en el mapa: de un jugador o de una criatura del Master.
@@ -92,6 +320,9 @@ class GameToken {
   /// Casillas que ocupa por lado (1 = normal, 2 = grande...)
   final int span;
 
+  /// Piso en el que está la ficha (0 = el primero)
+  final int floor;
+
   /// Imagen por defecto: 'npc' o el tipo de criatura (vacío = se deduce)
   final String icon;
 
@@ -106,6 +337,7 @@ class GameToken {
     required this.y,
     this.hidden = false,
     this.span = 1,
+    this.floor = 0,
     this.icon = '',
   });
 
@@ -127,6 +359,7 @@ class GameToken {
       y: ((d['y'] ?? 0) as num).toInt(),
       hidden: (d['hidden'] ?? false) as bool,
       span: ((d['span'] ?? 1) as num).toInt().clamp(1, 4).toInt(),
+      floor: ((d['floor'] ?? 0) as num).toInt(),
       icon: (d['icon'] ?? '') as String,
     );
   }

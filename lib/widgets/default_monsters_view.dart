@@ -76,13 +76,13 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Card(
                 margin: EdgeInsets.zero,
-                color: Colors.red.shade50,
+                color: Colors.red.withOpacity(0.14),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.lock_outline, color: Colors.red.shade800),
+                      Icon(Icons.lock_outline, color: Colors.red.shade400),
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Column(
@@ -215,11 +215,11 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                           onTap: () => _open(m),
                           leading: CircleAvatar(
                             radius: 16,
-                            backgroundColor: Colors.red.shade100,
+                            backgroundColor: Colors.red.withOpacity(0.25),
                             child: Icon(
                               Icons.pets,
                               size: 16,
-                              color: Colors.red.shade800,
+                              color: Colors.red.shade400,
                             ),
                           ),
                           title: Text(

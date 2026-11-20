@@ -71,7 +71,7 @@ class _RacesScreenState extends State<RacesScreen> {
                         ),
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: Colors.teal.shade100,
+                        backgroundColor: Colors.teal.withOpacity(0.25),
                         child: Text(DndData.raceName(r.index)[0]),
                       ),
                       title: Text(
@@ -256,7 +256,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
   Widget _chosenSubrace(String index) {
     return Card(
       margin: const EdgeInsets.only(top: 12),
-      color: Colors.teal.shade50,
+      color: Colors.teal.withOpacity(0.14),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: FutureBuilder<ApiSubrace>(

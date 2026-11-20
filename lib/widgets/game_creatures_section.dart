@@ -24,12 +24,16 @@ class GameCreaturesSection extends StatelessWidget {
   /// Selecciona la ficha de la criatura en el mapa.
   final void Function(String tokenId)? onLocate;
 
+  /// Piso en el que se colocan las criaturas al sacarlas al mapa
+  final int floor;
+
   const GameCreaturesSection({
     super.key,
     required this.gameCode,
     this.tokens = const [],
     this.selectedId,
     this.onLocate,
+    this.floor = 0,
   });
 
   Future<void> _addCreatures(BuildContext context) async {
@@ -120,6 +124,7 @@ class GameCreaturesSection extends StatelessWidget {
                 token: tokens.where((t) => t.id == gc.id).firstOrNull,
                 selected: selectedId == gc.id,
                 onLocate: onLocate,
+                floor: floor,
               ),
           ],
         );
@@ -137,6 +142,7 @@ class _GameCreatureTile extends StatelessWidget {
   final GameToken? token;
   final bool selected;
   final void Function(String tokenId)? onLocate;
+  final int floor;
 
   const _GameCreatureTile({
     required this.gameCode,
@@ -145,6 +151,7 @@ class _GameCreatureTile extends StatelessWidget {
     this.token,
     this.selected = false,
     this.onLocate,
+    this.floor = 0,
   });
 
   @override
@@ -228,7 +235,7 @@ class _GameCreatureTile extends StatelessWidget {
         );
 
         return Card(
-          color: selected ? Colors.amber.shade100 : null,
+          color: selected ? Colors.amber.withOpacity(0.28) : null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
             child: Column(
@@ -274,7 +281,7 @@ class _GameCreatureTile extends StatelessWidget {
                                 fontSize: 12,
                                 color: t != null && t.hidden
                                     ? Colors.deepOrange
-                                    : Colors.grey.shade700,
+                                    : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -301,7 +308,7 @@ class _GameCreatureTile extends StatelessWidget {
                                 : 'Sacar del mapa (oculta a los jugadores)',
                             icon: Icon(t.hidden ? Icons.login : Icons.logout),
                             onPressed: () => (t.hidden
-                                ? service.placeTokenOnMap(gameCode, t.id)
+                                ? service.placeTokenOnMap(gameCode, t.id, floor: floor)
                                 : service.setTokenHidden(gameCode, t.id, true)),
                           ),
                           if (onLocate != null)

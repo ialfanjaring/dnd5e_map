@@ -118,7 +118,7 @@ class _PasswordFieldState extends State<PasswordField> {
                                 : (strength.index + 1) / 4,
                             minHeight: 6,
                             color: _strengthColor(strength),
-                            backgroundColor: Colors.grey.shade300,
+                            backgroundColor: Colors.grey.withOpacity(0.35),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -158,7 +158,7 @@ class _PasswordFieldState extends State<PasswordField> {
                                     fontSize: 12,
                                     color: r.test(password, email)
                                         ? Colors.green.shade700
-                                        : Colors.grey.shade700,
+                                        : Colors.grey.shade600,
                                   ),
                                 ),
                               ),

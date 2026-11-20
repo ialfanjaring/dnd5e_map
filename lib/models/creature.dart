@@ -226,6 +226,12 @@ class GameCreature {
   /// Copia de la criatura del bestiario (null si es de la API)
   final Creature? snapshot;
 
+  /// Espacios de conjuro gastados por nivel
+  final Map<int, int> slotsUsed;
+
+  /// Máximos de espacios definidos por el Master (si no vienen de la API)
+  final Map<int, int> slotsMax;
+
   const GameCreature({
     required this.id,
     this.label,
@@ -233,6 +239,8 @@ class GameCreature {
     this.number = 1,
     this.damage = 0,
     this.snapshot,
+    this.slotsUsed = const {},
+    this.slotsMax = const {},
   });
 
   bool get isApi => apiIndex != null;
@@ -266,6 +274,20 @@ class GameCreature {
       number: ((data['number'] ?? 1) as num).toInt(),
       damage: damage,
       snapshot: snapshot,
+      slotsUsed: _slotMap(data['slotsUsed']),
+      slotsMax: _slotMap(data['slotsMax']),
     );
+  }
+
+  static Map<int, int> _slotMap(dynamic raw) {
+    final out = <int, int>{};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        final l = int.tryParse(k.toString());
+        final n = v is num ? v.toInt() : null;
+        if (l != null && n != null && n > 0) out[l] = n;
+      });
+    }
+    return out;
   }
 }

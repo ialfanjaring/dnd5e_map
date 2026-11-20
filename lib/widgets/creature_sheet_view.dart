@@ -37,7 +37,7 @@ class CreatureSheetView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = creature;
-    final accent = c.isMonster ? Colors.red.shade800 : Colors.blueGrey.shade700;
+    final accent = c.isMonster ? Colors.red.shade400 : Colors.blueGrey.shade300;
 
     return Card(
       elevation: 3,
@@ -69,7 +69,7 @@ class CreatureSheetView extends StatelessWidget {
               '${c.alignment.toLowerCase()}',
               style: TextStyle(
                 fontStyle: FontStyle.italic,
-                color: Colors.grey.shade700,
+                color: Colors.grey.shade600,
               ),
             ),
             _divider(accent),

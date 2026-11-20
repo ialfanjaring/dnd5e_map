@@ -5,6 +5,8 @@ import '../screens/items_screen.dart';
 import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import 'character_sheet_view.dart';
+import 'spellcasting_panel.dart';
+import '../services/class_api_service.dart';
 import 'avatars.dart';
 import 'resolved_character.dart';
 import '../models/character.dart';
@@ -55,6 +57,17 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
         SnackBar(content: Text('No se pudo cambiar los PG: $e')),
       );
     }
+  }
+
+  Future<Map<int, int>> _classSlots(GamePlayer p) async {
+    try {
+      final levels =
+          await ClassApiService().fetchLevels(p.character.characterClass);
+      for (final l in levels) {
+        if (l.level == p.character.level) return l.slots;
+      }
+    } catch (_) {}
+    return const {};
   }
 
   Future<void> _addItems() async {
@@ -152,7 +165,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                       value: ratio,
                       minHeight: 10,
                       color: barColor,
-                      backgroundColor: Colors.grey.shade300,
+                      backgroundColor: Colors.grey.withOpacity(0.35),
                     ),
                     const SizedBox(height: 10),
                     ResolvedCharacterBuilder(
@@ -172,7 +185,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                                   label,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey.shade700,
+                                    color: Colors.grey.shade600,
                                   ),
                                 ),
                               ],
@@ -232,6 +245,30 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                   ],
                 ),
               ),
+            ),
+
+            // ESPACIOS DE CONJURO Y HECHIZOS
+            FutureBuilder<Map<int, int>>(
+              future: _classSlots(p),
+              builder: (context, s) {
+                final slots = s.data ?? const <int, int>{};
+                if (slots.isEmpty && p.character.spells.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SpellcastingPanel(
+                      maxSlots: slots,
+                      used: p.slotsUsed,
+                      spells: p.character.spells,
+                      canEdit: canManage,
+                      onUsedChanged: (u) =>
+                          _service.updatePlayerSlots(widget.gameCode, p.uid, u),
+                    ),
+                  ),
+                );
+              },
             ),
 
             // FICHA COMPLETA

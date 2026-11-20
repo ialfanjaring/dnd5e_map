@@ -73,7 +73,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                         ),
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: Colors.deepPurple.shade100,
+                        backgroundColor: Colors.deepPurple.withOpacity(0.28),
                         child: Text(DndData.className(c.index)[0]),
                       ),
                       title: Text(
@@ -407,7 +407,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       children: [
         Text(
           '${spells.length} hechizos disponibles para $_className.',
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 8),
         for (final level in levels)

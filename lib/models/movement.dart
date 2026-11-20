@@ -4,18 +4,17 @@ import 'game_models.dart';
 ///
 /// Reglas (simples):
 /// - Cada casilla cuesta 5 pies; se permite moverse en diagonal.
-/// - Muro: no se puede cruzar. Agua, bosque y terreno difícil cuestan el doble.
+/// - Casillas bloqueadas (muros, mobiliario...): no se cruzan ni admiten fichas.
+///   Terreno difícil (agua, bosque, barro...): cuesta el doble.
 /// - Se puede pasar por casillas con otras fichas, pero no terminar en ellas.
 class Movement {
   static int _cost(String? terrain) {
-    switch (terrain) {
-      case 'wall':
+    switch (Terrains.parse(terrain).rule) {
+      case MoveRule.blocked:
         return -1; // bloqueado
-      case 'water':
-      case 'forest':
-      case 'rough':
+      case MoveRule.difficult:
         return 2;
-      default:
+      case MoveRule.normal:
         return 1;
     }
   }

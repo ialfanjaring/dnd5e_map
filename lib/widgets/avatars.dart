@@ -69,7 +69,7 @@ class Avatars {
         return (icon: e.icon, color: e.color);
       }
     }
-    return (icon: defaultIcon, color: Colors.grey.shade700);
+    return (icon: defaultIcon, color: Colors.grey.shade600);
   }
 
   /// Icono de una criatura: los NPC tienen el suyo; los monstruos, el de su tipo.

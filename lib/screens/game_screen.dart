@@ -23,10 +23,15 @@ import '../widgets/creature_sheet_view.dart';
 import '../widgets/dice_panel.dart';
 import '../widgets/game_board.dart';
 import '../widgets/game_creatures_section.dart';
+import '../widgets/combatant_dialog.dart';
 import '../widgets/game_sheet_widgets.dart';
 import '../widgets/initiative_panel.dart';
 import '../i18n/i18n.dart';
 import '../widgets/app_icon.dart';
+import '../utils/orientation.dart';
+import '../widgets/terrain_painter.dart';
+import '../widgets/terrain_picker.dart';
+import '../widgets/combat_setup.dart';
 
 enum _Tool { move, paint, erase }
 
@@ -56,6 +61,11 @@ class _GameScreenState extends State<GameScreen>
   List<GamePlayer> _players = [];
   List<GameToken> _tokens = [];
   Map<String, String> _terrain = {};
+
+  // Pisos (hojas del mapa)
+  int _viewFloor = 0; // el Master elige qué piso ve
+  int _terrainFloor = 0; // piso cuyo terreno estamos recibiendo
+  StreamSubscription<Map<String, String>>? _terrainSub;
   List<DiceRoll> _rolls = [];
   String? _dismissedRollId;
   bool _rollsLoaded = false;
@@ -83,7 +93,8 @@ class _GameScreenState extends State<GameScreen>
   final Map<String, String> _resolvedKeys = {};
 
   _Tool _tool = _Tool.move;
-  String _brush = 'wall';
+  ({int x, int y, int span})? _marker;
+  String _brush = 'stone';
   String? _selectedId;
   int _fitSignal = 0;
 
@@ -137,6 +148,8 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    // La partida se juega en horizontal
+    AppOrientation.landscape();
     // Master: Dados, Iniciativa, Jugadores, Criaturas
     // Jugador: Dados, Iniciativa, Mi ficha
     _tabs = TabController(length: widget.isMaster ? 4 : 3, vsync: this);
@@ -157,20 +170,79 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    // Al salir de la partida, la app vuelve a vertical
+    AppOrientation.portrait();
     _heartbeat?.cancel();
     _rollTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
+    _terrainSub?.cancel();
     _flushTimer?.cancel();
     if (_paintBuffer.isNotEmpty) {
-      _service.paintCells(_code, Map<String, String?>.from(_paintBuffer));
+      _service.paintCells(
+          _code, Map<String, String?>.from(_paintBuffer), _terrainFloor);
     }
     _tabs.dispose();
     _hiddenRolls.dispose();
     _visibleIds.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------
+  // PISOS
+  // ---------------------------------------------------------------
+
+  List<String> get _floorNames {
+    final raw = _game['floorNames'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.map((e) => e.toString()).toList();
+    }
+    return ['Piso 1'];
+  }
+
+  int get _floorCount => _floorNames.length;
+
+  String _floorName(int i) => tr(_floorNames[i.clamp(0, _floorCount - 1).toInt()]);
+
+  /// Piso que se está viendo: el Master elige; el jugador ve el de su ficha.
+  int get _floor {
+    final n = _floorCount;
+    if (widget.isMaster) return _viewFloor.clamp(0, n - 1).toInt();
+    final mine = _tokens.where((t) => t.id == 'p_$_uid').firstOrNull;
+    return (mine?.floor ?? 0).clamp(0, n - 1).toInt();
+  }
+
+  void _subscribeTerrain() {
+    _terrainSub?.cancel();
+    _terrainFloor = _floor;
+    _terrainSub = _service.terrain(_code, _terrainFloor).listen((t) {
+      if (!mounted) return;
+      setState(() => _terrain = t);
+    }, onError: _onError);
+  }
+
+  /// Si cambió el piso que se ve, se carga su terreno.
+  void _syncFloor() {
+    if (_floor != _terrainFloor) {
+      _flushPaint();
+      _paintBuffer.clear();
+      _terrain = {};
+      _subscribeTerrain();
+    }
+  }
+
+  void _setViewFloor(int i) {
+    setState(() {
+      _viewFloor = i;
+      _selectedId = null;
+    });
+    _syncFloor();
+  }
+
+  /// Fichas en el mapa del piso que se ve.
+  List<GameToken> get _onFloor =>
+      _tokens.where((t) => !t.hidden && t.floor == _floor).toList();
 
   void _onError(Object e, [StackTrace? st]) {
     // Al terminar la sesión se borra la partida y los permisos fallan: es normal
@@ -191,6 +263,7 @@ class _GameScreenState extends State<GameScreen>
         return;
       }
       setState(() => _game = g ?? {});
+      _syncFloor();
       _assignColorsIfNeeded();
     }, onError: _onError));
 
@@ -221,12 +294,10 @@ class _GameScreenState extends State<GameScreen>
         if (_selectedId != null && _selected == null) _selectedId = null;
       });
       _prefetchNames();
+      _syncFloor();
     }, onError: _onError));
 
-    _subs.add(_service.terrain(_code).listen((t) {
-      if (!mounted) return;
-      setState(() => _terrain = t);
-    }, onError: _onError));
+    _subscribeTerrain();
 
     _subs.add(_service.rolls(_code).listen((r) {
       if (!mounted) return;
@@ -403,6 +474,13 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  String _tokenName(String id) {
+    for (final t in _tokens) {
+      if (t.id == id) return _nameOf(t);
+    }
+    return id;
+  }
+
   String _nameOf(GameToken t) {
     if (t.isPlayer) return _playerOf(t.refId)?.character.name ?? '?';
     if (t.label.isNotEmpty) return t.label;
@@ -511,10 +589,12 @@ class _GameScreenState extends State<GameScreen>
   /// Casillas a las que puede llegar la ficha seleccionada.
   Set<String> get _reach {
     final t = _selected;
-    if (t == null || t.hidden || !_canMove(t)) return const {};
+    if (t == null || t.hidden || !_canMove(t) || t.floor != _floor) {
+      return const {};
+    }
 
     final occupied = <String>{};
-    for (final o in _onMap) {
+    for (final o in _onFloor) {
       if (o.id == t.id) continue;
       for (var dx = 0; dx < o.span; dx++) {
         for (var dy = 0; dy < o.span; dy++) {
@@ -568,14 +648,150 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Master: todas las fichas (jugadores, NPC y monstruos) tiran un d20.
-  Future<void> _rollInitiative() async {
-    final rnd = Random();
-    final entries = <InitEntry>[];
-    for (final t in _tokens) {
-      entries.add(await _rollEntry(t, rnd));
+  /// Master: elige qué fichas entran en el combate y cuáles van en grupo;
+  /// después cada jugador tira su iniciativa.
+  Future<void> _prepareCombat() async {
+    final candidates = [
+      for (final t in _tokens)
+        CombatCandidate(
+          id: t.id,
+          name: _nameOf(t),
+          isPlayer: t.isPlayer,
+          hidden: t.hidden,
+          baseKey: t.apiIndex ??
+              _nameOf(t).replaceAll(RegExp(r'\s*\d+$'), '').toLowerCase(),
+        ),
+    ];
+    if (candidates.isEmpty) {
+      _snack('Todavía no hay fichas en la partida.');
+      return;
     }
-    await _service.startCombat(_code, CombatState.sorted(entries));
+
+    final picks = await showCombatSetup(context, candidates);
+    if (picks == null || !mounted) return;
+
+    final entries = <InitEntry>[];
+    final groups = <String, List<GameToken>>{};
+    for (final pk in picks) {
+      final t = _tokens.where((x) => x.id == pk.id).firstOrNull;
+      if (t == null) continue;
+      if (pk.group != null) {
+        groups.putIfAbsent(pk.group!, () => []).add(t);
+        continue;
+      }
+      entries.add(InitEntry(
+        id: t.id,
+        name: _nameOf(t),
+        kind: t.kind,
+        // ignore: deprecated_member_use
+        color: _colorOf(t).value,
+        mod: 0,
+        roll: 0,
+        total: 0,
+        rolled: false,
+      ));
+    }
+
+    groups.forEach((letter, list) {
+      if (list.length == 1) {
+        final t = list.first;
+        entries.add(InitEntry(
+          id: t.id,
+          name: _nameOf(t),
+          kind: t.kind,
+          // ignore: deprecated_member_use
+          color: _colorOf(t).value,
+          mod: 0,
+          roll: 0,
+          total: 0,
+          rolled: false,
+        ));
+        return;
+      }
+      final bases = {
+        for (final t in list)
+          _nameOf(t).replaceAll(RegExp(r'\s*\d+$'), '').trim(),
+      };
+      final name = bases.length == 1
+          ? '${bases.first} ×${list.length}'
+          : '${tr('Grupo')} $letter (${list.length})';
+      entries.add(InitEntry(
+        id: 'g_$letter',
+        name: name,
+        kind: 'creature',
+        // ignore: deprecated_member_use
+        color: _colorOf(list.first).value,
+        mod: 0,
+        roll: 0,
+        total: 0,
+        rolled: false,
+        members: [for (final t in list) t.id],
+      ));
+    });
+
+    // Jugadores primero, luego criaturas
+    entries.sort((a, b) =>
+        (a.isPlayer ? 0 : 1).compareTo(b.isPlayer ? 0 : 1));
+
+    try {
+      await _service.startInitiativePhase(_code, entries);
+      _openInitiative();
+    } catch (e) {
+      _snack('No se pudo preparar el combate: $e');
+    }
+  }
+
+  /// Modificador de una entrada (en un grupo, el mejor de sus miembros).
+  Future<int> _entryMod(InitEntry e) async {
+    final ids = e.isGroup ? e.members : [e.id];
+    var best = -100;
+    for (final id in ids) {
+      final t = _tokens.where((x) => x.id == id).firstOrNull;
+      if (t == null) continue;
+      final m = await _initMod(t);
+      if (m > best) best = m;
+    }
+    return best == -100 ? 0 : best;
+  }
+
+  /// Un jugador tira su propia iniciativa.
+  Future<void> _rollMyInitiative() async {
+    final t = _tokens.where((x) => x.id == 'p_$_uid').firstOrNull;
+    if (t == null) return;
+    final mod = await _initMod(t);
+    await _service.postInitiativeRoll(
+      _code,
+      t.id,
+      roll: Random().nextInt(20) + 1,
+      mod: mod,
+    );
+  }
+
+  /// El Master tira por una entrada.
+  Future<void> _rollEntryFor(InitEntry e) async {
+    await _service.postInitiativeRoll(
+      _code,
+      e.id,
+      roll: Random().nextInt(20) + 1,
+      mod: await _entryMod(e),
+    );
+  }
+
+  /// El Master tira por las entradas que faltan.
+  Future<void> _rollPending({required bool onlyCreatures}) async {
+    final st = _combat;
+    if (st == null) return;
+    for (final e in st.pending) {
+      if (onlyCreatures && e.isPlayer) continue;
+      await _rollEntryFor(e);
+    }
+  }
+
+  /// El Master cierra las tiradas: se ordena y empiezan los turnos.
+  Future<void> _startTurns(CombatState st) async {
+    // Se vuelve a leer el estado: puede haber tiradas nuevas
+    final fresh = await _service.combat(_code).first ?? st;
+    await _service.startTurns(_code, CombatState.sorted(fresh.entries));
   }
 
   Future<void> _addToCombat(String tokenId, CombatState st) async {
@@ -591,10 +807,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   List<({String id, String name})> _missingInCombat(CombatState st) {
-    final inList = st.entries.map((e) => e.id).toSet();
     return [
       for (final t in _tokens)
-        if (!inList.contains(t.id)) (id: t.id, name: _nameOf(t)),
+        if (!st.entries.any((e) => e.covers(t.id)))
+          (id: t.id, name: _nameOf(t)),
     ];
   }
 
@@ -613,42 +829,55 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// Indicador del turno actual (se superpone al mapa; toca para abrir la
-  /// lista de iniciativa en el panel de la derecha).
-  Widget _buildTurnBar() {
+  /// Franja con el turno actual: va solo en la parte superior del panel de
+  /// la derecha (no se superpone al mapa).
+  Widget _turnBanner() {
     final st = _combat;
     if (st == null || !st.active) return const SizedBox.shrink();
 
-    final cur = st.currentEntry;
-    final mine = st.current == 'p_$_uid';
-    final visible = widget.isMaster || _visibleIds.value.contains(st.current);
-    final name = cur == null ? '—' : (visible ? cur.name : 'Algo en las sombras…');
+    final Color bg;
+    final String text;
+    if (st.rolling) {
+      final iRoll = st.entries.any((e) => e.id == 'p_$_uid' && !e.rolled);
+      bg = iRoll ? Colors.amber.shade300 : Colors.blueGrey.shade100;
+      text = iRoll ? '¡Tira tu iniciativa!' : 'Tiradas de iniciativa';
+    } else {
+      final cur = st.currentEntry;
+      final mine = st.current == 'p_$_uid';
+      final visible = widget.isMaster ||
+          (cur != null &&
+              (_visibleIds.value.contains(cur.id) ||
+                  cur.members.any(_visibleIds.value.contains)));
+      bg = mine ? Colors.green.shade300 : Colors.blueGrey.shade100;
+      text = mine
+          ? '¡Tu turno!'
+          : 'Turno: ${cur == null ? '—' : (visible ? cur.name : 'Algo en las sombras…')}';
+    }
 
     return Material(
-      color: mine ? Colors.green.shade200 : Colors.white.withAlpha(235),
+      color: bg,
       textStyle: const TextStyle(color: Colors.black87),
-      borderRadius: BorderRadius.circular(10),
-      elevation: 3,
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: _openInitiative,
+        onTap: () => _tabs.animateTo(_tabInitiative),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.flag, size: 18, color: Color(0xFF00A040)),
-              const SizedBox(width: 6),
-              Flexible(
+              const SizedBox(width: 8),
+              Expanded(
                 child: Text(
-                  mine
-                      ? '¡Tu turno!'
-                      : 'Turno: $name',
+                  tr(text),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
+              if (!st.rolling)
+                Text(
+                  '${tr('Ronda')} ${st.round}',
+                  style: const TextStyle(fontSize: 12),
+                ),
             ],
           ),
         ),
@@ -705,7 +934,7 @@ class _GameScreenState extends State<GameScreen>
 
   GameToken? _tokenAt(int x, int y) {
     GameToken? hit;
-    for (final t in _onMap) {
+    for (final t in _onFloor) {
       if (t.covers(x, y)) {
         hit = t;
         if (t.id == _selectedId) return t;
@@ -723,7 +952,7 @@ class _GameScreenState extends State<GameScreen>
       if (!_canMove(hit)) return;
       setState(() {
         _selectedId = hit.id == _selectedId ? null : hit.id;
-        if (_selectedId != null) _bottomOpen = true;
+        // El panel de herramientas se abre a mano (no tapa el mapa al elegir)
       });
       return;
     }
@@ -734,39 +963,88 @@ class _GameScreenState extends State<GameScreen>
     if (sel != null && _canMove(sel)) {
       final nx = x > _cols - sel.span ? _cols - sel.span : x;
       final ny = y > _rows - sel.span ? _rows - sel.span : y;
+
+      // No se puede colocar una ficha en casillas bloqueadas (muros...)
+      final map = _displayTerrain;
+      for (var i = 0; i < sel.span; i++) {
+        for (var j = 0; j < sel.span; j++) {
+          if (Terrains.parse(map[cellKey(nx + i, ny + j)]).rule ==
+              MoveRule.blocked) {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(SnackBar(
+                content: Text(tr('Esa casilla está bloqueada: no se pueden colocar fichas.')),
+                duration: const Duration(seconds: 2),
+              ));
+            return;
+          }
+        }
+      }
       _confirmAndMove(sel, nx, ny);
     }
   }
 
   Future<void> _confirmAndMove(GameToken sel, int nx, int ny) async {
-    final ok = await showDialog<bool>(
+    final here = _floor;
+    final cellValue = _displayTerrain[cellKey(nx, ny)];
+    final dests = <int>[
+      if (!sel.hidden && _floorCount > 1)
+        for (var i = 0; i < _floorCount; i++)
+          if (Terrains.canChangeFloor(cellValue, here, i)) i,
+    ];
+    final onLink = dests.isNotEmpty;
+
+    final text = sel.hidden
+        ? '¿Colocar a ${_nameOf(sel)} en la casilla (${nx + 1}, ${ny + 1})?'
+        : '¿Mover a ${_nameOf(sel)} de (${sel.x + 1}, ${sel.y + 1}) '
+            'a (${nx + 1}, ${ny + 1})?';
+
+    // Punto en la casilla elegida mientras se confirma
+    setState(() => _marker = (x: nx, y: ny, span: sel.span));
+
+    // Resultado: piso de destino (el actual = solo mover); null = cancelar
+    final target = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(sel.hidden ? 'Colocar ficha' : 'Mover ficha'),
         content: Text(
-          sel.hidden
-              ? '¿Colocar a ${_nameOf(sel)} en la casilla (${nx + 1}, ${ny + 1})?'
-              : '¿Mover a ${_nameOf(sel)} de (${sel.x + 1}, ${sel.y + 1}) '
-                  'a (${nx + 1}, ${ny + 1})?',
+          onLink
+              ? '$text\n\n${tr('Hay una escalera: puedes cambiar de piso.')}'
+              : text,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Tx('Cancelar'),
           ),
+          if (onLink)
+            for (final i in dests)
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(ctx, i),
+                icon: Icon(i > here ? Icons.arrow_upward : Icons.arrow_downward,
+                    size: 18),
+                label: Text('${tr('Ir a')} ${_floorName(i)}'),
+              ),
           ElevatedButton(
             autofocus: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Tx('Confirmar'),
+            onPressed: () => Navigator.pop(ctx, here),
+            child: Text(tr(onLink ? 'Solo mover' : 'Confirmar')),
           ),
         ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (mounted) setState(() => _marker = null);
+    if (target == null || !mounted) return;
+    // Tras mover, la ficha se deselecciona (se acaba el resaltado del alcance)
+    setState(() => _selectedId = null);
 
     if (sel.hidden) {
       _service
-          .placeTokenOnMap(_code, sel.id, x: nx, y: ny)
+          .placeTokenOnMap(_code, sel.id, x: nx, y: ny, floor: here)
+          .catchError(_onError);
+    } else if (target != sel.floor) {
+      _service
+          .moveTokenToFloor(_code, sel.id, nx, ny, target)
           .catchError(_onError);
     } else {
       _service.moveToken(_code, sel.id, nx, ny).catchError(_onError);
@@ -791,8 +1069,9 @@ class _GameScreenState extends State<GameScreen>
     if (_paintBuffer.isEmpty) return;
 
     final batch = Map<String, String?>.from(_paintBuffer);
+    final floor = _terrainFloor;
     try {
-      await _service.paintCells(_code, batch);
+      await _service.paintCells(_code, batch, floor);
     } catch (e) {
       _onError(e);
     }
@@ -937,12 +1216,58 @@ class _GameScreenState extends State<GameScreen>
 
     if (ok != true) return;
     setState(_paintBuffer.clear);
-    _service.clearTerrain(_code).catchError(_onError);
+    _service.clearTerrain(_code, _terrainFloor).catchError(_onError);
   }
 
   // ---------------------------------------------------------------
   // INTERFAZ
   // ---------------------------------------------------------------
+
+  /// Franja bajo la barra superior que indica el modo activo del Master
+  /// (no se superpone al mapa).
+  PreferredSizeWidget _modeBar() {
+    final (label, icon, color) = switch (_tool) {
+      _Tool.move => (tr('Modo: Mover fichas'), Icons.pan_tool_alt_outlined, Colors.blue),
+      _Tool.paint => (tr('Modo: Pintar terreno'), Icons.brush, Colors.deepOrange),
+      _Tool.erase => (tr('Modo: Borrar terreno'), Icons.cleaning_services_outlined, Colors.red),
+    };
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(30),
+      child: GestureDetector(
+        onTap: _tool == _Tool.move
+            ? () => setState(() => _bottomOpen = true)
+            : () => setState(() => _tool = _Tool.move),
+        child: Container(
+          height: 30,
+          width: double.infinity,
+          color: color,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              if (_tool != _Tool.move) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '· ${tr('toca para volver a Mover')}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -953,6 +1278,7 @@ class _GameScreenState extends State<GameScreen>
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        bottom: widget.isMaster ? _modeBar() : null,
         actions: [
           IconButton(
             tooltip: tr('Ver código de la sala'),
@@ -997,10 +1323,13 @@ class _GameScreenState extends State<GameScreen>
           // En horizontal el móvil puede tener barras de sistema a los lados
           final pad = MediaQuery.of(context).padding;
           final panelW = min(380.0, w * 0.9);
+          final toolsW = min(330.0, w * 0.6);
           const anim = Duration(milliseconds: 220);
 
-          final myTurn =
-              (_combat?.active ?? false) && _combat!.current == 'p_$_uid';
+          final myTurn = (_combat?.inTurns ?? false) &&
+              _combat!.current == 'p_$_uid';
+          final myRoll = (_combat?.rolling ?? false) &&
+              _combat!.entries.any((e) => e.id == 'p_$_uid' && !e.rolled);
 
           return Stack(
             children: [
@@ -1008,15 +1337,15 @@ class _GameScreenState extends State<GameScreen>
 
               // Arriba a la izquierda: avisos, turno y última tirada
               Positioned(
-                left: 8 + pad.left,
+                left: 8 + pad.left + 28 + (_bottomOpen ? toolsW : 0),
                 top: 8,
-                width: min(300.0, w - 64 - pad.left - pad.right),
+                width: min(300.0, w - 64 - pad.left - pad.right - (_bottomOpen ? toolsW : 0)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_error != null)
                       Card(
-                        color: Colors.red.shade50,
+                        color: Colors.red.withOpacity(0.14),
                         child: Padding(
                           padding: const EdgeInsets.all(8),
                           child: Row(
@@ -1037,21 +1366,66 @@ class _GameScreenState extends State<GameScreen>
                           ),
                         ),
                       ),
-                    _buildTurnBar(),
+                    _floorChip(),
                     const SizedBox(height: 6),
                     _buildLastRoll(),
                   ],
                 ),
               ),
 
-              // Abajo: herramientas y ficha seleccionada (desplegable)
+              // Izquierda: herramientas y ficha seleccionada (desplegable)
               AnimatedPositioned(
                 duration: anim,
                 curve: Curves.easeOut,
-                left: pad.left,
-                bottom: pad.bottom,
-                right: _panelOpen ? panelW + pad.right : pad.right,
-                child: _buildBottomOverlay(h),
+                top: 0,
+                bottom: 0,
+                width: toolsW + pad.left,
+                left: _bottomOpen ? 0 : -(toolsW + pad.left),
+                child: Material(
+                  elevation: 10,
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: pad.left, bottom: pad.bottom),
+                    child: _buildToolsPanel(),
+                  ),
+                ),
+              ),
+
+              // Pestaña para abrir/cerrar el panel de la izquierda
+              AnimatedPositioned(
+                duration: anim,
+                curve: Curves.easeOut,
+                top: 0,
+                bottom: 0,
+                left: _bottomOpen ? toolsW + pad.left : pad.left,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Material(
+                    color: !widget.isMaster || _tool == _Tool.move
+                        ? Theme.of(context).colorScheme.primary
+                        : (_tool == _Tool.paint ? Colors.deepOrange : Colors.red),
+                    elevation: 4,
+                    borderRadius: const BorderRadius.horizontal(
+                      right: Radius.circular(12),
+                    ),
+                    child: InkWell(
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(12),
+                      ),
+                      onTap: () => setState(() => _bottomOpen = !_bottomOpen),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 18,
+                        ),
+                        child: Icon(
+                          _bottomOpen ? Icons.chevron_left : Icons.chevron_right,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
               // Derecha: panel con pestañas (desplegable)
@@ -1085,7 +1459,7 @@ class _GameScreenState extends State<GameScreen>
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Material(
-                    color: myTurn && !_panelOpen
+                    color: (myTurn || myRoll) && !_panelOpen
                         ? Colors.green
                         : Theme.of(context).colorScheme.primary,
                     elevation: 4,
@@ -1105,7 +1479,7 @@ class _GameScreenState extends State<GameScreen>
                         child: Icon(
                           _panelOpen
                               ? Icons.chevron_right
-                              : (myTurn ? Icons.flag : Icons.chevron_left),
+                              : ((myTurn || myRoll) ? Icons.flag : Icons.chevron_left),
                           color: Colors.white,
                         ),
                       ),
@@ -1125,7 +1499,7 @@ class _GameScreenState extends State<GameScreen>
       cols: _cols,
       rows: _rows,
       terrain: _displayTerrain,
-      tokens: _onMap,
+      tokens: _onFloor,
       selectedId: _selectedId,
       colorOf: _colorOf,
       nameOf: _nameOf,
@@ -1135,60 +1509,192 @@ class _GameScreenState extends State<GameScreen>
       onCellTap: _onCellTap,
       onCellPaint: _onCellPaint,
       reachable: _reach,
-      turnId: (_combat?.active ?? false) ? _combat!.current : null,
+      marker: _marker,
+      turnIds: _combat?.currentTokenIds ?? const {},
     );
   }
 
-  /// Barra inferior desplegable: herramientas del Master y ficha seleccionada.
-  Widget _buildBottomOverlay(double maxHeight) {
+  /// Panel izquierdo desplegable: herramientas del Master y ficha seleccionada.
+  Widget _buildToolsPanel() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Material(
-          color: Theme.of(context).colorScheme.primary,
-          elevation: 4,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-          child: InkWell(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            onTap: () => setState(() => _bottomOpen = !_bottomOpen),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _bottomOpen
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_up,
-                    color: Colors.white,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Tx(
+            widget.isMaster ? 'Herramientas' : 'Mi ficha en el mapa',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildToolbar(),
+                if (widget.isMaster) _floorsSection(),
+                if (widget.isMaster && _tool == _Tool.paint)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+                    child: TerrainPicker(
+                      brush: _brush,
+                      onChanged: (v) => setState(() => _brush = v),
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.isMaster ? 'Herramientas' : 'Mi ficha en el mapa',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
-              ),
+                _buildSelectedBar(),
+              ],
             ),
           ),
         ),
-        if (_bottomOpen)
-          Material(
-            elevation: 6,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxHeight * 0.5),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildToolbar(),
-                    _buildSelectedBar(),
-                  ],
-                ),
+      ],
+    );
+  }
+
+  // ---- Pisos: selector, alta, nombre y baja (Master) ----
+
+  Future<void> _addFloor() async {
+    if (_floorCount >= 6) return;
+    final names = [..._floorNames, 'Piso ${_floorCount + 1}'];
+    await _service.setFloorNames(_code, names).catchError(_onError);
+    _setViewFloor(names.length - 1);
+  }
+
+  Future<void> _renameFloor() async {
+    final i = _floor;
+    final ctrl = TextEditingController(text: _floorNames[i]);
+    final v = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Tx('Nombre del piso'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLength: 24,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Tx('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Tx('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (v == null || v.isEmpty) return;
+    final names = [..._floorNames];
+    names[i] = v;
+    _service.setFloorNames(_code, names).catchError(_onError);
+  }
+
+  Future<void> _removeLastFloor() async {
+    if (_floorCount < 2) return;
+    final last = _floorCount - 1;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Tx('Quitar el último piso'),
+        content: Text(
+          '${tr('Se borrará el terreno de')} «${_floorName(last)}» '
+          '${tr('y sus fichas pasarán al piso anterior.')}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Tx('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Tx('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (_viewFloor >= last) _setViewFloor(last - 1);
+    _service.removeLastFloor(_code, _floorNames).catchError(_onError);
+  }
+
+  Widget _floorsSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 4),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Icon(Icons.layers_outlined, size: 18),
+          for (var i = 0; i < _floorCount; i++)
+            ChoiceChip(
+              selected: _floor == i,
+              visualDensity: VisualDensity.compact,
+              label: Text(_floorName(i)),
+              onSelected: (_) => _setViewFloor(i),
+            ),
+          IconButton(
+            tooltip: tr('Añadir piso'),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _floorCount >= 6 ? null : _addFloor,
+          ),
+          IconButton(
+            tooltip: tr('Renombrar piso'),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _renameFloor,
+          ),
+          IconButton(
+            tooltip: tr('Quitar el último piso'),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.remove_circle_outline),
+            onPressed: _floorCount < 2 ? null : _removeLastFloor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Etiqueta del piso actual (arriba a la izquierda). El Master puede
+  /// cambiar de piso desde aquí.
+  Widget _floorChip() {
+    if (_floorCount < 2) return const SizedBox.shrink();
+    final chip = Material(
+      color: Theme.of(context).colorScheme.surface.withAlpha(235),
+      elevation: 3,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.layers_outlined, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                _floorName(_floor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-          ),
+            if (widget.isMaster) const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+    if (!widget.isMaster) return chip;
+    return PopupMenuButton<int>(
+      tooltip: tr('Cambiar de piso'),
+      padding: EdgeInsets.zero,
+      onSelected: _setViewFloor,
+      itemBuilder: (_) => [
+        for (var i = 0; i < _floorCount; i++)
+          PopupMenuItem(value: i, child: Text(_floorName(i))),
       ],
+      child: chip,
     );
   }
 
@@ -1247,10 +1753,12 @@ class _GameScreenState extends State<GameScreen>
     return Material(
       color: Theme.of(context).colorScheme.surface,
       elevation: 2,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             if (widget.isMaster) ...[
               SegmentedButton<_Tool>(
@@ -1275,18 +1783,6 @@ class _GameScreenState extends State<GameScreen>
                 selected: {_tool},
                 onSelectionChanged: (s) => setState(() => _tool = s.first),
               ),
-              const SizedBox(width: 8),
-              if (_tool == _Tool.paint)
-                for (final t in Terrains.all)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      avatar: Icon(t.icon, size: 16, color: Color(t.color)),
-                      label: Text(t.name),
-                      selected: _brush == t.id,
-                      onSelected: (_) => setState(() => _brush = t.id),
-                    ),
-                  ),
               IconButton(
                 tooltip: tr('Tamaño del mapa'),
                 icon: const Icon(Icons.grid_on),
@@ -1303,7 +1799,7 @@ class _GameScreenState extends State<GameScreen>
                 padding: const EdgeInsets.only(left: 4),
                 child: Tx(
                   'Toca tu ficha y luego una casilla para moverla',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ),
           ],
@@ -1322,21 +1818,47 @@ class _GameScreenState extends State<GameScreen>
       elevation: 6,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(radius: 12, backgroundColor: _colorOf(t)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                t.hidden
-                    ? '${_nameOf(t)} · fuera del mapa'
-                    : '${_nameOf(t)} · (${t.x + 1}, ${t.y + 1}) · '
-                        'Mov. ${_speedOf(t)} pies',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+            Row(
+              children: [
+                CircleAvatar(radius: 12, backgroundColor: _colorOf(t)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t.hidden
+                        ? '${_nameOf(t)} · fuera del mapa'
+                        : '${_nameOf(t)} · (${t.x + 1}, ${t.y + 1}) · '
+                            'Mov. ${_speedOf(t)} pies',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
+            Wrap(
+              children: [
+            if (_floorCount > 1 &&
+                !t.hidden &&
+                (widget.isMaster ||
+                    Terrains.isLink(_terrain[cellKey(t.x, t.y)])))
+              PopupMenuButton<int>(
+                tooltip: tr('Cambiar de piso'),
+                icon: const Icon(Icons.swap_vert),
+                onSelected: (i) => _service
+                    .moveTokenToFloor(_code, t.id, t.x, t.y, i)
+                    .catchError(_onError),
+                itemBuilder: (_) => [
+                  for (var i = 0; i < _floorCount; i++)
+                    if (i != t.floor &&
+                        (widget.isMaster ||
+                            Terrains.canChangeFloor(
+                                _terrain[cellKey(t.x, t.y)], t.floor, i)))
+                      PopupMenuItem(value: i, child: Text(_floorName(i))),
+                ],
+              ),
             if (canOpenSheet)
               IconButton(
                 tooltip: tr('Ver ficha'),
@@ -1350,7 +1872,7 @@ class _GameScreenState extends State<GameScreen>
                     : 'Sacar del mapa (oculta a los jugadores)',
                 icon: Icon(t.hidden ? Icons.login : Icons.logout),
                 onPressed: () => (t.hidden
-                        ? _service.placeTokenOnMap(_code, t.id)
+                        ? _service.placeTokenOnMap(_code, t.id, floor: _floor)
                         : _service.setTokenHidden(_code, t.id, true))
                     .catchError(_onError),
               ),
@@ -1378,6 +1900,8 @@ class _GameScreenState extends State<GameScreen>
                 onPressed: () => _removeCreature(t),
               ),
             ],
+              ],
+            ),
           ],
         ),
       ),
@@ -1390,6 +1914,7 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _dicePanel() => DicePanel(
         gameCode: _code,
+        isMaster: widget.isMaster,
         hiddenRolls: _hiddenRolls,
         nameProvider: () => _myName,
         colorProvider: () => _myColor,
@@ -1408,11 +1933,15 @@ class _GameScreenState extends State<GameScreen>
             gameCode: _code,
             tokens: _tokens,
             selectedId: _selectedId,
+            floor: _floor,
             onLocate: (id) => setState(() {
               // Se cierra el panel para poder tocar el mapa
+              final tk = _tokens.where((x) => x.id == id).firstOrNull;
+              if (tk != null) _viewFloor = tk.floor;
               _selectedId = id;
               _panelOpen = false;
-              _bottomOpen = true;
+              _bottomOpen = false;
+              WidgetsBinding.instance.addPostFrameCallback((_) => _syncFloor());
             }),
           ),
         ],
@@ -1424,10 +1953,45 @@ class _GameScreenState extends State<GameScreen>
         myUid: _uid,
         service: _service,
         visibleIds: _visibleIds,
-        onRollAll: _rollInitiative,
+        onPrepare: _prepareCombat,
+        onRollMine: _rollMyInitiative,
+        onRollEntry: _rollEntryFor,
+        onRollPending: _rollPending,
+        onStartTurns: _startTurns,
         missing: _missingInCombat,
         onAdd: _addToCombat,
+        onOpenEntry: _openCombatant,
       );
+
+  /// Ventana de PG y conjuros de un combatiente (toque en la iniciativa).
+  Future<void> _openCombatant(InitEntry e) async {
+    var id = e.id;
+    if (e.isGroup) {
+      final picked = await showDialog<String>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: Text(e.name),
+          children: [
+            for (final m in e.members)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, m),
+                child: Text(_tokenName(m)),
+              ),
+          ],
+        ),
+      );
+      if (picked == null || !mounted) return;
+      id = picked;
+    }
+    await showCombatantDialog(
+      context,
+      service: _service,
+      gameCode: _code,
+      tokenId: id,
+      isMaster: widget.isMaster,
+      myUid: _uid,
+    );
+  }
 
   /// Panel de la derecha, con pestañas: dados, iniciativa, jugadores y,
   /// para el Master, criaturas y fichas fuera del mapa.
@@ -1441,6 +2005,7 @@ class _GameScreenState extends State<GameScreen>
 
     return Column(
       children: [
+        _turnBanner(),
         TabBar(controller: _tabs, isScrollable: true, tabs: tabs),
         Expanded(
           child: TabBarView(

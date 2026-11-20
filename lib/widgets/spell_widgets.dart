@@ -85,7 +85,7 @@ Future<void> showSpellDetail(
                     '${s.ritual ? ' (ritual)' : ''}',
                     style: TextStyle(
                       fontStyle: FontStyle.italic,
-                      color: Colors.grey.shade700,
+                      color: Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 8),

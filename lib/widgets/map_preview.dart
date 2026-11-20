@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_models.dart';
 import '../models/map_template.dart';
+import 'terrain_painter.dart';
 
 /// Miniatura de un mapa.
 class MapPreview extends StatelessWidget {
@@ -38,13 +39,19 @@ class _PreviewPainter extends CustomPainter {
       if (p.length != 2) return;
       final x = int.tryParse(p[0]);
       final y = int.tryParse(p[1]);
-      final t = Terrains.byId(type);
-      if (x == null || y == null || t == null) return;
-      canvas.drawRect(
+      final info = Terrains.parse(type);
+      if (x == null || y == null || info.type == null) return;
+      paintTerrainCell(
+        canvas,
         Rect.fromLTWH(x * cw, y * ch, cw + 0.5, ch + 0.5),
-        Paint()..color = Color(t.color),
+        info,
+        x,
+        y,
+        detail: cw > 14,
       );
     });
+    paintWallOutlines(canvas, map.cells, map.cols, map.rows, cw, ch);
+    paintDoorGroups(canvas, map.cells, map.cols, map.rows, cw, ch);
   }
 
   @override

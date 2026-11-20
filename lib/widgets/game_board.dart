@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../models/game_models.dart';
+import 'terrain_painter.dart';
 
 /// Mapa de cuadrículas con terreno y fichas. Siempre está encajado y centrado:
 /// no admite zoom ni desplazamiento.
@@ -30,8 +31,12 @@ class GameBoard extends StatefulWidget {
   /// Casillas ("x_y") a las que puede llegar la ficha seleccionada (sombreadas)
   final Set<String> reachable;
 
-  /// Ficha que tiene el turno de iniciativa (se resalta)
-  final String? turnId;
+  /// Fichas que tienen el turno de iniciativa (se resaltan; varias si es un grupo)
+  final Set<String> turnIds;
+
+  /// Casilla elegida como destino mientras se confirma el movimiento
+  /// (x, y y tamaño de la ficha); se dibuja como un punto.
+  final ({int x, int y, int span})? marker;
 
   const GameBoard({
     super.key,
@@ -48,7 +53,8 @@ class GameBoard extends StatefulWidget {
     required this.onCellTap,
     required this.onCellPaint,
     this.reachable = const {},
-    this.turnId,
+    this.turnIds = const {},
+    this.marker,
   });
 
   @override
@@ -200,7 +206,33 @@ class _GameBoardState extends State<GameBoard> {
                               name: widget.nameOf(t),
               icon: widget.iconOf?.call(t),
                               selected: widget.selectedId == t.id,
-                              turn: widget.turnId == t.id,
+                              turn: widget.turnIds.contains(t.id),
+                            ),
+                          ),
+                        ),
+                      if (widget.marker != null)
+                        Positioned(
+                          left: widget.marker!.x * cell,
+                          top: widget.marker!.y * cell,
+                          width: widget.marker!.span * cell,
+                          height: widget.marker!.span * cell,
+                          child: IgnorePointer(
+                            child: Center(
+                              child: Container(
+                                width: cell * 0.34,
+                                height: cell * 0.34,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFE91E63),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: max(2.0, cell * 0.05),
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black54, blurRadius: 4),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -245,14 +277,20 @@ class _GridPainter extends CustomPainter {
       final y = int.tryParse(parts[1]);
       if (x == null || y == null || x >= cols || y >= rows) return;
 
-      final t = Terrains.byId(type);
-      if (t == null) return;
+      final info = Terrains.parse(type);
+      if (info.type == null) return;
 
-      canvas.drawRect(
+      paintTerrainCell(
+        canvas,
         Rect.fromLTWH(x * cell, y * cell, cell, cell),
-        Paint()..color = Color(t.color),
+        info,
+        x,
+        y,
       );
     });
+
+    paintWallOutlines(canvas, terrain, cols, rows, cell, cell);
+    paintDoorGroups(canvas, terrain, cols, rows, cell, cell);
 
     // Casillas a las que puede llegar la ficha seleccionada
     if (reachable.isNotEmpty) {

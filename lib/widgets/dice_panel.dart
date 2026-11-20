@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,11 +12,14 @@ import 'app_icon.dart';
 /// Tirada de dados y registro de la partida.
 ///
 /// - Descubierta: se publica y la ven todos en el registro.
-/// - Oculta: solo la ve quien la hace (queda en su lista privada).
+/// - Oculta: la ve quien la hace y el Master.
 class DicePanel extends StatefulWidget {
   final String gameCode;
 
-  /// Tiradas ocultas de esta sesión (solo locales)
+  /// El Master ve las tiradas ocultas de todos
+  final bool isMaster;
+
+  /// Tiradas ocultas visibles para este usuario (las suyas; todas si es Master)
   final ValueNotifier<List<DiceRoll>> hiddenRolls;
 
   /// Nombre y color de quien tira, consultados en el momento de la tirada
@@ -25,6 +29,7 @@ class DicePanel extends StatefulWidget {
   const DicePanel({
     super.key,
     required this.gameCode,
+    required this.isMaster,
     required this.hiddenRolls,
     required this.nameProvider,
     required this.colorProvider,
@@ -38,6 +43,7 @@ class _DicePanelState extends State<DicePanel> {
   final _service = GameService();
   final _rnd = Random.secure();
   late final Stream<List<DiceRoll>> _rollsStream;
+  StreamSubscription<List<DiceRoll>>? _hiddenSub;
 
   String _die = 'd20';
   int _count = 1;
@@ -50,6 +56,15 @@ class _DicePanelState extends State<DicePanel> {
   void initState() {
     super.initState();
     _rollsStream = _service.rolls(widget.gameCode);
+    _hiddenSub = _service
+        .hiddenRolls(widget.gameCode, isMaster: widget.isMaster, uid: _uid)
+        .listen((list) => widget.hiddenRolls.value = list, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _hiddenSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _roll() async {
@@ -64,9 +79,13 @@ class _DicePanelState extends State<DicePanel> {
     );
 
     if (_hidden) {
-      // Solo la ve quien la hace
-      widget.hiddenRolls.value = [roll, ...widget.hiddenRolls.value];
-      _snack('Tirada oculta · ${roll.label}: ${roll.resultText}');
+      // La ven quien la hace y el Master
+      try {
+        await _service.postHiddenRoll(widget.gameCode, roll);
+        _snack('Tirada oculta · ${roll.label}: ${roll.resultText}');
+      } catch (e) {
+        _snack('No se pudo guardar la tirada oculta: $e');
+      }
       return;
     }
 
@@ -162,7 +181,7 @@ class _DicePanelState extends State<DicePanel> {
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
           child: Text(
             _hidden
-                ? 'Solo verás tú el resultado.'
+                ? 'La verás tú y el Master.'
                 : 'El resultado se publica en el registro para todos.',
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
@@ -206,11 +225,13 @@ class _DicePanelState extends State<DicePanel> {
                     ),
                   ),
                 if (hidden.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 8, 12, 2),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
                     child: Tx(
-                      'Mis tiradas ocultas (solo tú)',
-                      style: TextStyle(
+                      widget.isMaster
+                          ? 'Tiradas ocultas (todos los jugadores)'
+                          : 'Mis tiradas ocultas (tú y el Master)',
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),

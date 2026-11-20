@@ -5,6 +5,17 @@ import 'package:http/http.dart' as http;
 import '../models/character.dart';
 import '../models/creature.dart';
 
+/// Lanzamiento de conjuros de un monstruo de la API: espacios por nivel e
+/// índices de sus hechizos. Se consulta al momento (no se guarda).
+class MonsterSpellcasting {
+  final Map<int, int> slots;
+  final List<String> spells;
+
+  const MonsterSpellcasting({this.slots = const {}, this.spells = const []});
+
+  bool get isEmpty => slots.isEmpty && spells.isEmpty;
+}
+
 /// Monstruo de la lista de la API (solo índice y nombre).
 class ApiMonsterRef {
   final String index;
@@ -64,6 +75,42 @@ class MonsterApiService {
     '24': 24,
     '30': 30,
   };
+
+  static final Map<String, MonsterSpellcasting> _spellcastingCache = {};
+
+  /// Hechizos y espacios de conjuro de un monstruo de la API.
+  Future<MonsterSpellcasting> fetchSpellcasting(String index) async {
+    final cached = _spellcastingCache[index];
+    if (cached != null) return cached;
+
+    final m = await _getJson('/monsters/$index') as Map<String, dynamic>;
+    final slots = <int, int>{};
+    final spells = <String>[];
+
+    for (final ab in (m['special_abilities'] as List? ?? const [])) {
+      if (ab is! Map) continue;
+      final sc = ab['spellcasting'];
+      if (sc is! Map) continue;
+
+      final rawSlots = sc['slots'];
+      if (rawSlots is Map) {
+        rawSlots.forEach((k, v) {
+          final lvl = int.tryParse(k.toString());
+          final n = v is num ? v.toInt() : int.tryParse(v.toString());
+          if (lvl != null && n != null && n > 0) slots[lvl] = n;
+        });
+      }
+      for (final sp in (sc['spells'] as List? ?? const [])) {
+        if (sp is! Map) continue;
+        final url = (sp['url'] ?? '').toString();
+        final idx = url.isEmpty ? '' : url.split('/').last;
+        if (idx.isNotEmpty && !spells.contains(idx)) spells.add(idx);
+      }
+    }
+
+    return _spellcastingCache[index] =
+        MonsterSpellcasting(slots: slots, spells: spells);
+  }
 
   /// Monstruo ya consultado en esta sesión (null si aún no se ha descargado).
   Creature? cachedMonster(String index) => _monsterCache[index];

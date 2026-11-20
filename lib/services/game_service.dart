@@ -21,13 +21,30 @@ class GamePlayer {
   /// Puntos de golpe actuales
   final int currentHp;
 
+  /// Espacios de conjuro gastados por nivel
+  final Map<int, int> slotsUsed;
+
   const GamePlayer({
     required this.uid,
     required this.email,
     required this.character,
     this.color,
     required this.currentHp,
+    this.slotsUsed = const {},
   });
+}
+
+/// Lee un mapa de espacios de conjuro guardado como {"1": 2, "3": 1}.
+Map<int, int> parseSlotMap(dynamic raw) {
+  final out = <int, int>{};
+  if (raw is Map) {
+    raw.forEach((k, v) {
+      final l = int.tryParse(k.toString());
+      final n = v is num ? v.toInt() : null;
+      if (l != null && n != null && n > 0) out[l] = n;
+    });
+  }
+  return out;
 }
 
 class GameService {
@@ -50,8 +67,12 @@ class GameService {
   CollectionReference<Map<String, dynamic>> _rollsCol(String code) =>
       _games.doc(code).collection('rolls');
 
-  DocumentReference<Map<String, dynamic>> _terrainDoc(String code) =>
-      _games.doc(code).collection('map').doc('terrain');
+  DocumentReference<Map<String, dynamic>> _terrainDoc(String code,
+          [int floor = 0]) =>
+      _games.doc(code).collection('map').doc(floor == 0 ? 'terrain' : 'terrain$floor');
+
+  CollectionReference<Map<String, dynamic>> _hiddenRollsCol(String code) =>
+      _games.doc(code).collection('hiddenRolls');
 
   DocumentReference<Map<String, dynamic>> _combatDoc(String code) =>
       _games.doc(code).collection('combat').doc('state');
@@ -144,6 +165,7 @@ class GameService {
           character: character,
           color: (data['color'] as num?)?.toInt(),
           currentHp: ((data['currentHp'] ?? character.maxHp) as num).toInt(),
+          slotsUsed: parseSlotMap(data['slotsUsed']),
         );
       }).toList();
       list.sort((a, b) => a.character.name.compareTo(b.character.name));
@@ -269,6 +291,12 @@ class GameService {
   Future<void> updatePlayerHp(String code, String uid, int hp) =>
       _playersCol(code).doc(uid).update({'currentHp': hp < 0 ? 0 : hp});
 
+  /// Espacios de conjuro gastados por un jugador (él mismo o el Master).
+  Future<void> updatePlayerSlots(String code, String uid, Map<int, int> used) =>
+      _playersCol(code).doc(uid).update({
+        'slotsUsed': {for (final e in used.entries) '${e.key}': e.value},
+      });
+
   /// El jugador modifica la copia de su ficha que está en la partida.
   Future<void> updatePlayerCharacter(String code, Character c) async {
     final ref = _playersCol(code).doc(_user.uid);
@@ -327,6 +355,7 @@ class GameService {
     String tokenId, {
     int? x,
     int? y,
+    int? floor,
   }) async {
     var px = x;
     var py = y;
@@ -349,7 +378,7 @@ class GameService {
 
     await _tokensCol(code)
         .doc(tokenId)
-        .update({'x': px, 'y': py, 'hidden': false});
+        .update({'x': px, 'y': py, 'hidden': false, if (floor != null) 'floor': floor});
   }
 
   Future<void> setTokenSpan(String code, String tokenId, int span) =>
@@ -445,24 +474,61 @@ class GameService {
   // TERRENO DEL MAPA
   // ==========================================
 
-  Stream<Map<String, String>> terrain(String code) {
-    return _terrainDoc(code).snapshots().map((snap) {
+  Stream<Map<String, String>> terrain(String code, [int floor = 0]) {
+    return _terrainDoc(code, floor).snapshots().map((snap) {
       final raw = (snap.data()?['cells'] as Map?) ?? {};
       return {for (final e in raw.entries) e.key.toString(): e.value.toString()};
     });
   }
 
   /// Pinta (o borra, si el valor es null) varias casillas a la vez.
-  Future<void> paintCells(String code, Map<String, String?> cells) {
-    return _terrainDoc(code).set({
+  Future<void> paintCells(String code, Map<String, String?> cells,
+      [int floor = 0]) {
+    return _terrainDoc(code, floor).set({
       'cells': {
         for (final e in cells.entries) e.key: e.value ?? FieldValue.delete(),
       },
     }, SetOptions(merge: true));
   }
 
-  Future<void> clearTerrain(String code) =>
-      _terrainDoc(code).set({'cells': <String, dynamic>{}});
+  Future<void> clearTerrain(String code, [int floor = 0]) =>
+      _terrainDoc(code, floor).set({'cells': <String, dynamic>{}});
+
+  // ==========================================
+  // PISOS (hojas del mapa)
+  // ==========================================
+
+  /// Cambia los nombres de los pisos (añadir o renombrar). La cantidad no
+  /// puede bajar: para quitar un piso, usa [removeLastFloor].
+  Future<void> setFloorNames(String code, List<String> names) =>
+      _games.doc(code).update({'floorNames': names});
+
+  /// Quita el último piso: borra su terreno y devuelve sus fichas al piso
+  /// anterior.
+  Future<void> removeLastFloor(String code, List<String> names) async {
+    if (names.length < 2) return;
+    final last = names.length - 1;
+    final batch = FirebaseFirestore.instance.batch();
+    batch.update(_games.doc(code), {
+      'floorNames': names.sublist(0, last),
+    });
+    batch.delete(_terrainDoc(code, last));
+    final toks = await _tokensCol(code).where('floor', isEqualTo: last).get();
+    for (final t in toks.docs) {
+      batch.update(t.reference, {'floor': last - 1});
+    }
+    await batch.commit();
+  }
+
+  /// Mueve una ficha a otra casilla y piso (escaleras, trampillas...).
+  Future<void> moveTokenToFloor(
+    String code,
+    String tokenId,
+    int x,
+    int y,
+    int floor,
+  ) =>
+      _tokensCol(code).doc(tokenId).update({'x': x, 'y': y, 'floor': floor});
 
   // ==========================================
   // DADOS
@@ -479,6 +545,34 @@ class GameService {
   /// Publica una tirada descubierta: la ven todos en el registro.
   Future<void> postRoll(String code, DiceRoll roll) {
     return _rollsCol(code).add({
+      'uid': roll.uid,
+      'name': roll.name,
+      'color': roll.color,
+      'die': roll.die,
+      'values': roll.values,
+      'at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Tiradas ocultas: el Master ve todas; un jugador solo las suyas.
+  Stream<List<DiceRoll>> hiddenRolls(
+    String code, {
+    required bool isMaster,
+    required String uid,
+  }) {
+    Query<Map<String, dynamic>> q = _hiddenRollsCol(code);
+    if (!isMaster) q = q.where('uid', isEqualTo: uid);
+    return q.limit(80).snapshots().map((snap) {
+      final list = snap.docs.map(DiceRoll.fromDoc).toList();
+      list.sort((a, b) => (b.at ?? DateTime.now())
+          .compareTo(a.at ?? DateTime.now()));
+      return list;
+    });
+  }
+
+  /// Publica una tirada oculta (solo la ven quien la hace y el Master).
+  Future<void> postHiddenRoll(String code, DiceRoll roll) {
+    return _hiddenRollsCol(code).add({
       'uid': roll.uid,
       'name': roll.name,
       'color': roll.color,
@@ -506,6 +600,42 @@ class GameService {
       'round': 1,
       'current': entries.isEmpty ? '' : entries.first.id,
       'entries': entries.map((e) => e.toMap()).toList(),
+    });
+  }
+
+  /// El Master prepara el combate: fase de tiradas de iniciativa.
+  /// Cada jugador tira la suya; el Master tira por las criaturas.
+  Future<void> startInitiativePhase(String code, List<InitEntry> entries) {
+    return _combatDoc(code).set({
+      'active': true,
+      'phase': 'rolling',
+      'round': 1,
+      'current': '',
+      'entries': entries.map((e) => e.toMap()).toList(),
+      'rolls': <String, dynamic>{},
+    });
+  }
+
+  /// Guarda una tirada de iniciativa (un jugador solo puede tirar por sí mismo).
+  Future<void> postInitiativeRoll(
+    String code,
+    String entryId, {
+    required int roll,
+    required int mod,
+  }) {
+    return _combatDoc(code).update({
+      'rolls.$entryId': {'roll': roll, 'mod': mod},
+    });
+  }
+
+  /// El Master da por terminada la fase de tiradas y empieza los turnos.
+  Future<void> startTurns(String code, List<InitEntry> sortedEntries) {
+    return _combatDoc(code).update({
+      'phase': 'turns',
+      'round': 1,
+      'current': sortedEntries.isEmpty ? '' : sortedEntries.first.id,
+      'entries': sortedEntries.map((e) => e.toMap()).toList(),
+      'rolls': <String, dynamic>{},
     });
   }
 
@@ -628,6 +758,21 @@ class GameService {
   }
 
   /// Guarda los puntos de golpe perdidos de una criatura.
+  /// Espacios de conjuro de una criatura: gastados y (opcional) máximos
+  /// propios, para NPC cuyo máximo no viene de la API.
+  Future<void> updateCreatureSlots(
+    String code,
+    String creatureId, {
+    Map<int, int>? used,
+    Map<int, int>? max,
+  }) =>
+      _creaturesCol(code).doc(creatureId).update({
+        if (used != null)
+          'slotsUsed': {for (final e in used.entries) '${e.key}': e.value},
+        if (max != null)
+          'slotsMax': {for (final e in max.entries) '${e.key}': e.value},
+      });
+
   Future<void> updateCreatureDamage(String code, String creatureId, int damage) =>
       _creaturesCol(code).doc(creatureId).update({'damageTaken': damage});
 
@@ -675,6 +820,9 @@ class GameService {
     try {
       await _deleteCollection(game.collection('combat'));
     } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('hiddenRolls'));
+    } catch (_) {}
     await game.delete();
   }
 
@@ -693,6 +841,9 @@ class GameService {
       await _deleteCollection(game.collection('combat'));
     } catch (_) {}
     await _deleteCollection(game.collection('rolls'));
+    try {
+      await _deleteCollection(game.collection('hiddenRolls'));
+    } catch (_) {}
   }
 
   /// Termina la sesión: avisa a los jugadores y borra la partida.

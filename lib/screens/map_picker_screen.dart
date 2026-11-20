@@ -190,17 +190,17 @@ class _MapGrid extends StatelessWidget {
                   Expanded(child: Center(child: MapPreview(map: m))),
                   const SizedBox(height: 8),
                   Text(
-                    m.name,
+                    m.builtIn ? tr(m.name) : m.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '${m.cols} × ${m.rows}'
-                    '${m.description.isEmpty ? '' : ' · ${m.description}'}',
+                    '${m.cols} × ${m.rows}${m.floorCount > 1 ? ' · ${m.floorCount} ${tr('pisos')}' : ''}'
+                    '${m.description.isEmpty ? '' : ' · ${m.builtIn ? tr(m.description) : m.description}'}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

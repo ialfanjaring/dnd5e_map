@@ -554,7 +554,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         Text(
           'Bonificador de competencia: ${Character.signed(_profBonus)}   ·   '
           'Iniciativa: ${Character.signed(Character.modifier(_total('dex')))}',
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 4),
         Builder(builder: (context) {
@@ -738,7 +738,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               hint,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ),
         Align(
