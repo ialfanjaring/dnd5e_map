@@ -2,7 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart' as mobile_google;
 
-import 'google_desktop_auth.dart';
+import 'google_desktop_auth_stub.dart'
+    if (dart.library.io) 'google_desktop_auth.dart';
 
 /// Excepción con mensajes legibles para la UI.
 class AuthException implements Exception {
@@ -31,7 +32,9 @@ class AuthService {
   // Rellena los dos valores con los de tu cliente OAuth de tipo "Escritorio".
   // El ID tiene la forma 1234567890-abc123.apps.googleusercontent.com
   static const String _desktopClientId = '553630619928-iegivq87k1tb8gc5orekd25lirvtr50g.apps.googleusercontent.com';
-  static const String _desktopClientSecret = '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';
+  // Dirección del Cloudflare Worker que canjea el código por los tokens (ver
+  // carpeta worker/). El Client Secret vive SOLO allí; esta URL no es secreta.
+  static const String _tokenProxyUrl = 'https://dnd5e-google-token.dnd5emap.workers.dev';
   static const int _redirectPort = 61797;
 
   User? get currentUser => _auth.currentUser;
@@ -168,17 +171,17 @@ class AuthService {
         debugPrint('GOOGLE client_id en uso: $_desktopClientId');
 
         if (_desktopClientId.startsWith('PEGA_AQUI') ||
-            _desktopClientSecret.startsWith('PEGA_AQUI'))
+            _tokenProxyUrl.startsWith('PEGA_AQUI'))
         {
 
           throw const AuthException(
-              'Faltan el Client ID y el Client Secret de Google en '
+              'Faltan el Client ID y la URL del Worker de Google en '
                   'auth_service.dart.');
         }
         // Flujo propio: navegador + localhost, sin librerías de terceros.
         final tokens = await GoogleDesktopAuth.signIn(
           clientId: _desktopClientId,
-          clientSecret: _desktopClientSecret,
+          tokenUrl: _tokenProxyUrl,
           port: _redirectPort,
         );
         return await _auth.signInWithCredential(
