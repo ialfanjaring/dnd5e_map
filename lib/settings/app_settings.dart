@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Preferencias de la app: idioma y tema. Se guardan en
 /// users/{uid}/prefs/app (son datos del usuario, no de la API).
@@ -51,16 +52,34 @@ class AppSettings extends ChangeNotifier {
       };
       if (mode != _themeMode) changed = true;
       _themeMode = mode;
-      if (changed) notifyListeners();
+      if (changed) {
+        notifyListeners();
+        _rebuildEverything();
+      }
     } catch (_) {
       // Sin conexión o sin permisos: se mantienen los valores actuales.
     }
+  }
+
+  /// Fuerza a reconstruir TODAS las pantallas abiertas (también las que
+  /// están debajo en la pila y los diálogos) para que el idioma cambie al
+  /// instante donde estés, sin perder su estado.
+  static void _rebuildEverything() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      void visit(Element e) {
+        e.markNeedsBuild();
+        e.visitChildren(visit);
+      }
+
+      WidgetsBinding.instance.rootElement?.visitChildren(visit);
+    });
   }
 
   Future<void> setLang(String lang) async {
     if (lang == _lang) return;
     _lang = lang;
     notifyListeners();
+    _rebuildEverything();
     await _save();
   }
 

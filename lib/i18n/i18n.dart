@@ -44,12 +44,16 @@ class Tx extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      tr(es),
-      style: style,
-      maxLines: maxLines,
-      overflow: overflow,
-      textAlign: textAlign,
+    // Se reconstruye al cambiar el idioma aunque el widget sea const
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) => Text(
+        tr(es),
+        style: style,
+        maxLines: maxLines,
+        overflow: overflow,
+        textAlign: textAlign,
+      ),
     );
   }
 }

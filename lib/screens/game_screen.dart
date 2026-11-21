@@ -33,6 +33,7 @@ import '../utils/orientation.dart';
 import '../widgets/terrain_painter.dart';
 import '../widgets/terrain_picker.dart';
 import '../widgets/combat_setup.dart';
+import 'spell_browser_screen.dart';
 
 enum _Tool { move, paint, erase }
 
@@ -1375,6 +1376,14 @@ class _GameScreenState extends State<GameScreen>
         centerTitle: true,
         bottom: widget.isMaster ? _modeBar() : null,
         actions: [
+          IconButton(
+            tooltip: tr('Hechizos'),
+            icon: const AppIcon('libro_hechizos'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SpellBrowserScreen()),
+            ),
+          ),
           IconButton(
             tooltip: tr('Ver código de la sala'),
             icon: const AppIcon('llave'),

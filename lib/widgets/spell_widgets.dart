@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/class_api_service.dart';
 import '../i18n/i18n.dart';
+import '../services/translation_service.dart';
 
 String spellLevelLabel(int level) => level == 0 ? 'Truco' : 'Nivel $level';
 
@@ -57,7 +58,7 @@ Future<void> showSpellDetail(
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text(name),
+      title: TrText(name, srdName: name, srdField: 'n', srdSection: 'spells'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: FutureBuilder<ApiSpell>(
@@ -99,15 +100,23 @@ Future<void> showSpellDetail(
                         : s.duration,
                   ),
                   const SizedBox(height: 12),
-                  Text(s.desc.join('\n\n'), style: const TextStyle(height: 1.4)),
+                  TrText(
+                    s.desc.join('\n\n'),
+                    srdName: s.name,
+                    srdSection: 'spells',
+                    style: const TextStyle(height: 1.4),
+                  ),
                   if (s.higherLevel.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     const Tx(
                       'A niveles superiores',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    Text(
+                    TrText(
                       s.higherLevel.join('\n\n'),
+                      srdName: s.name,
+                      srdField: 'h',
+                      srdSection: 'spells',
                       style: const TextStyle(height: 1.4),
                     ),
                   ],

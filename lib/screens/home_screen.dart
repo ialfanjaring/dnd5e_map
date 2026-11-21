@@ -12,9 +12,11 @@ import 'creatures_screen.dart';
 import 'items_screen.dart';
 import 'join_game_screen.dart';
 import 'map_picker_screen.dart';
+import 'reference_screen.dart';
 import 'game_screen.dart';
 import 'master_room_screen.dart';
 import '../i18n/i18n.dart';
+import '../services/translation_service.dart';
 import '../settings/app_settings.dart';
 import 'settings_screen.dart';
 import '../widgets/app_icon.dart';
@@ -32,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Idioma y tema guardados del usuario
     AppSettings.instance.load();
+    SrdEs.ensureLoaded();
   }
 
   int _tab = 0;
@@ -44,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ('Bestiario', 'calavera'),
     ('Objetos', 'cofre'),
     ('Mapas', 'mapa'),
+    ('Libro', 'libro_hechizos'),
   ];
 
   void _open(Widget screen) {
@@ -125,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
       lazy(2, () => const CreaturesScreen(embedded: true)),
       lazy(3, () => const ItemsScreen(embedded: true)),
       lazy(4, () => const MapPickerScreen(embedded: true)),
+      lazy(5, () => const ReferenceScreen()),
     ];
 
     return ListenableBuilder(

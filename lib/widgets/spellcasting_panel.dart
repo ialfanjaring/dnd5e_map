@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../i18n/i18n.dart';
+import '../screens/spell_browser_screen.dart';
 import '../services/class_api_service.dart';
 import 'spell_widgets.dart';
 
@@ -341,7 +342,7 @@ class _SpellcastingPanelState extends State<SpellcastingPanel> {
           widgets.add(ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            title: Text(sp.name),
+            title: Text(spellName(sp.name)),
             subtitle: Text(sp.school),
             onTap: () => showSpellDetail(context, sp.index, sp.name),
             trailing: sp.level == 0

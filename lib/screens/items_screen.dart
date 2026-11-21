@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../services/custom_item_service.dart';
 import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
+import '../services/translation_service.dart';
 import '../widgets/item_widgets.dart';
 import 'item_form_screen.dart';
+import 'spell_browser_screen.dart';
 import '../i18n/i18n.dart';
 import '../widgets/options_button.dart';
 
@@ -141,6 +143,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
     super.initState();
     _future = _api.fetchCategory(_category);
     _startLoading(_future);
+    SrdEs.ensureLoaded().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   /// Descarga en segundo plano los detalles de la lista (con 8 peticiones a
@@ -277,8 +282,12 @@ class _ItemsScreenState extends State<ItemsScreen> {
   /// descripción, daño y propiedades).
   String _haystack(ApiItemRef r) {
     final it = _api.cachedItem(r.index);
-    if (it == null) return r.name.toLowerCase();
-    return [
+    final es = r.index.startsWith(ApiItem.customPrefix)
+        ? ''
+        : '${SrdEs.item(r.name, 'n') ?? ''} ${SrdEs.item(r.name, 'd') ?? ''}';
+    if (it == null) return foldText('${r.name} $es');
+    return foldText([
+      es,
       it.name,
       it.category,
       it.rarity,
@@ -289,7 +298,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       it.armorCategory,
       ...it.properties,
       ...it.desc,
-    ].join(' ').toLowerCase();
+    ].join(' '));
   }
 
   IconData _iconFor(ApiItem? it, bool custom) {
@@ -459,8 +468,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     _currentRefs = all;
 
     // Palabras clave: todas deben aparecer
-    final words = _search.text
-        .toLowerCase()
+    final words = foldText(_search.text)
         .split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty)
         .toList();
@@ -564,7 +572,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
             backgroundColor: rk.color.withAlpha(60),
             child: Icon(_iconFor(it, custom), size: 18, color: rk.color),
           ),
-          title: Text(r.name),
+          title: Text(
+            (custom ? null : SrdEs.item(r.name, 'n')) ?? r.name,
+          ),
           subtitle: it == null
               ? null
               : Row(
@@ -708,7 +718,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search),
-                      hintText: tr('Buscar por palabras clave (nombre, efecto, daño… en inglés)'),
+                      hintText: tr('Buscar por palabras clave (nombre, efecto, daño…)'),
                       border: const OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -735,7 +745,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  EquipmentApiService.categories[_category] ?? '',
+                  tr(EquipmentApiService.categories[_category] ?? ''),
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ),
@@ -762,7 +772,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                   Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: ChoiceChip(
-                                      label: Text(e.value),
+                                      label: Text(tr(e.value)),
                                       selected: _category == e.key,
                                       onSelected: (_) => _setCategory(e.key),
                                     ),

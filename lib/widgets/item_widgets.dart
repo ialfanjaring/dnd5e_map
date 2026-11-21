@@ -1,55 +1,80 @@
 import 'package:flutter/material.dart';
 
+import '../services/translation_service.dart';
+import '../settings/app_settings.dart';
+
 import '../models/character.dart';
 import '../models/equipment_effects.dart';
 import '../services/equipment_api_service.dart';
 import '../i18n/i18n.dart';
 
 /// Resumen de las características de un objeto, en español.
+/// Valor de la API en el idioma de la app: en español usa el mapa en
+/// español; en otros idiomas busca su traducción y, si no la hay, deja el
+/// texto original en inglés (así no se mezclan idiomas).
+String _loc(String raw, String? es, {bool lower = false}) {
+  if (AppSettings.instance.lang == 'es') return es ?? raw;
+  if (es == null || es.isEmpty) return raw;
+  final key = es[0].toUpperCase() + es.substring(1);
+  final t = tr(key);
+  final out = t == key ? raw : t;
+  return lower ? out.toLowerCase() : out;
+}
+
 List<String> itemFacts(ApiItem it) {
   final facts = <String>[];
 
   if (it.isMagic) {
     if (it.category.isNotEmpty) facts.add(it.category);
     if (it.rarity.isNotEmpty) {
-      facts.add('Rareza: ${EquipmentApiService.rarities[it.rarity] ?? it.rarity}');
+      facts.add(
+        '${tr('Rareza')}: ${_loc(it.rarity, EquipmentApiService.rarities[it.rarity])}',
+      );
     }
     // Los objetos mágicos propios con estadísticas siguen abajo
     if (!it.isEquippable) return facts;
   }
-  if (it.magicBonus != 0) facts.add('Bonificador mágico: +${it.magicBonus}');
+  if (it.magicBonus != 0) facts.add('${tr('Bonificador mágico')}: +${it.magicBonus}');
 
   if (it.isWeapon) {
-    final type = EquipmentApiService.damageTypes[it.damageType] ??
-        it.damageType.toLowerCase();
-    facts.add('${it.weaponCategory == 'Martial' ? 'Marcial' : 'Sencilla'} · '
-        '${it.isRanged ? 'a distancia' : 'cuerpo a cuerpo'}');
-    facts.add('Daño ${it.damageDice} $type');
+    final type = _loc(
+      it.damageType,
+      EquipmentApiService.damageTypes[it.damageType] ?? it.damageType.toLowerCase(),
+      lower: true,
+    );
+    facts.add('${tr(it.weaponCategory == 'Martial' ? 'Marcial' : 'Sencilla')} · '
+        '${tr(it.isRanged ? 'a distancia' : 'cuerpo a cuerpo')}');
+    facts.add('${tr('Daño')} ${it.damageDice} $type');
     if (it.rangeNormal != null && it.isRanged) {
-      facts.add('Alcance ${it.rangeNormal} pies');
+      facts.add('${tr('Alcance')} ${it.rangeNormal} ${tr('pies')}');
     }
     if (it.properties.isNotEmpty) {
-      facts.add('Propiedades: ${it.properties.map((p) => EquipmentApiService.properties[p] ?? p).join(', ')}');
+      facts.add(
+        '${tr('Propiedades')}: '
+        '${it.properties.map((p) => _loc(p, EquipmentApiService.properties[p])).join(', ')}',
+      );
     }
   }
 
   if (it.isShield) {
-    facts.add('Escudo: +${it.acBase} a la CA');
+    facts.add('${tr('Escudo')}: +${it.acBase} ${tr('a la CA')}');
   } else if (it.isArmor) {
-    final cat = EquipmentApiService.armorCategories[it.armorCategory] ??
-        it.armorCategory;
+    final cat = _loc(
+      it.armorCategory,
+      EquipmentApiService.armorCategories[it.armorCategory] ?? it.armorCategory,
+    );
     final dex = !it.acDexBonus
         ? ''
         : (it.acMaxBonus == null
-            ? ' + Des'
-            : ' + Des (máx. ${it.acMaxBonus})');
-    facts.add('Armadura $cat: CA ${it.acBase}$dex');
-    if (it.strMinimum > 0) facts.add('Requiere Fuerza ${it.strMinimum}');
-    if (it.stealthDisadvantage) facts.add('Desventaja en Sigilo');
+            ? ' + ${tr('Des')}'
+            : ' + ${tr('Des')} (${tr('máx.')} ${it.acMaxBonus})');
+    facts.add('${tr('Armadura')} $cat: ${tr('CA')} ${it.acBase}$dex');
+    if (it.strMinimum > 0) facts.add('${tr('Requiere Fuerza')} ${it.strMinimum}');
+    if (it.stealthDisadvantage) facts.add(tr('Desventaja en Sigilo'));
   }
 
-  if (it.cost.isNotEmpty) facts.add('Coste: ${it.cost}');
-  if (it.weight != null) facts.add('Peso: ${it.weight} lb');
+  if (it.cost.isNotEmpty) facts.add('${tr('Coste')}: ${it.cost}');
+  if (it.weight != null) facts.add('${tr('Peso')}: ${it.weight} lb');
   return facts;
 }
 
@@ -93,7 +118,7 @@ Future<void> showItemDetail(
         final facts = itemFacts(it);
 
         return AlertDialog(
-          title: Text(it.name),
+          title: TrText(it.name, translate: !it.isCustom, srdName: it.name, srdField: 'n'),
           content: SizedBox(
             width: 460,
             child: SingleChildScrollView(
@@ -107,7 +132,7 @@ Future<void> showItemDetail(
                     ),
                   if (it.desc.isNotEmpty) ...[
                     const Divider(),
-                    Text(it.desc.join('\n\n')),
+                    TrText(it.desc.join('\n\n'), translate: !it.isCustom, srdName: it.name),
                   ],
                 ],
               ),

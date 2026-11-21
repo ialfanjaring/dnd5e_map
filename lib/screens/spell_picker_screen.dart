@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/class_api_service.dart';
 import '../widgets/spell_widgets.dart';
+import 'spell_browser_screen.dart';
 import '../i18n/i18n.dart';
 
 class _PickerData {
@@ -382,7 +383,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
           color: Colors.deepPurple,
         ),
         title: Text(
-          s.name,
+          spellName(s.name),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(s.level == null ? '' : spellLevelLabel(s.level!)),
