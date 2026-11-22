@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "1044725912868",
+    "project_id": "proyectodnd5e",
+    "storage_bucket": "proyectodnd5e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1044725912868:android:c1a567c7a743393592cfb1",
+        "android_client_info": {
+          "package_name": "org.iesch.dnd5e_map"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1044725912868-627vhuulablngjdm64qbeg4mpslcco8e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.iesch.dnd5e_map",
+            "certificate_hash": "55efd2d86d0ddc95cc136962623d1961de601e6e"
+          }
+        },
+        {
+          "client_id": "1044725912868-no1323mmkauf371p727g3du4bb8kpvc0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.iesch.dnd5e_map",
+            "certificate_hash": "decc75ae658dde771400b37b012354982c8b1fc0"
+          }
+        },
+        {
+          "client_id": "1044725912868-da7bg52s65bu84j8kvv031ver3c4cpq8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAC5wNkfK5rXiRDPXDKBIZx-87PUcrBcng"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1044725912868-da7bg52s65bu84j8kvv031ver3c4cpq8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1044725912868-k4i5afq76mtqo821no0u27f95r6026qh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.dnd5eMap"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
