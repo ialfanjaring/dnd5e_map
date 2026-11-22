@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - name: Firma (keystore desde secretos)
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
@@ -35,7 +35,7 @@ jobs:
           storeFile=upload-keystore.jks
           EOT
       - run: flutter pub get
-      - run: flutter build apk --release --android-skip-build-dependency-validation
+      - run: flutter build apk --release
       - run: cp build/app/outputs/flutter-apk/app-release.apk dnd5e_map.apk
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: dnd5e_map.apk }
@@ -45,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - run: flutter pub get
       - run: flutter build windows --release
       - name: Instalador
@@ -63,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - run: flutter pub get
       - run: flutter build web --release --base-href /${{ env.REPO_NAME }}/app/
       - uses: actions/upload-artifact@v4
