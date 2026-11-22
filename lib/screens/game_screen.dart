@@ -33,7 +33,7 @@ import '../utils/orientation.dart';
 import '../widgets/terrain_painter.dart';
 import '../widgets/terrain_picker.dart';
 import '../widgets/combat_setup.dart';
-import 'spell_browser_screen.dart';
+import 'reference_screen.dart';
 
 enum _Tool { move, paint, erase }
 
@@ -78,6 +78,7 @@ class _GameScreenState extends State<GameScreen>
 
   // Paneles desplegables que se superponen al mapa
   late final TabController _tabs;
+  bool _fullMap = false; // mapa a pantalla completa (sin barra ni paneles)
   bool _panelOpen = false;
   bool _bottomOpen = false;
   static const int _tabInitiative = 1;
@@ -154,7 +155,7 @@ class _GameScreenState extends State<GameScreen>
     AppOrientation.landscape();
     // Master: Dados, Iniciativa, Jugadores, Criaturas
     // Jugador: Dados, Iniciativa, Mi ficha
-    _tabs = TabController(length: widget.isMaster ? 5 : 3, vsync: this);
+    _tabs = TabController(length: widget.isMaster ? 6 : 4, vsync: this);
     _listen();
 
     // Marca la partida como activa mientras el mapa está abierto
@@ -1367,8 +1368,23 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   Widget build(BuildContext context) {
+    final inCombat = _combat?.active ?? false;
+    final cur = _combat?.current ?? '';
+    final turnNow = (_combat?.inTurns ?? false) &&
+        (widget.isMaster ? !cur.startsWith('p_') : cur == 'p_$_uid');
+    // Combate: rojo. Tu turno: verde.
+    final Color? tint = turnNow
+        ? Colors.green
+        : (inCombat ? Colors.red : null);
     return Scaffold(
-      appBar: AppBar(
+      backgroundColor: tint == null
+          ? null
+          : Color.alphaBlend(tint.withOpacity(0.28),
+              Theme.of(context).scaffoldBackgroundColor),
+      appBar: _fullMap
+          ? null
+          : AppBar(
+        backgroundColor: tint?.withOpacity(0.55),
         title: Text(
           (_game['name'] ?? 'Partida').toString(),
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1377,12 +1393,9 @@ class _GameScreenState extends State<GameScreen>
         bottom: widget.isMaster ? _modeBar() : null,
         actions: [
           IconButton(
-            tooltip: tr('Hechizos'),
-            icon: const AppIcon('libro_hechizos'),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SpellBrowserScreen()),
-            ),
+            tooltip: tr('Mapa completo'),
+            icon: const Icon(Icons.fullscreen),
+            onPressed: () => setState(() => _fullMap = true),
           ),
           IconButton(
             tooltip: tr('Ver código de la sala'),
@@ -1428,6 +1441,34 @@ class _GameScreenState extends State<GameScreen>
             children: [
               Positioned.fill(child: _buildBoard()),
 
+              // Tinte de combate (rojo) / tu turno (verde) sobre el mapa
+              if (tint != null)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      color: tint.withOpacity(0.18),
+                    ),
+                  ),
+                ),
+
+              // Salir del modo mapa completo
+              if (_fullMap)
+                Positioned(
+                  top: 8 + pad.top,
+                  right: 8 + pad.right,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: tr('Salir del mapa completo'),
+                      icon: const Icon(Icons.fullscreen_exit,
+                          color: Colors.white),
+                      onPressed: () => setState(() => _fullMap = false),
+                    ),
+                  ),
+                ),
+
               // Arriba a la izquierda: avisos, turno y última tirada
               Positioned(
                 left: 8 + pad.left + 28 + (_bottomOpen ? toolsW : 0),
@@ -1466,6 +1507,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
 
+              if (!_fullMap) ...[
               // Izquierda: herramientas y ficha seleccionada (desplegable)
               AnimatedPositioned(
                 duration: anim,
@@ -1580,6 +1622,7 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ),
               ),
+              ],
             ],
           );
         },
@@ -2155,6 +2198,7 @@ class _GameScreenState extends State<GameScreen>
       const Tab(text: 'Iniciativa'),
       Tab(text: widget.isMaster ? 'Jugadores' : 'Mi ficha'),
       if (widget.isMaster) const Tab(text: 'Objetos'),
+      const Tab(text: 'Libro'),
       if (widget.isMaster) const Tab(text: 'Criaturas'),
     ];
 
@@ -2172,6 +2216,7 @@ class _GameScreenState extends State<GameScreen>
               _sheetPanel(),
               if (widget.isMaster)
                 ItemsScreen(gameCode: _code, inPanel: true),
+              const ReferenceScreen(inPanel: true),
               if (widget.isMaster) _creaturesPanel(),
             ],
           ),

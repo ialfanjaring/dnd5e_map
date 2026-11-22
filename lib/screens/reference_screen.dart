@@ -12,7 +12,9 @@ import 'spell_browser_screen.dart';
 /// Apartado «Libro»: clases y razas en tarjetas visuales y buscador de
 /// hechizos.
 class ReferenceScreen extends StatefulWidget {
-  const ReferenceScreen({super.key});
+  /// true cuando se muestra dentro del panel de la partida (sin barra superior)
+  final bool inPanel;
+  const ReferenceScreen({super.key, this.inPanel = false});
 
   @override
   State<ReferenceScreen> createState() => _ReferenceScreenState();
@@ -24,11 +26,14 @@ class _ReferenceScreenState extends State<ReferenceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Tx('Libro', style: const TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        actions: const [OptionsButton()],
-      ),
+      appBar: widget.inPanel
+          ? null
+          : AppBar(
+              title: Tx('Libro',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              centerTitle: true,
+              actions: const [OptionsButton()],
+            ),
       body: Column(
         children: [
           Padding(

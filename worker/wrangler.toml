@@ -1,0 +1,7 @@
+name = "dnd5e-google-token"
+main = "index.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+GOOGLE_CLIENT_ID = "553630619928-qqmfts7r2juohjntpovs459ecprkm10e.apps.googleusercontent.com"
+REDIRECT_URI = "http://localhost:61797"
