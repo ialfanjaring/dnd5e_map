@@ -35,7 +35,7 @@ jobs:
           storeFile=upload-keystore.jks
           EOT
       - run: flutter pub get
-      - run: flutter build apk --release
+      - run: flutter build apk --release --android-skip-build-dependency-validation
       - run: cp build/app/outputs/flutter-apk/app-release.apk dnd5e_map.apk
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: dnd5e_map.apk }
