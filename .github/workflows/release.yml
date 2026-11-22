@@ -31,9 +31,13 @@ jobs:
           cat > android/key.properties <<EOT
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyAlias=upload
           storeFile=upload-keystore.jks
           EOT
+      - name: Comprobar keystore (muestra los alias que contiene)
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: keytool -list -keystore android/app/upload-keystore.jks -storepass "$KS_PASS" | grep -i "entry\|Keystore type\|Your keystore"
       - name: google-services.json (Firebase, desde secreto)
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
