@@ -31,7 +31,7 @@ class AuthService {
   // Credenciales OAuth de escritorio (Windows), escritas directamente aquí.
   // Rellena los dos valores con los de tu cliente OAuth de tipo "Escritorio".
   // El ID tiene la forma 1234567890-abc123.apps.googleusercontent.com
-  static const String _desktopClientId = '553630619928-iegivq87k1tb8gc5orekd25lirvtr50g.apps.googleusercontent.com';
+  static const String _desktopClientId = '553630619928-qqmfts7r2juohjntpovs459ecprkm10e.apps.googleusercontent.com';
   // Dirección del Cloudflare Worker que canjea el código por los tokens (ver
   // carpeta worker/). El Client Secret vive SOLO allí; esta URL no es secreta.
   static const String _tokenProxyUrl = 'https://dnd5e-google-token.dnd5emap.workers.dev';

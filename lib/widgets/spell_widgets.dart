@@ -3,6 +3,54 @@ import 'package:flutter/material.dart';
 import '../services/class_api_service.dart';
 import '../i18n/i18n.dart';
 import '../services/translation_service.dart';
+import '../settings/app_settings.dart';
+
+
+/// Traduce al español los datos fijos de un hechizo (tiempo, alcance,
+/// duración, componentes). Solo actúa con la app en español.
+String spellTerm(String v, {String kind = ''}) {
+  if (v.isEmpty || AppSettings.instance.lang != 'es') return v;
+  var t = v;
+  final fixed = <String, String>{
+    '1 action': '1 acción',
+    '1 bonus action': '1 acción adicional',
+    '1 reaction': '1 reacción',
+    'Self': 'Personal',
+    'Touch': 'Toque',
+    'Sight': 'Visión',
+    'Unlimited': 'Ilimitado',
+    'Special': 'Especial',
+    'Instantaneous': 'Instantánea',
+    'Until dispelled': 'Hasta que se disipe',
+    'Until dispelled or triggered': 'Hasta que se disipe o se active',
+  };
+  if (fixed.containsKey(t)) return fixed[t]!;
+  final units = <String, String>{
+    'round': 'asalto', 'rounds': 'asaltos',
+    'minute': 'minuto', 'minutes': 'minutos',
+    'hour': 'hora', 'hours': 'horas',
+    'day': 'día', 'days': 'días',
+    'foot': 'pies', 'feet': 'pies',
+    'mile': 'milla', 'miles': 'millas',
+    'bonus action': 'acción adicional', 'action': 'acción',
+    'reaction': 'reacción',
+  };
+  t = t.replaceAllMapped(
+      RegExp(r'\b(\d+)[ -](rounds?|minutes?|hours?|days?|foot|feet|miles?|bonus action|action|reaction)\b'),
+      (m) => '${m[1]} ${units[m[2]]}');
+  t = t.replaceAll('Up to', 'Hasta');
+  t = t.replaceAll('Self (', 'Personal (');
+  t = t.replaceAll('hemisphere', 'hemisferio').replaceAll('radius', 'radio')
+      .replaceAll('cone', 'cono').replaceAll('cube', 'cubo')
+      .replaceAll('sphere', 'esfera').replaceAll('line', 'línea');
+  t = t.replaceAll('Touch', 'Toque').replaceAll('Sight', 'Visión')
+      .replaceAll('Instantaneous', 'Instantánea')
+      .replaceAll('Until dispelled', 'Hasta que se disipe')
+      .replaceAll('Special', 'Especial');
+  // «, which has» ... en tiempo de lanzamiento (ej. "1 reaction, which you take when…")
+  t = t.replaceAll(', which you take', ', que realizas');
+  return t;
+}
 
 String spellLevelLabel(int level) => level == 0 ? 'Truco' : 'Nivel $level';
 
@@ -90,14 +138,14 @@ Future<void> showSpellDetail(
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _line('Tiempo de lanzamiento', s.castingTime),
-                  _line('Alcance', s.range),
+                  _line('Tiempo de lanzamiento', spellTerm(s.castingTime)),
+                  _line('Alcance', spellTerm(s.range)),
                   _line('Componentes', s.components),
                   _line(
                     'Duración',
                     s.concentration
-                        ? '${s.duration} (concentración)'
-                        : s.duration,
+                        ? '${spellTerm(s.duration)} (concentración)'
+                        : spellTerm(s.duration),
                   ),
                   const SizedBox(height: 12),
                   TrText(
