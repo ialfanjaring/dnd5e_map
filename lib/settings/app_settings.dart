@@ -40,7 +40,7 @@ class AppSettings extends ChangeNotifier {
       final l = d['lang'];
       final m = d['theme'];
       var changed = false;
-      if (l is String && RegExp(r'^[a-z]{2,3}(-[A-Za-z]{2,4})?$').hasMatch(l)) {
+      if (l is String && (l == 'es' || l == 'en')) {
         if (l != _lang) changed = true;
         _lang = l;
       }

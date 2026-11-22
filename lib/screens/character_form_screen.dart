@@ -486,7 +486,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ),
           items: [
             for (final a in DndData.alignments)
-              DropdownMenuItem(value: a, child: Text(a)),
+              DropdownMenuItem(value: a, child: Text(DndData.alignmentLabel(a))),
           ],
           onChanged: (v) => setState(() => _alignment = v),
         ),
@@ -615,7 +615,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         for (final entry in DndData.skills.entries)
           FilterChip(
             label: Text(
-              '${entry.key} (${DndData.abilityShort[entry.value]}) '
+              '${DndData.skillLabel(entry.key)} (${DndData.abilityShort[entry.value]}) '
               '${Character.signed(Character.modifier(_total(entry.value)) + (_skills.contains(entry.key) ? _profBonus : 0))}',
             ),
             selected: _skills.contains(entry.key),

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../i18n/i18n.dart';
+
 /// Datos de reglas básicas de D&D 5e (SRD) en español.
 class DndData {
   static const List<String> abilityKeys = [
@@ -11,7 +13,16 @@ class DndData {
     'cha',
   ];
 
-  static const Map<String, String> abilityNames = {
+  static Map<String, String> get abilityNames =>
+      {
+        for (final e in _abilityNamesEs.entries)
+          // «Fuerza» también es el tipo de daño (Force) en el diccionario
+          e.key: e.key == 'str' && tr(e.value) == 'Force'
+              ? 'Strength'
+              : tr(e.value),
+      };
+
+  static const Map<String, String> _abilityNamesEs = {
     'str': 'Fuerza',
     'dex': 'Destreza',
     'con': 'Constitución',
@@ -20,7 +31,10 @@ class DndData {
     'cha': 'Carisma',
   };
 
-  static const Map<String, String> abilityShort = {
+  static Map<String, String> get abilityShort =>
+      {for (final e in _abilityShortEs.entries) e.key: tr(e.value)};
+
+  static const Map<String, String> _abilityShortEs = {
     'str': 'FUE',
     'dex': 'DES',
     'con': 'CON',
@@ -153,12 +167,18 @@ class DndData {
     'wizard',
   };
 
-  static String raceName(String index) => raceNames[index] ?? _pretty(index);
+  static String raceName(String index) =>
+      tr(raceNames[index] ?? _pretty(index));
 
-  static String className(String index) => classNames[index] ?? _pretty(index);
+  static String className(String index) =>
+      tr(classNames[index] ?? _pretty(index));
 
   static String subraceName(String index) =>
-      subraceNames[index] ?? _pretty(index);
+      tr(subraceNames[index] ?? _pretty(index));
+
+  /// Textos guardados en español (habilidad, alineamiento) -> idioma de la app.
+  static String skillLabel(String s) => tr(s);
+  static String alignmentLabel(String s) => tr(s);
 
   static String _pretty(String index) => index
       .split('-')
@@ -343,7 +363,7 @@ class Character {
       : '${DndData.raceName(race)} (${DndData.subraceName(subrace)})';
 
   String get summary =>
-      '$raceLabel ${DndData.className(characterClass)} · Nivel $level';
+      '$raceLabel ${DndData.className(characterClass)} · ${tr('Nivel')} $level';
 
   // ---------- Firestore ----------
 
