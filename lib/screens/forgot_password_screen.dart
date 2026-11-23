@@ -116,7 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+            Text(trMsg(_error!), style: TextStyle(color: Colors.red.shade700)),
           ],
           const SizedBox(height: 16),
           SizedBox(

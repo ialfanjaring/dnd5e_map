@@ -93,7 +93,7 @@ class _RacesScreenState extends State<RacesScreen> {
 }
 
 /// Información de una raza: bonificadores, rasgos y subrazas.
-/// Los datos vienen de la D&D 5e SRD API (textos en inglés).
+/// Los datos vienen de la D&D 5e SRD API (en español donde hay traducción).
 class RaceInfoScreen extends StatefulWidget {
   /// Índice de la raza en la API (ej. elf)
   final String raceIndex;
@@ -244,7 +244,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
           ),
         const SizedBox(height: 8),
         Tx(
-          'Datos de la D&D 5e SRD API (textos en inglés).',
+          'Datos de la D&D 5e SRD API (en español donde hay traducción).',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/character.dart';
 import '../services/class_api_service.dart';
+import '../services/translation_service.dart';
 import '../widgets/spell_widgets.dart';
 import '../i18n/i18n.dart';
 
@@ -97,7 +98,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
 }
 
 /// Información de una clase: resumen, subidas de nivel, hechizos y subclases.
-/// Los datos vienen de la D&D 5e SRD API (textos en inglés).
+/// Los datos vienen de la D&D 5e SRD API (en español donde hay traducción).
 class ClassInfoScreen extends StatefulWidget {
   /// Índice de la clase en la API (ej. wizard)
   final String classIndex;
@@ -288,7 +289,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           ),
         const SizedBox(height: 8),
         Tx(
-          'Datos de la D&D 5e SRD API (textos en inglés).',
+          'Datos de la D&D 5e SRD API (en español donde hay traducción).',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
@@ -424,7 +425,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                 for (final s in byLevel[level]!)
                   ListTile(
                     dense: true,
-                    title: Text(s.name),
+                    title: Text(SrdEs.get('spells', s.name, 'n') ?? s.name),
                     trailing: const Icon(Icons.info_outline, size: 20),
                     onTap: () => showSpellDetail(context, s.index, s.name),
                   ),

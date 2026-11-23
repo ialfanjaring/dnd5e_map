@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:math';
 
 /// Inicio de sesión con Google para Windows sin librerías de terceros y SIN
@@ -28,7 +29,15 @@ class GoogleDesktopAuth {
 
     final HttpServer server;
     try {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+      // Escucha en IPv4 e IPv6: "localhost" puede resolverse a ::1 en Windows
+      HttpServer srv;
+      try {
+        srv = await HttpServer.bind(InternetAddress.loopbackIPv6, port,
+            v6Only: false);
+      } on SocketException {
+        srv = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+      }
+      server = srv;
     } on SocketException {
       throw Exception(
           'El puerto $port está ocupado. Cierra otras ventanas de la app y '
@@ -46,6 +55,7 @@ class GoogleDesktopAuth {
         'code_challenge': challenge,
         'code_challenge_method': 'S256',
       });
+      debugPrint('GOOGLE esperando respuesta en $redirect');
       await Process.run('rundll32', ['url.dll,FileProtocolHandler', url.toString()]);
 
       String? code;
@@ -77,10 +87,11 @@ class GoogleDesktopAuth {
       if (code == null) throw Exception('No se recibió el código de Google.');
 
       // El Worker canjea el código por los tokens usando el secreto
+      debugPrint('GOOGLE código recibido, canjeando en $tokenUrl');
       final client = HttpClient();
       try {
         final req = await client
-            .postUrl(Uri.parse(tokenUrl))
+            .postUrl(Uri.parse(tokenUrl.trim()))
             .timeout(const Duration(seconds: 20));
         req.headers.contentType = ContentType.json;
         req.write(jsonEncode({
@@ -101,6 +112,9 @@ class GoogleDesktopAuth {
           throw Exception('Google no devolvió los tokens esperados.');
         }
         return (idToken: idToken, accessToken: accessToken);
+      } on TimeoutException {
+        throw Exception('No se pudo contactar con el Worker ($tokenUrl). '
+            'Comprueba la URL, tu conexión o la VPN.');
       } finally {
         client.close(force: true);
       }

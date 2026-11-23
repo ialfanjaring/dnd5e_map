@@ -204,9 +204,9 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
         const SizedBox(height: 10),
         TextField(
           controller: _searchCtrl,
-          decoration: const InputDecoration(
-            hintText: 'Buscar hechizo (en inglés)...',
-            prefixIcon: Icon(Icons.search),
+          decoration: InputDecoration(
+            hintText: tr('Buscar hechizo...'),
+            prefixIcon: const Icon(Icons.search),
             border: OutlineInputBorder(),
             isDense: true,
           ),

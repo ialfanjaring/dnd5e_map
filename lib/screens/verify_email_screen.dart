@@ -151,7 +151,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 if (_message != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    _message!,
+                    trMsg(_message!),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade600),
                   ),

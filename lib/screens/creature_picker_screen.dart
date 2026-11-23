@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/translation_service.dart';
 
 import '../models/creature.dart';
 import '../services/creature_service.dart';
@@ -181,8 +182,8 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                                 controller: _searchCtrl,
                                 decoration: InputDecoration(
                                   hintText: onApiTab
-                                      ? 'Buscar por nombre (en inglés)...'
-                                      : 'Buscar por nombre o tipo...',
+                                      ? tr('Buscar por nombre...')
+                                      : tr('Buscar por nombre o tipo...'),
                                   prefixIcon: const Icon(Icons.search),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
@@ -433,7 +434,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
         }
 
         final list = snapshot.data!
-            .where((m) => _query.isEmpty || m.name.toLowerCase().contains(_query))
+            .where((m) => _query.isEmpty || _monsterMatches(m.name, _query))
             .toList();
 
         if (list.isEmpty) {
@@ -468,7 +469,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                   child: ListTile(
                     dense: true,
                     title: Text(
-                      m.name,
+                      SrdEs.monsterName(m.name) ?? m.name,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     leading: _previewing == m.index
@@ -527,4 +528,15 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
       ],
     );
   }
+}
+
+
+/// Busca por nombre en inglés y también en español (sin acentos).
+bool _monsterMatches(String enName, String query) {
+  String f(String x) => x
+      .toLowerCase()
+      .replaceAll('á', 'a').replaceAll('é', 'e').replaceAll('í', 'i')
+      .replaceAll('ó', 'o').replaceAll('ú', 'u').replaceAll('ü', 'u');
+  final q = f(query);
+  return f(enName).contains(q) || f(SrdEs.monsterName(enName) ?? '').contains(q);
 }

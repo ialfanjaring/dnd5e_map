@@ -123,7 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (_error != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        _error!,
+                        trMsg(_error!),
                         style: TextStyle(color: Colors.red.shade700),
                       ),
                     ],

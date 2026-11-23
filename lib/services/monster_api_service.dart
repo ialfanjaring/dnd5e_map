@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/character.dart';
 import '../models/creature.dart';
 import '../settings/app_settings.dart';
+import 'translation_service.dart';
 
 /// Lanzamiento de conjuros de un monstruo de la API: espacios por nivel e
 /// índices de sus hechizos. Se consulta al momento (no se guarda).
@@ -295,11 +296,17 @@ class MonsterApiService {
     return cr.toInt().toString();
   }
 
-  static String _namedBlocks(dynamic list) {
+  static String _namedBlocks(dynamic list, String monster) {
     if (list is! List) return '';
     return list
         .whereType<Map>()
-        .map((e) => '${e['name'] ?? ''}. ${e['desc'] ?? ''}'.trim())
+        .map((e) {
+          final en = (e['name'] ?? '').toString();
+          final n = SrdEs.monsterItem(monster, en, 'n') ?? en;
+          final d = SrdEs.monsterItem(monster, en, 'd') ??
+              (e['desc'] ?? '').toString();
+          return '$n. $d'.trim();
+        })
         .where((s) => s.isNotEmpty)
         .join('\n');
   }
@@ -409,14 +416,14 @@ class MonsterApiService {
         '${_es ? 'Inmunidades al daño' : 'Damage Immunities'}: ${_stringList(m['damage_immunities'])}',
       if (conditionImmunities.isNotEmpty)
         '${_es ? 'Inmunidades a condiciones' : 'Condition Immunities'}: $conditionImmunities',
-      _namedBlocks(m['special_abilities']),
+      _namedBlocks(m['special_abilities'], (m['name'] ?? index).toString()),
     ].where((s) => s.isNotEmpty).join('\n');
 
     // Acciones, reacciones y acciones legendarias
-    final reactions = _namedBlocks(m['reactions']);
-    final legendary = _namedBlocks(m['legendary_actions']);
+    final reactions = _namedBlocks(m['reactions'], (m['name'] ?? index).toString());
+    final legendary = _namedBlocks(m['legendary_actions'], (m['name'] ?? index).toString());
     final actionsText = [
-      _namedBlocks(m['actions']),
+      _namedBlocks(m['actions'], (m['name'] ?? index).toString()),
       if (reactions.isNotEmpty) '${_es ? 'Reacciones' : 'Reactions'}:\n$reactions',
       if (legendary.isNotEmpty) '${_es ? 'Acciones legendarias' : 'Legendary Actions'}:\n$legendary',
     ].where((s) => s.isNotEmpty).join('\n\n');
@@ -431,7 +438,8 @@ class MonsterApiService {
     return Creature(
       ownerUid: '',
       kind: 'monster',
-      name: (m['name'] ?? index) as String,
+      name: SrdEs.monsterName((m['name'] ?? index).toString()) ??
+          (m['name'] ?? index) as String,
       size: _sizes[m['size']] ?? (m['size'] ?? 'Mediana') as String,
       creatureType: subtype.isEmpty ? typeEs : '$typeEs ($subtype)',
       alignment: _alignments[alignmentRaw.toLowerCase()] ?? alignmentRaw,

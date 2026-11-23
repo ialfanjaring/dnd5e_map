@@ -125,7 +125,7 @@ Widget _gridOf(List<Widget> cards) {
       final rows = (n / bestCols).ceil();
       final cw = (aw - gap * (bestCols - 1)) / bestCols;
       var ch = (ah - gap * (rows - 1)) / rows;
-      if (ch > cw * 1.2) ch = cw * 1.2; // tarjetas casi cuadradas
+      if (ch > cw * 1.7) ch = cw * 1.7; // en móvil vertical, tarjetas altas
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -194,7 +194,7 @@ class _Tile extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: SizedBox(
-                  width: 130,
+                  width: 108,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -209,15 +209,17 @@ class _Tile extends StatelessWidget {
                         child: leading,
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -236,9 +238,14 @@ class _Tile extends StatelessWidget {
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            badge!,
-                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              badge!,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 11),
+                            ),
                           ),
                         ),
                       ],

@@ -8,31 +8,34 @@ import '../settings/app_settings.dart';
 /// Diccionario SRD 5.1 en español incluido en la app (assets/data/srd_es.json).
 /// Es un recurso estático que se genera UNA vez (ver tool/build_translations.dart):
 /// la app nunca traduce en línea ni escribe nada en Firestore.
-/// Secciones: 'items' (objetos) y 'spells' (hechizos). Cada entrada:
+/// Secciones: 'items' (objetos), 'spells' (hechizos) y 'monsters'
+/// (tool/build_monsters.dart). Cada entrada:
 /// {n: nombre, d: descripción, h: niveles superiores}.
 class SrdEs {
   static Map<String, dynamic> _data = {};
-  static bool _loaded = false;
-  static bool _loading = false;
+  static Future<void>? _loadFuture;
 
   static String _norm(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-  static Future<void> ensureLoaded() async {
-    if (_loaded || _loading) return;
-    _loading = true;
+  /// Carga el diccionario una sola vez. Si varias pantallas lo piden a la vez,
+  /// todas esperan a la misma carga (antes, la segunda seguía sin datos).
+  static Future<void> ensureLoaded() => _loadFuture ??= _load();
+
+  static Future<void> _load() async {
     try {
       final raw = await rootBundle.loadString('assets/data/srd_es.json');
       final m = jsonDecode(raw);
       if (m is Map) _data = Map<String, dynamic>.from(m);
-      debugPrint('SRD ES cargado: ${(_data['items'] as Map?)?.length ?? 0} '
-          'objetos, ${(_data['spells'] as Map?)?.length ?? 0} hechizos');
+      int n(String k) => (_data[k] as Map?)?.length ?? 0;
+      debugPrint('SRD ES cargado: ${n('items')} objetos, ${n('spells')} '
+          'hechizos, ${n('monsters')} monstruos, ${n('classes')} clases, '
+          '${n('subclasses')} subclases, ${n('features')} rasgos, '
+          '${n('races')} razas');
     } catch (e) {
       debugPrint('SRD ES NO cargado (¿falta assets/data/ en pubspec.yaml?): $e');
       _data = {}; // sin asset: se muestra el texto original
     }
-    _loaded = true;
-    _loading = false;
   }
 
   /// Texto en español ('n' nombre, 'd' descripción, 'h' niveles superiores)
@@ -49,6 +52,23 @@ class SrdEs {
 
   static String? item(String enName, String field) =>
       get('items', enName, field);
+
+  /// Nombre en español de un monstruo (null si no hay traducción).
+  static String? monsterName(String enName) => get('monsters', enName, 'n');
+
+  /// Traducción de un rasgo/acción de un monstruo. [field]: 'n' nombre, 'd' texto.
+  static String? monsterItem(String monster, String item, String field) {
+    if (AppSettings.instance.lang != 'es') return null;
+    final mon = (_data['monsters'] as Map?)?[_norm(monster)];
+    final items = mon is Map ? mon['i'] : null;
+    if (items is! Map) return null;
+    var e = items[_norm(item)];
+    // «Lightning Breath (Recharge 5-6)» -> prueba sin el paréntesis
+    e ??= items[_norm(item.replaceAll(RegExp(r'\s*\(.*\)'), ''))];
+    if (e is! Map) return null;
+    final v = e[field]?.toString() ?? '';
+    return v.isEmpty ? null : v;
+  }
 }
 
 /// Muestra [en] y, si el SRD en español tiene ese elemento, lo sustituye por
