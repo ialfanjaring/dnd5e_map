@@ -122,7 +122,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Raza: ${DndData.raceName(widget.raceIndex)}',
+          '${tr('Raza')}: ${DndData.raceName(widget.raceIndex)}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -142,7 +142,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'No se pudo conectar con la API.\n${snapshot.error}',
+                      '${tr('No se pudo conectar con la API.')}\n${snapshot.error}',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -186,7 +186,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (r.speed != null) _kv('Velocidad', '${r.speed} pies'),
+                if (r.speed != null) _kv('Velocidad', '${r.speed} ${tr('pies')}'),
                 if (r.size.isNotEmpty) _kv('Tamaño', r.size),
                 _kv('Bonificadores', bonuses.isEmpty ? '—' : bonuses),
                 if (r.languages.isNotEmpty)
@@ -339,7 +339,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
         TextSpan(
           children: [
             TextSpan(
-              text: '$label: ',
+              text: '${tr(label)}: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             TextSpan(text: value),
@@ -353,7 +353,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: ExpansionTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(tr(title), style: const TextStyle(fontWeight: FontWeight.bold)),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [Text(text, style: const TextStyle(height: 1.4))],
@@ -370,7 +370,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
+              tr(title),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),

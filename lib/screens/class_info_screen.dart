@@ -146,10 +146,10 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      const Tab(text: 'Resumen'),
-      const Tab(text: 'Niveles'),
-      if (_isCaster) const Tab(text: 'Hechizos'),
-      const Tab(text: 'Subclases'),
+      Tab(text: tr('Resumen')),
+      Tab(text: tr('Niveles')),
+      if (_isCaster) Tab(text: tr('Hechizos')),
+      Tab(text: tr('Subclases')),
     ];
 
     return DefaultTabController(
@@ -157,7 +157,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Clase: $_className',
+            '${tr('Clase')}: $_className',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
@@ -193,7 +193,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'No se pudo conectar con la API.\n${snapshot.error}',
+                    '${tr('No se pudo conectar con la API.')}\n${snapshot.error}',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
@@ -331,12 +331,12 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                     ),
                   ),
             title: Text(
-              'Nivel ${l.level}'
-              '${isCurrent ? ' (tu nivel)' : ''}',
+              '${tr('Nivel')} ${l.level}'
+              '${isCurrent ? ' (${tr('tu nivel')})' : ''}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
-              featureNames.isEmpty ? 'Sin rasgos nuevos' : featureNames,
+              featureNames.isEmpty ? tr('Sin rasgos nuevos') : featureNames,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -347,7 +347,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               if (l.abilityScoreImprovement)
                 _kv(
                   'Mejora de características',
-                  '+2 a repartir (o dote, si tu Master lo permite)',
+                  tr('+2 a repartir (o dote, si tu Master lo permite)'),
                 ),
               if (l.cantripsKnown != null)
                 _kv('Trucos conocidos', '${l.cantripsKnown}'),
@@ -407,7 +407,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          '${spells.length} hechizos disponibles para $_className.',
+          '${spells.length} ${tr('hechizos disponibles para')} $_className.',
           style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 8),
@@ -417,10 +417,10 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               title: Text(
                 level < 0
                     ? 'Nivel sin indicar'
-                    : (level == 0 ? 'Trucos' : 'Nivel $level'),
+                    : (level == 0 ? tr('Trucos') : '${tr('Nivel')} $level'),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text('${byLevel[level]!.length} hechizos'),
+              subtitle: Text('${byLevel[level]!.length} ${tr('hechizos')}'),
               children: [
                 for (final s in byLevel[level]!)
                   ListTile(
@@ -478,7 +478,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
         TextSpan(
           children: [
             TextSpan(
-              text: '$label: ',
+              text: '${tr(label)}: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             TextSpan(text: value),
@@ -496,7 +496,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
+              tr(title),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
