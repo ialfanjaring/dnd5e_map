@@ -68,57 +68,57 @@ class _ItemsScreenState extends State<ItemsScreen> {
   /// Rarezas: clave (en minúsculas, inglés) -> (nombre, nivel orientativo, orden, color)
   static const Map<String, ({String name, int level, int order, Color color})>
       _rarities = {
-    '': (name: tr('Mundano'), level: 1, order: 0, color: Color(0xFF78909C)),
-    'common': (name: tr('Común'), level: 1, order: 1, color: Color(0xFF9E9E9E)),
-    'uncommon': (name: tr('Poco común'), level: 3, order: 2, color: Color(0xFF43A047)),
-    'rare': (name: tr('Raro'), level: 5, order: 3, color: Color(0xFF1E88E5)),
-    'very rare': (name: tr('Muy raro'), level: 11, order: 4, color: Color(0xFF8E24AA)),
-    'legendary': (name: tr('Legendario'), level: 17, order: 5, color: Color(0xFFFB8C00)),
-    'artifact': (name: tr('Artefacto'), level: 17, order: 6, color: Color(0xFFD32F2F)),
-    'varies': (name: tr('Variable'), level: 1, order: 7, color: Color(0xFF00897B)),
+    '': (name: 'Mundano', level: 1, order: 0, color: Color(0xFF78909C)),
+    'common': (name: 'Común', level: 1, order: 1, color: Color(0xFF9E9E9E)),
+    'uncommon': (name: 'Poco común', level: 3, order: 2, color: Color(0xFF43A047)),
+    'rare': (name: 'Raro', level: 5, order: 3, color: Color(0xFF1E88E5)),
+    'very rare': (name: 'Muy raro', level: 11, order: 4, color: Color(0xFF8E24AA)),
+    'legendary': (name: 'Legendario', level: 17, order: 5, color: Color(0xFFFB8C00)),
+    'artifact': (name: 'Artefacto', level: 17, order: 6, color: Color(0xFFD32F2F)),
+    'varies': (name: 'Variable', level: 1, order: 7, color: Color(0xFF00897B)),
   };
 
   /// Subtipos por categoría: (clave de la API, nombre). Las claves de la API
   /// se descargan como listas de índices (rápido, sin abrir cada objeto).
   static const Map<String, List<(String, String)>> _subs = {
     'weapon': [
-      ('simple-weapons', tr('Simples')),
-      ('martial-weapons', tr('Marciales')),
-      ('melee-weapons', tr('Cuerpo a cuerpo')),
+      ('simple-weapons', 'Simples'),
+      ('martial-weapons', 'Marciales'),
+      ('melee-weapons', 'Cuerpo a cuerpo'),
       ('ranged-weapons', 'A distancia'),
     ],
     'armor': [
-      ('light-armor', tr('Ligeras')),
-      ('medium-armor', tr('Medias')),
-      ('heavy-armor', tr('Pesadas')),
-      ('shields', tr('Escudos')),
+      ('light-armor', 'Ligeras'),
+      ('medium-armor', 'Medias'),
+      ('heavy-armor', 'Pesadas'),
+      ('shields', 'Escudos'),
     ],
     'adventuring-gear': [
-      ('ammunition', tr('Munición')),
-      ('arcane-foci', tr('Focos arcanos')),
-      ('druidic-foci', tr('Focos druídicos')),
-      ('holy-symbols', tr('Símbolos sagrados')),
-      ('equipment-packs', tr('Paquetes')),
-      ('standard-gear', tr('Equipo común')),
+      ('ammunition', 'Munición'),
+      ('arcane-foci', 'Focos arcanos'),
+      ('druidic-foci', 'Focos druídicos'),
+      ('holy-symbols', 'Símbolos sagrados'),
+      ('equipment-packs', 'Paquetes'),
+      ('standard-gear', 'Equipo común'),
     ],
     'tools': [
-      ('artisans-tools', tr('De artesano')),
-      ('musical-instruments', tr('Instrumentos')),
-      ('gaming-sets', tr('Juegos')),
+      ('artisans-tools', 'De artesano'),
+      ('musical-instruments', 'Instrumentos'),
+      ('gaming-sets', 'Juegos'),
     ],
   };
 
   /// Tipos de objeto mágico (categoría de la API) -> nombre
   static const Map<String, String> _magicTypes = {
-    'Armor': tr('Armadura'),
-    'Weapon': tr('Arma'),
-    'Potion': tr('Poción'),
-    'Ring': tr('Anillo'),
-    'Rod': tr('Vara'),
-    'Staff': tr('Bastón'),
-    'Wand': tr('Varita'),
-    'Scroll': tr('Pergamino'),
-    'Wondrous Items': tr('Objeto maravilloso'),
+    'Armor': 'Armadura',
+    'Weapon': 'Arma',
+    'Potion': 'Poción',
+    'Ring': 'Anillo',
+    'Rod': 'Vara',
+    'Staff': 'Bastón',
+    'Wand': 'Varita',
+    'Scroll': 'Pergamino',
+    'Wondrous Items': 'Objeto maravilloso',
   };
 
   Future<void> _setSub(String key) async {
@@ -292,7 +292,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       it.name,
       it.category,
       it.rarity,
-      _rarities[_rarityKey(it)]?.name ?? '',
+      tr(_rarities[_rarityKey(it)]?.name ?? ''),
       it.weaponCategory,
       it.weaponRange,
       it.damageType,

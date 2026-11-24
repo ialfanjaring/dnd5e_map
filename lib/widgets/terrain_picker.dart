@@ -14,10 +14,10 @@ class TerrainPicker extends StatelessWidget {
   const TerrainPicker({super.key, required this.brush, required this.onChanged});
 
   static const _flags = <(String?, String, IconData)>[
-    (null, tr('Según terreno'), Icons.auto_awesome),
-    ('n', tr('Libre'), Icons.directions_walk),
-    ('d', tr('Difícil'), Icons.terrain),
-    ('b', tr('Sin fichas'), Icons.block),
+    (null, 'Según terreno', Icons.auto_awesome),
+    ('n', 'Libre', Icons.directions_walk),
+    ('d', 'Difícil', Icons.terrain),
+    ('b', 'Sin fichas', Icons.block),
   ];
 
   @override

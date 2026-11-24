@@ -171,7 +171,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              tr('No se pudo conectar con la API.\n')
+                              '${tr('No se pudo conectar con la API.\n')}'
                               '${snapshot.error}',
                               textAlign: TextAlign.center,
                             ),
