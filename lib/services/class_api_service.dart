@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../i18n/srd_terms.dart';
+import '../settings/app_settings.dart';
+import 'translation_service.dart';
+
 int? _int(dynamic v) => v is num ? v.toInt() : null;
 
 List<String> _names(dynamic list) {
@@ -13,14 +17,131 @@ List<String> _names(dynamic list) {
       .toList();
 }
 
-List<ApiRef> _refs(dynamic list) {
+/// Nombre en español de un elemento del SRD (sección de srd_es.json) o el
+/// original si no hay traducción o la app no está en español.
+/// La API y el módulo en español no siempre llaman igual a un elemento
+/// (p. ej. «Land» frente a «Circle of the Land»). Nombres alternativos con los
+/// que buscar la traducción, por nombre de la API en minúsculas.
+const Map<String, List<String>> _nameAliases = {
+  'berserker': ['Path of the Berserker'],
+  'totem warrior': ['Path of the Totem Warrior'],
+  'lore': ['College of Lore'],
+  'life': ['Life Domain'],
+  'land': ['Circle of the Land'],
+  'open hand': ['Way of the Open Hand'],
+  'devotion': ['Oath of Devotion'],
+  'draconic': ['Draconic Bloodline', 'Draconic Sorcery'],
+  'fiend': ['The Fiend'],
+  'evocation': ['School of Evocation'],
+  'lightfoot halfling': ['Lightfoot'],
+  'rock gnome': ['Rock'],
+  'hill dwarf': ['Hill'],
+  'high elf': ['High'],
+};
+
+List<String> _candidates(String en) {
+  final l = <String>[en];
+  final a = _nameAliases[en.trim().toLowerCase()];
+  if (a != null) l.addAll(a);
+  return l;
+}
+
+String? _trNameCore(String section, String en) {
+  if (section == 'traits') {
+    final t = traitEs(en);
+    if (t != null) return t.n;
+  }
+  // Los rasgos raciales y las subrazas vienen dentro del archivo de razas.
+  final secs = switch (section) {
+    'traits' => const ['traits', 'features', 'races'],
+    'features' => const ['features', 'traits', 'races'],
+    'subraces' => const ['subraces', 'races'],
+    _ => [section],
+  };
+  for (final cand in _candidates(en)) {
+    for (final sec in secs) {
+      final t = SrdEs.get(sec, cand, 'n');
+      if (t != null) return t;
+    }
+  }
+  return null;
+}
+
+String _trName(String section, String en) {
+  if (en.isEmpty) return en;
+  final direct = _trNameCore(section, en);
+  if (direct != null) return direct;
+
+  // «Bardic Inspiration (d6)» -> «Inspiración bárdica (d6)»
+  final pm = RegExp(r'^(.*?)(\s*\([^)]*\))$').firstMatch(en);
+  if (pm != null) {
+    final base = _trNameCore(section, pm[1]!);
+    if (base != null) return '$base${pm[2]}';
+  }
+
+  // «Spellcasting: Bard» -> «Lanzamiento de conjuros: Bardo»
+  final ci = en.indexOf(':');
+  if (ci > 0) {
+    final left = _trNameCore(section, en.substring(0, ci).trim());
+    if (left != null) {
+      final right = en.substring(ci + 1).trim();
+      return '$left: ${_trName('classes', right)}';
+    }
+  }
+  return en;
+}
+
+/// Rasgos que se llaman igual en varias clases pero con texto distinto: su
+/// descripción no se sustituye para no mostrar la de otra clase.
+const Set<String> _ambiguousFeatures = {
+  'spellcasting',
+  'fightingstyle',
+  'channeldivinity',
+  'unarmoreddefense',
+  'extraattack',
+  'expertise',
+  'primalpath',
+  'divinedomain',
+};
+
+/// Texto en español (separado en párrafos) o null si no hay traducción.
+List<String>? _trParas(List<String> sections, String enName) {
+  final k = enName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  if (_ambiguousFeatures.contains(k)) return null;
+  if (sections.contains('traits')) {
+    final t = traitEs(enName);
+    if (t != null) return [t.d];
+  }
+  // «Bardic Inspiration (d6)»: prueba también sin el paréntesis
+  final noParen = enName.replaceAll(RegExp(r'\s*\([^)]*\)'), '').trim();
+  if (noParen != enName) {
+    final r = _trParas(sections, noParen);
+    if (r != null) return r;
+  }
+  for (final cand in _candidates(enName)) {
+    for (final sec in sections) {
+      final t = SrdEs.get(sec, cand, 'd');
+      if (t != null) {
+        return t.split('\n').where((e) => e.trim().isNotEmpty).toList();
+      }
+    }
+  }
+  return null;
+}
+
+bool get _isEs => AppSettings.instance.lang == 'es';
+
+List<ApiRef> _refs(dynamic list, [String? section]) {
   if (list is! List) return const [];
   return list
       .whereType<Map>()
-      .map((e) => ApiRef(
-            index: (e['index'] ?? '').toString(),
-            name: (e['name'] ?? '').toString(),
-          ))
+      .map((e) {
+        final n = (e['name'] ?? '').toString();
+        return ApiRef(
+          index: (e['index'] ?? '').toString(),
+          name: section == null ? n : _trName(section, n),
+        );
+      })
       .where((r) => r.index.isNotEmpty)
       .toList();
 }
@@ -64,29 +185,36 @@ class ApiClass {
 
     return ApiClass(
       index: (m['index'] ?? '') as String,
-      name: (m['name'] ?? '') as String,
+      name: _trName('classes', (m['name'] ?? '') as String),
       hitDie: _int(m['hit_die']) ?? 8,
-      savingThrows: _names(m['saving_throws']),
-      proficiencies: _names(m['proficiencies']),
+      savingThrows: srdTerms(_names(m['saving_throws'])),
+      proficiencies: srdTerms(_names(m['proficiencies'])),
       startingEquipment: ((m['starting_equipment'] as List?) ?? const [])
           .whereType<Map>()
           .map((e) {
         final q = _int(e['quantity']) ?? 1;
-        final n = ((e['equipment'] as Map?)?['name'] ?? '').toString();
+        final en = ((e['equipment'] as Map?)?['name'] ?? '').toString();
+        final n = SrdEs.item(en, 'n') ?? en;
         return q > 1 ? '$q× $n' : n;
       }).where((s) => s.isNotEmpty).toList(),
-      subclasses: _refs(m['subclasses']),
+      subclasses: _refs(m['subclasses'], 'subclasses'),
       spellcastingLevel: sc is Map ? _int(sc['level']) : null,
       spellcastingAbility: sc is Map
-          ? ((sc['spellcasting_ability'] as Map?)?['name'])?.toString()
+          ? srdTerm(
+              ((sc['spellcasting_ability'] as Map?)?['name'] ?? '').toString())
           : null,
       spellcastingInfo: sc is Map
           ? ((sc['info'] as List?) ?? const [])
               .whereType<Map>()
-              .map((e) => (
-                    name: (e['name'] ?? '').toString(),
-                    text: ((e['desc'] as List?) ?? const []).join('\n\n'),
-                  ))
+              .map((e) {
+                final en = (e['name'] ?? '').toString();
+                final es = spellcastingInfoEs((m['index'] ?? '').toString(), en);
+                return (
+                  name: es?.n ?? en,
+                  text: es?.d ??
+                      ((e['desc'] as List?) ?? const []).join('\n\n'),
+                );
+              })
               .toList()
           : const [],
     );
@@ -128,17 +256,21 @@ class ApiRace {
   });
 
   factory ApiRace.fromJson(Map<String, dynamic> m) {
+    final idx = (m['index'] ?? '').toString();
     return ApiRace(
       index: (m['index'] ?? '') as String,
-      name: (m['name'] ?? '') as String,
+      name: _trName('races', (m['name'] ?? '') as String),
       speed: _int(m['speed']),
-      size: (m['size'] ?? '').toString(),
-      sizeDescription: (m['size_description'] ?? '').toString(),
-      age: (m['age'] ?? '').toString(),
-      alignment: (m['alignment'] ?? '').toString(),
-      languageDescription: (m['language_desc'] ?? '').toString(),
-      languages: _names(m['languages']),
-      proficiencies: _names(m['starting_proficiencies']),
+      size: srdTerm((m['size'] ?? '').toString()),
+      sizeDescription: raceText(idx, 'size_description') ??
+          (m['size_description'] ?? '').toString(),
+      age: raceText(idx, 'age') ?? (m['age'] ?? '').toString(),
+      alignment:
+          raceText(idx, 'alignment') ?? (m['alignment'] ?? '').toString(),
+      languageDescription: raceText(idx, 'language_desc') ??
+          (m['language_desc'] ?? '').toString(),
+      languages: srdTerms(_names(m['languages'])),
+      proficiencies: srdTerms(_names(m['starting_proficiencies'])),
       abilityBonuses: ((m['ability_bonuses'] as List?) ?? const [])
           .whereType<Map>()
           .map((e) => (
@@ -148,8 +280,8 @@ class ApiRace {
               ))
           .where((b) => b.ability.isNotEmpty)
           .toList(),
-      traits: _refs(m['traits']),
-      subraces: _refs(m['subraces']),
+      traits: _refs(m['traits'], 'traits'),
+      subraces: _refs(m['subraces'], 'subraces'),
     );
   }
 }
@@ -175,8 +307,11 @@ class ApiSubrace {
   factory ApiSubrace.fromJson(Map<String, dynamic> m) {
     return ApiSubrace(
       index: (m['index'] ?? '') as String,
-      name: (m['name'] ?? '') as String,
-      description: (m['desc'] ?? '').toString(),
+      name: _trName('subraces', (m['name'] ?? '') as String),
+      description: subraceText((m['index'] ?? '').toString()) ??
+          (_trParas(['subraces', 'races'], (m['name'] ?? '').toString())
+              ?.join('\n')) ??
+          (m['desc'] ?? '').toString(),
       abilityBonuses: ((m['ability_bonuses'] as List?) ?? const [])
           .whereType<Map>()
           .map((e) => (
@@ -186,7 +321,7 @@ class ApiSubrace {
               ))
           .where((b) => b.ability.isNotEmpty)
           .toList(),
-      traits: _refs(m['racial_traits']),
+      traits: _refs(m['racial_traits'], 'traits'),
     );
   }
 }
@@ -232,7 +367,7 @@ class ApiClassLevel {
       level: _int(m['level']) ?? 0,
       profBonus: _int(m['prof_bonus']) ?? 2,
       abilityScoreImprovement: (_int(m['ability_score_bonuses']) ?? 0) > 0,
-      features: _refs(m['features']),
+      features: _refs(m['features'], 'features'),
       cantripsKnown: sc is Map ? _int(sc['cantrips_known']) : null,
       spellsKnown: sc is Map ? _int(sc['spells_known']) : null,
       slots: slots,
@@ -245,11 +380,11 @@ class ApiClassLevel {
 
     final out = <String>[];
     v.forEach((key, value) {
-      final label = key.toString().replaceAll('_', ' ');
+      final label = classSpecificLabel(key.toString());
       if (value is num || value is String) {
         out.add('$label: $value');
       } else if (value is bool) {
-        out.add('$label: ${value ? 'sí' : 'no'}');
+        out.add('$label: ${value ? (_isEs ? 'sí' : 'yes') : 'no'}');
       } else if (value is Map &&
           value['dice_count'] != null &&
           value['dice_value'] != null) {
@@ -315,7 +450,11 @@ class ApiSpell {
   factory ApiSpell.fromJson(Map<String, dynamic> m) {
     final schoolName = ((m['school'] as Map?)?['name'] ?? '').toString();
     final comps = ((m['components'] as List?) ?? const []).join(', ');
-    final material = (m['material'] ?? '').toString();
+    final enMaterial = (m['material'] ?? '').toString();
+    final material = enMaterial.isEmpty
+        ? ''
+        : (SrdEs.get('spells', (m['name'] ?? '').toString(), 'm') ??
+            enMaterial);
 
     List<String> strings(dynamic v) =>
         v is List ? v.map((e) => e.toString()).toList() : const [];
@@ -339,8 +478,9 @@ class ApiSpell {
 
 /// Cliente de la D&D 5e SRD API para clases, niveles, rasgos y hechizos.
 ///
-/// La API solo ofrece los textos en inglés (también fr-FR y pt-BR), así que
-/// el contenido se muestra en inglés y las etiquetas de la app en español.
+/// La API solo ofrece los textos en inglés. En español se sustituyen por las
+/// traducciones empaquetadas en assets/data/srd_es.json y por los términos de
+/// lib/i18n/srd_terms.dart; lo que no tenga traducción se muestra en inglés.
 class ClassApiService {
 
   static const String _base = 'https://www.dnd5eapi.co/api/2014';
@@ -351,7 +491,11 @@ class ClassApiService {
   static final Map<String, ApiSpell> _spellCache = {};
   static final Map<String, List<String>> _textCache = {};
 
+  static String get _lang => AppSettings.instance.lang;
+
   Future<dynamic> _getJson(String path) async {
+    // El diccionario en español debe estar cargado antes de construir modelos.
+    await SrdEs.ensureLoaded();
     final res = await http
         .get(Uri.parse('$_base$path'))
         .timeout(const Duration(seconds: 20));
@@ -363,16 +507,18 @@ class ClassApiService {
   }
 
   Future<ApiClass> fetchClass(String index) async {
-    final cached = _classCache[index];
+    final k = '$_lang|$index';
+    final cached = _classCache[k];
     if (cached != null) return cached;
 
     final data = await _getJson('/classes/$index') as Map<String, dynamic>;
-    return _classCache[index] = ApiClass.fromJson(data);
+    return _classCache[k] = ApiClass.fromJson(data);
   }
 
   /// Los 20 niveles de la clase.
   Future<List<ApiClassLevel>> fetchLevels(String index) async {
-    final cached = _levelsCache[index];
+    final k = '$_lang|$index';
+    final cached = _levelsCache[k];
     if (cached != null) return cached;
 
     final data = await _getJson('/classes/$index/levels');
@@ -386,7 +532,7 @@ class ClassApiService {
         .toList()
       ..sort((a, b) => a.level.compareTo(b.level));
 
-    return _levelsCache[index] = levels;
+    return _levelsCache[k] = levels;
   }
 
   static Map<String, ApiSpellRef>? _allSpellsCache;
@@ -478,21 +624,20 @@ class ClassApiService {
 
   /// Descripción de un rasgo de clase.
   Future<List<String>> fetchFeatureText(String index) async {
-    final key = 'feature:$index';
+    final key = 'feature:$_lang:$index';
     final cached = _textCache[key];
     if (cached != null) return cached;
 
     final data = await _getJson('/features/$index') as Map<String, dynamic>;
-    final desc = ((data['desc'] ?? const []) as List)
-        .map((e) => e.toString())
-        .toList();
+    final desc = _trParas(['features'], (data['name'] ?? '').toString()) ??
+        ((data['desc'] ?? const []) as List).map((e) => e.toString()).toList();
 
     return _textCache[key] = desc;
   }
 
   /// Descripción de una subclase.
   Future<List<String>> fetchSubclassText(String index) async {
-    final key = 'subclass:$index';
+    final key = 'subclass:$_lang:$index';
     final cached = _textCache[key];
     if (cached != null) return cached;
 
@@ -501,6 +646,9 @@ class ClassApiService {
     final desc = ((data['desc'] ?? const []) as List)
         .map((e) => e.toString())
         .toList();
+
+    final es = _trParas(['subclasses'], (data['name'] ?? '').toString());
+    if (es != null) return _textCache[key] = es;
 
     return _textCache[key] = [
       if (flavor.isNotEmpty) flavor,
@@ -525,23 +673,26 @@ class ClassApiService {
   }
 
   Future<ApiRace> fetchRace(String index) async {
-    final cached = _raceCache[index];
+    final k = '$_lang|$index';
+    final cached = _raceCache[k];
     if (cached != null) return cached;
 
     final data = await _getJson('/races/$index') as Map<String, dynamic>;
-    return _raceCache[index] = ApiRace.fromJson(data);
+    return _raceCache[k] = ApiRace.fromJson(data);
   }
 
   /// Descripción de un rasgo racial.
   Future<List<String>> fetchTraitText(String index) async {
-    final key = 'trait:$index';
+    final key = 'trait:$_lang:$index';
     final cached = _textCache[key];
     if (cached != null) return cached;
 
     final data = await _getJson('/traits/$index') as Map<String, dynamic>;
-    final desc = ((data['desc'] ?? const []) as List)
-        .map((e) => e.toString())
-        .toList();
+    final desc =
+        _trParas(['traits', 'features', 'races'], (data['name'] ?? '').toString()) ??
+            ((data['desc'] ?? const []) as List)
+                .map((e) => e.toString())
+                .toList();
 
     return _textCache[key] = desc;
   }
@@ -549,11 +700,12 @@ class ClassApiService {
   static final Map<String, ApiSubrace> _subraceCache = {};
 
   Future<ApiSubrace> fetchSubrace(String index) async {
-    final cached = _subraceCache[index];
+    final k = '$_lang|$index';
+    final cached = _subraceCache[k];
     if (cached != null) return cached;
 
     final data = await _getJson('/subraces/$index') as Map<String, dynamic>;
-    return _subraceCache[index] = ApiSubrace.fromJson(data);
+    return _subraceCache[k] = ApiSubrace.fromJson(data);
   }
 
   /// Descripción, bonificadores y rasgos de una subraza, como texto.
@@ -567,9 +719,10 @@ class ClassApiService {
 
     return [
       sub.description,
-      if (bonuses.isNotEmpty) 'Bonificadores: ${bonuses.join(', ')}',
+      if (bonuses.isNotEmpty)
+        '${_isEs ? 'Bonificadores' : 'Bonuses'}: ${bonuses.join(', ')}',
       if (sub.traits.isNotEmpty)
-        'Rasgos: ${sub.traits.map((t) => t.name).join(', ')}',
+        '${_isEs ? 'Rasgos' : 'Traits'}: ${sub.traits.map((t) => t.name).join(', ')}',
     ].where((t) => t.isNotEmpty).toList();
   }
 

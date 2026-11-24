@@ -20,7 +20,7 @@ class CharacterSheetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(character.name)),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: SingleChildScrollView(
@@ -28,7 +28,7 @@ class CharacterSheetScreen extends StatelessWidget {
             child: CharacterSheetView(character: character),
           ),
         ),
-      ),
+      )),
     );
   }
 }
@@ -134,7 +134,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      [c.background, c.alignment]
+                      [c.background, DndData.alignmentLabel(c.alignment)]
                           .where((e) => e.isNotEmpty)
                           .join(' · '),
                       style: TextStyle(color: Colors.grey.shade600),
@@ -160,7 +160,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
                 ),
               ),
               icon: const Icon(Icons.menu_book_outlined),
-              label: Text('Ver clase: ${DndData.className(c.characterClass)}'),
+              label: Text('${tr('Ver clase')}: ${DndData.className(c.characterClass)}'),
             ),
             TextButton.icon(
               onPressed: () => Navigator.push(
@@ -173,7 +173,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
                 ),
               ),
               icon: const Icon(Icons.diversity_3_outlined),
-              label: Text('Ver raza: ${c.raceLabel}'),
+              label: Text('${tr('Ver raza')}: ${c.raceLabel}'),
             ),
           ],
         ),
@@ -184,16 +184,16 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _StatBox(label: 'CA', value: '${c.effectiveAc}'),
-            _StatBox(label: 'PG', value: '${c.maxHp}'),
-            _StatBox(label: 'Velocidad', value: '${c.effectiveSpeed} pies'),
-            _StatBox(label: 'Iniciativa', value: Character.signed(c.initiative)),
+            _StatBox(label: tr('CA'), value: '${c.effectiveAc}'),
+            _StatBox(label: tr('PG'), value: '${c.maxHp}'),
+            _StatBox(label: tr('Velocidad'), value: '${c.effectiveSpeed} ${tr('pies')}'),
+            _StatBox(label: tr('Iniciativa'), value: Character.signed(c.initiative)),
             _StatBox(
-              label: 'Competencia',
+              label: tr('Competencia'),
               value: Character.signed(c.proficiencyBonus),
             ),
             _StatBox(
-              label: 'Percepción pasiva',
+              label: tr('Percepción pasiva'),
               value: '${c.passivePerception}',
             ),
           ],
@@ -223,7 +223,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
 
         // SALVACIONES
         _SectionCard(
-          title: 'Tiradas de salvación',
+          title: tr('Tiradas de salvación'),
           child: Wrap(
             spacing: 8,
             runSpacing: 4,
@@ -240,7 +240,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
 
         // HABILIDADES
         _SectionCard(
-          title: 'Habilidades',
+          title: tr('Habilidades'),
           child: Wrap(
             spacing: 8,
             runSpacing: 4,
@@ -248,7 +248,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
               for (final s in DndData.skills.keys)
                 _ProfRow(
                   proficient: c.skills.contains(s),
-                  label: '$s (${DndData.abilityShort[DndData.skills[s]]})',
+                  label: '${DndData.skillLabel(s)} (${DndData.abilityShort[DndData.skills[s]]})',
                   bonus: c.skillBonus(s),
                 ),
             ],
@@ -257,13 +257,13 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
 
         // RASGOS DE RAZA Y SUBRAZA
         _SectionCard(
-          title: 'Rasgos de raza: ${c.raceLabel}',
+          title: '${tr('Rasgos de raza')}: ${c.raceLabel}',
           child: _RaceTraits(race: c.race, subrace: c.subrace),
         ),
 
         // SUBCLASES DE LA CLASE
         _SectionCard(
-          title: 'Subclases: ${DndData.className(c.characterClass)}',
+          title: '${tr('Subclases')}: ${DndData.className(c.characterClass)}',
           child: _Subclasses(classIndex: c.characterClass),
         ),
 
@@ -285,11 +285,11 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
           ),
 
         if (c.equipment.isNotEmpty)
-          _SectionCard(title: 'Equipo', child: Text(c.equipment)),
+          _SectionCard(title: tr('Equipo'), child: Text(c.equipment)),
 
         if (c.notes.isNotEmpty)
           _SectionCard(
-            title: 'Notas e historia',
+            title: tr('Notas e historia'),
             child: Text(c.notes),
           ),
       ],

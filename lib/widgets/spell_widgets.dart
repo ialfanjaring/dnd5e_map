@@ -52,7 +52,8 @@ String spellTerm(String v, {String kind = ''}) {
   return t;
 }
 
-String spellLevelLabel(int level) => level == 0 ? 'Truco' : 'Nivel $level';
+String spellLevelLabel(int level) =>
+    level == 0 ? tr('Truco') : '${tr('Nivel')} $level';
 
 /// Diálogo que carga un texto de la API (rasgo, subclase...) y lo muestra.
 Future<void> showTextDialog(
@@ -130,21 +131,21 @@ Future<void> showSpellDetail(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${spellLevelLabel(s.level)} · ${s.school}'
-                    '${s.ritual ? ' (ritual)' : ''}',
+                    '${spellLevelLabel(s.level)} · ${tr(s.school)}'
+                    '${s.ritual ? ' ${tr('(ritual)')}' : ''}',
                     style: TextStyle(
                       fontStyle: FontStyle.italic,
                       color: Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _line('Tiempo de lanzamiento', spellTerm(s.castingTime)),
-                  _line('Alcance', spellTerm(s.range)),
-                  _line('Componentes', s.components),
+                  _line(tr('Tiempo de lanzamiento'), spellTerm(s.castingTime)),
+                  _line(tr('Alcance'), spellTerm(s.range)),
+                  _line(tr('Componentes'), s.components),
                   _line(
-                    'Duración',
+                    tr('Duración'),
                     s.concentration
-                        ? '${spellTerm(s.duration)} (concentración)'
+                        ? '${spellTerm(s.duration)} ${tr('(concentración)')}'
                         : spellTerm(s.duration),
                   ),
                   const SizedBox(height: 12),
@@ -205,6 +206,9 @@ Widget _line(String label, String value) {
 
 /// Chips con los hechizos de una lista de índices, agrupados por nivel.
 /// El nombre y el nivel se leen de la API (solo se guardan los índices).
+/// Nombre del hechizo en español si está en el SRD (solo con la app en español).
+String _loc(String enName) => SrdEs.get('spells', enName, 'n') ?? enName;
+
 class SpellChips extends StatelessWidget {
   final List<String> indexes;
 
@@ -247,8 +251,8 @@ class SpellChips extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Text(
                   level < 0
-                      ? 'Nivel sin indicar'
-                      : (level == 0 ? 'Trucos' : 'Nivel $level'),
+                      ? tr('Nivel sin indicar')
+                      : (level == 0 ? tr('Trucos') : '${tr('Nivel')} $level'),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.deepPurple.shade700,
@@ -259,15 +263,15 @@ class SpellChips extends StatelessWidget {
                 spacing: 6,
                 children: [
                   for (final s in byLevel[level]!
-                    ..sort((a, b) => a.name.compareTo(b.name)))
+                    ..sort((a, b) => _loc(a.name).compareTo(_loc(b.name))))
                     onDelete == null
                         ? ActionChip(
-                            label: Text(s.name),
+                            label: Text(_loc(s.name)),
                             onPressed: () =>
                                 showSpellDetail(context, s.index, s.name),
                           )
                         : InputChip(
-                            label: Text(s.name),
+                            label: Text(_loc(s.name)),
                             onPressed: () =>
                                 showSpellDetail(context, s.index, s.name),
                             onDeleted: () => onDelete!(s.index),

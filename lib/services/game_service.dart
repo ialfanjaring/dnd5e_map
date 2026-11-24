@@ -108,6 +108,18 @@ class GameService {
 
   /// Crea la partida y devuelve el código de invitación.
   Future<String> createGame(String name) async {
+    try {
+      return await _createGame(name);
+    } on FirebaseException catch (e) {
+      if (e.code != 'permission-denied') rethrow;
+      // Token con «email_verified» desactualizado: se renueva y se reintenta.
+      await FirebaseAuth.instance.currentUser?.reload();
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      return _createGame(name);
+    }
+  }
+
+  Future<String> _createGame(String name) async {
     for (var i = 0; i < 10; i++) {
       final code = _randomCode();
       final ref = _games.doc(code);

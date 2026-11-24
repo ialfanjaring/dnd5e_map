@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (_error != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        _error!,
+                        trMsg(_error!),
                         style: TextStyle(color: Colors.red.shade700),
                       ),
                     ],
@@ -195,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }

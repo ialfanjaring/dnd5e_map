@@ -24,16 +24,24 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - name: Firma (keystore desde secretos)
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
           cat > android/key.properties <<EOT
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyAlias=upload
           storeFile=upload-keystore.jks
           EOT
+      - name: Comprobar keystore (muestra los alias que contiene)
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: keytool -list -keystore android/app/upload-keystore.jks -storepass "$KS_PASS" | grep -i "entry\|Keystore type\|Your keystore"
+      - name: google-services.json (Firebase, desde secreto)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
       - run: flutter pub get
       - run: flutter build apk --release
       - run: cp build/app/outputs/flutter-apk/app-release.apk dnd5e_map.apk
@@ -45,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - run: flutter pub get
       - run: flutter build windows --release
       - name: Instalador
@@ -63,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { channel: stable, cache: true }
+        with: { flutter-version: '3.47.7', channel: stable, cache: true }
       - run: flutter pub get
       - run: flutter build web --release --base-href /${{ env.REPO_NAME }}/app/
       - uses: actions/upload-artifact@v4
@@ -94,7 +102,7 @@ jobs:
         with: { name: web, path: _site/app }
       - name: Página de descargas
         run: cp -r site/* _site/
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with: { path: _site }
       - id: deploy
         uses: actions/deploy-pages@v4

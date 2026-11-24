@@ -61,7 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Tx('Crear cuenta')),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -123,7 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (_error != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        _error!,
+                        trMsg(_error!),
                         style: TextStyle(color: Colors.red.shade700),
                       ),
                     ],
@@ -154,7 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }

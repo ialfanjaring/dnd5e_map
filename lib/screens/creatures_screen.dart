@@ -101,7 +101,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
                 _currentKind == 'npc' ? 'Nuevo NPC' : 'Nueva criatura',
               ),
             ),
-      body: _tabController.index == 3
+      body: SafeArea(top: false, child: _tabController.index == 3
           ? const DefaultMonstersView()
           : Column(
         children: [
@@ -135,7 +135,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
           ),
           Expanded(child: _buildList()),
         ],
-      ),
+      )),
     );
   }
 

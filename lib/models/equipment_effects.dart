@@ -83,7 +83,7 @@ class EquipmentEffects {
     if (armor != null && armor.strMinimum > 0 && c.score('str') < armor.strMinimum) {
       penalty = 10;
       notes.add(
-        '${armor.name}: requiere Fuerza ${armor.strMinimum}; '
+        '${armor.displayName}: requiere Fuerza ${armor.strMinimum}; '
         'la velocidad baja 10 pies.',
       );
     }

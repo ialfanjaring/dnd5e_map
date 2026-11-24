@@ -16,7 +16,7 @@ class CreatureSheetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title ?? creature.name)),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: SingleChildScrollView(
@@ -24,7 +24,7 @@ class CreatureSheetScreen extends StatelessWidget {
             child: CreatureSheetView(creature: creature),
           ),
         ),
-      ),
+      )),
     );
   }
 }
@@ -60,13 +60,13 @@ class CreatureSheetView extends StatelessWidget {
                   ),
                 ),
                 Chip(
-                  label: Text(CreatureData.kinds[c.kind] ?? 'Monstruo'),
+                  label: Text(tr(CreatureData.kinds[c.kind] ?? 'Monstruo')),
                 ),
               ],
             ),
             Text(
-              '${c.size} ${c.creatureType.toLowerCase()}, '
-              '${c.alignment.toLowerCase()}',
+              '${tr(c.size)} ${_typeTr(c.creatureType).toLowerCase()}, '
+              '${tr(c.alignment).toLowerCase()}',
               style: TextStyle(
                 fontStyle: FontStyle.italic,
                 color: Colors.grey.shade600,
@@ -75,12 +75,12 @@ class CreatureSheetView extends StatelessWidget {
             _divider(accent),
 
             // COMBATE
-            _line('Clase de armadura', '${c.armorClass}'),
+            _line(tr('Clase de armadura'), '${c.armorClass}'),
             _line(
-              'Puntos de golpe',
+              tr('Puntos de golpe'),
               c.hitDice.isEmpty ? '${c.maxHp}' : '${c.maxHp} (${c.hitDice})',
             ),
-            _line('Velocidad', c.speed),
+            _line(tr('Velocidad'), c.speed),
             _divider(accent),
 
             // CARACTERÍSTICAS
@@ -93,7 +93,7 @@ class CreatureSheetView extends StatelessWidget {
                   Column(
                     children: [
                       Text(
-                        DndData.abilityShort[k]!,
+                        tr(DndData.abilityShort[k]!),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: accent,
@@ -106,12 +106,12 @@ class CreatureSheetView extends StatelessWidget {
             ),
             _divider(accent),
 
-            if (c.skills.isNotEmpty) _line('Habilidades', c.skills),
-            if (c.senses.isNotEmpty) _line('Sentidos', c.senses),
-            if (c.languages.isNotEmpty) _line('Idiomas', c.languages),
+            if (c.skills.isNotEmpty) _line(tr('Habilidades'), c.skills),
+            if (c.senses.isNotEmpty) _line(tr('Sentidos'), c.senses),
+            if (c.languages.isNotEmpty) _line(tr('Idiomas'), c.languages),
             _line(
-              'Desafío',
-              '${c.challengeRating} (${c.xp} PX)',
+              tr('Desafío'),
+              '${c.challengeRating} (${c.xp} ${tr('PX')})',
             ),
 
             if (c.traits.isNotEmpty) ...[
@@ -164,6 +164,12 @@ class CreatureSheetView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// «Dragón (subtipo)» -> traduce solo el tipo.
+  String _typeTr(String t) {
+    final i = t.indexOf(' (');
+    return i < 0 ? tr(t) : '${tr(t.substring(0, i))}${t.substring(i)}';
   }
 
   Widget _divider(Color color) => Padding(

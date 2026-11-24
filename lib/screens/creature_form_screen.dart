@@ -152,7 +152,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar $label' : 'Nuevo $label'),
       ),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Form(
@@ -185,7 +185,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 

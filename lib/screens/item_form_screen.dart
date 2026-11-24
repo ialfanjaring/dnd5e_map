@@ -159,7 +159,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
           ),
         ],
       ),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: Form(
@@ -442,7 +442,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }

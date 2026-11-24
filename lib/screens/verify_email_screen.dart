@@ -98,7 +98,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     final email = _auth.currentUser?.email ?? '';
 
     return Scaffold(
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -151,7 +151,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 if (_message != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    _message!,
+                    trMsg(_message!),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
@@ -165,7 +165,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 }

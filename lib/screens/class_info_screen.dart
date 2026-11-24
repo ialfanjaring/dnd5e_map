@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/character.dart';
 import '../services/class_api_service.dart';
+import '../services/translation_service.dart';
 import '../widgets/spell_widgets.dart';
 import '../i18n/i18n.dart';
 
@@ -44,7 +45,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<List<ApiRef>>(
+      body: SafeArea(top: false, child: FutureBuilder<List<ApiRef>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -91,13 +92,13 @@ class _ClassesScreenState extends State<ClassesScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 }
 
 /// Información de una clase: resumen, subidas de nivel, hechizos y subclases.
-/// Los datos vienen de la D&D 5e SRD API (textos en inglés).
+/// Los datos vienen de la D&D 5e SRD API (en español donde hay traducción).
 class ClassInfoScreen extends StatefulWidget {
   /// Índice de la clase en la API (ej. wizard)
   final String classIndex;
@@ -145,10 +146,10 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      const Tab(text: 'Resumen'),
-      const Tab(text: 'Niveles'),
-      if (_isCaster) const Tab(text: 'Hechizos'),
-      const Tab(text: 'Subclases'),
+      Tab(text: tr('Resumen')),
+      Tab(text: tr('Niveles')),
+      if (_isCaster) Tab(text: tr('Hechizos')),
+      Tab(text: tr('Subclases')),
     ];
 
     return DefaultTabController(
@@ -156,13 +157,13 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Clase: $_className',
+            '${tr('Clase')}: $_className',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
           bottom: TabBar(tabs: tabs),
         ),
-        body: TabBarView(
+        body: SafeArea(top: false, child: TabBarView(
           children: [
             _async<ApiClass>(_classFuture, _summaryTab),
             _async<List<ApiClassLevel>>(_levelsFuture, _levelsTab),
@@ -170,7 +171,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               _async<List<ApiSpellRef>>(_spellsFuture, _spellsTab),
             _async<ApiClass>(_classFuture, _subclassesTab),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -192,7 +193,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'No se pudo conectar con la API.\n${snapshot.error}',
+                    '${tr('No se pudo conectar con la API.')}\n${snapshot.error}',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
@@ -288,7 +289,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           ),
         const SizedBox(height: 8),
         Tx(
-          'Datos de la D&D 5e SRD API (textos en inglés).',
+          'Datos de la D&D 5e SRD API (en español donde hay traducción).',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
@@ -330,12 +331,12 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
                     ),
                   ),
             title: Text(
-              'Nivel ${l.level}'
-              '${isCurrent ? ' (tu nivel)' : ''}',
+              '${tr('Nivel')} ${l.level}'
+              '${isCurrent ? ' (${tr('tu nivel')})' : ''}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
-              featureNames.isEmpty ? 'Sin rasgos nuevos' : featureNames,
+              featureNames.isEmpty ? tr('Sin rasgos nuevos') : featureNames,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -346,7 +347,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               if (l.abilityScoreImprovement)
                 _kv(
                   'Mejora de características',
-                  '+2 a repartir (o dote, si tu Master lo permite)',
+                  tr('+2 a repartir (o dote, si tu Master lo permite)'),
                 ),
               if (l.cantripsKnown != null)
                 _kv('Trucos conocidos', '${l.cantripsKnown}'),
@@ -406,7 +407,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          '${spells.length} hechizos disponibles para $_className.',
+          '${spells.length} ${tr('hechizos disponibles para')} $_className.',
           style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 8),
@@ -416,15 +417,15 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               title: Text(
                 level < 0
                     ? 'Nivel sin indicar'
-                    : (level == 0 ? 'Trucos' : 'Nivel $level'),
+                    : (level == 0 ? tr('Trucos') : '${tr('Nivel')} $level'),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text('${byLevel[level]!.length} hechizos'),
+              subtitle: Text('${byLevel[level]!.length} ${tr('hechizos')}'),
               children: [
                 for (final s in byLevel[level]!)
                   ListTile(
                     dense: true,
-                    title: Text(s.name),
+                    title: Text(SrdEs.get('spells', s.name, 'n') ?? s.name),
                     trailing: const Icon(Icons.info_outline, size: 20),
                     onTap: () => showSpellDetail(context, s.index, s.name),
                   ),
@@ -477,7 +478,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
         TextSpan(
           children: [
             TextSpan(
-              text: '$label: ',
+              text: '${tr(label)}: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             TextSpan(text: value),
@@ -495,7 +496,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
+              tr(title),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),

@@ -336,7 +336,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar personaje' : 'Nuevo personaje'),
       ),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Form(
@@ -373,7 +373,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -486,7 +486,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ),
           items: [
             for (final a in DndData.alignments)
-              DropdownMenuItem(value: a, child: Text(a)),
+              DropdownMenuItem(value: a, child: Text(DndData.alignmentLabel(a))),
           ],
           onChanged: (v) => setState(() => _alignment = v),
         ),
@@ -615,7 +615,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         for (final entry in DndData.skills.entries)
           FilterChip(
             label: Text(
-              '${entry.key} (${DndData.abilityShort[entry.value]}) '
+              '${DndData.skillLabel(entry.key)} (${DndData.abilityShort[entry.value]}) '
               '${Character.signed(Character.modifier(_total(entry.value)) + (_skills.contains(entry.key) ? _profBonus : 0))}',
             ),
             selected: _skills.contains(entry.key),
@@ -883,7 +883,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               for (var i = 0; i < _items.length; i++)
                 InputChip(
                   label: Text(
-                    EquipmentApiService().cachedItem(_items[i])?.name ??
+                    EquipmentApiService().cachedItem(_items[i])?.displayName ??
                         _items[i].replaceFirst(RegExp(r'^[mc]:'), ''),
                   ),
                   onDeleted: () => setState(() {

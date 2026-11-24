@@ -42,7 +42,7 @@ class MapPickerScreen extends StatelessWidget {
           icon: const Icon(Icons.add),
           label: const Tx('Crear mapa'),
         ),
-        body: TabBarView(
+        body: SafeArea(top: false, child: TabBarView(
           children: [
             _MapGrid(
               maps: DefaultMaps.all,
@@ -81,7 +81,7 @@ class MapPickerScreen extends StatelessWidget {
               },
             ),
           ],
-        ),
+        )),
       ),
     );
   }

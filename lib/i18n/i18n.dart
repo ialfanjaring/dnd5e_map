@@ -8,10 +8,6 @@ import 'langs.dart';
 const Map<String, String> uiLanguages = {
   'es': 'Español',
   'en': 'English',
-  'fr': 'Français',
-  'de': 'Deutsch',
-  'pt-BR': 'Português (Brasil)',
-  'it': 'Italiano',
 };
 
 /// Traduce un texto escrito en español al idioma de la app. Todas las
@@ -21,7 +17,18 @@ String tr(String es) {
   final lang = AppSettings.instance.lang;
   if (lang == 'es') return es;
   if (lang == 'en') return enStrings[es] ?? es;
-  return bundledStrings[lang]?[es] ?? enStrings[es] ?? es;
+  return enStrings[es] ?? es;
+}
+
+/// Traduce un mensaje de error/aviso (con o sin números dentro).
+String trMsg(String es) {
+  final w = RegExp(r'^Espera (\d+) segundos antes de reenviar\.$').firstMatch(es);
+  if (w != null) {
+    return tr('Espera {n} segundos antes de reenviar.').replaceAll('{n}', w.group(1)!);
+  }
+  final c = RegExp(r'^No se pudo crear la cuenta \((.+)\)\.$').firstMatch(es);
+  if (c != null) return '${tr('No se pudo crear la cuenta')} (${c.group(1)}).';
+  return tr(es);
 }
 
 /// Como [Text] pero traduce el texto según el idioma. Se puede usar con

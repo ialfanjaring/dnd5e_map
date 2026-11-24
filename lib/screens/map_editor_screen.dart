@@ -239,7 +239,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
           ),
         ],
       ),
-      body: OrientationBuilder(
+      body: SafeArea(top: false, child: OrientationBuilder(
         builder: (context, orientation) {
           final board = GameBoard(
             cols: _cols,
@@ -367,7 +367,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
             ],
           );
         },
-      ),
+      )),
     );
   }
 

@@ -110,7 +110,7 @@ class _SpellcastingPanelState extends State<SpellcastingPanel> {
       final picked = await showDialog<int>(
         context: context,
         builder: (ctx) => SimpleDialog(
-          title: Text('${tr('Lanzar')} ${sp.name}'),
+          title: Text('${tr('Lanzar')} ${spellName(sp.name)}'),
           children: [
             for (final l in options)
               SimpleDialogOption(
@@ -343,7 +343,7 @@ class _SpellcastingPanelState extends State<SpellcastingPanel> {
             dense: true,
             contentPadding: EdgeInsets.zero,
             title: Text(spellName(sp.name)),
-            subtitle: Text(sp.school),
+            subtitle: Text(tr(sp.school)),
             onTap: () => showSpellDetail(context, sp.index, sp.name),
             trailing: sp.level == 0
                 ? null

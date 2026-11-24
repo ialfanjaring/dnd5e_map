@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/translation_service.dart';
 
 import '../services/monster_api_service.dart';
 import 'creature_sheet_view.dart';
@@ -97,7 +98,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                             ),
                             SizedBox(height: 2),
                             Tx(
-                              'De la API de D&D 5e (SRD, en inglés). Solo se '
+                              'De la API de D&D 5e (SRD). Solo se '
                               'pueden consultar; para usarlos en una partida, '
                               'añádelos desde la sala del Master.',
                               style: TextStyle(fontSize: 12),
@@ -119,9 +120,9 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                   Expanded(
                     child: TextField(
                       controller: _searchCtrl,
-                      decoration: const InputDecoration(
-                        hintText: 'Buscar por nombre (en inglés)...',
-                        prefixIcon: Icon(Icons.search),
+                      decoration: InputDecoration(
+                        hintText: tr('Buscar por nombre...'),
+                        prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -189,7 +190,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                   final list = snapshot.data!
                       .where((m) =>
                           _query.isEmpty ||
-                          m.name.toLowerCase().contains(_query))
+                          _monsterMatches(m.name, _query))
                       .toList();
 
                   if (list.isEmpty) {
@@ -223,7 +224,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                             ),
                           ),
                           title: Text(
-                            m.name,
+                            SrdEs.monsterName(m.name) ?? m.name,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           trailing: _loadingIndex == m.index
@@ -247,4 +248,15 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
       ),
     );
   }
+}
+
+
+/// Busca por nombre en inglés y también en español (sin acentos).
+bool _monsterMatches(String enName, String query) {
+  String f(String x) => x
+      .toLowerCase()
+      .replaceAll('á', 'a').replaceAll('é', 'e').replaceAll('í', 'i')
+      .replaceAll('ó', 'o').replaceAll('ú', 'u').replaceAll('ü', 'u');
+  final q = f(query);
+  return f(enName).contains(q) || f(SrdEs.monsterName(enName) ?? '').contains(q);
 }

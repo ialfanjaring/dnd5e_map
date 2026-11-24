@@ -126,7 +126,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<_PickerData>(
+      body: SafeArea(top: false, child: FutureBuilder<_PickerData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -160,7 +160,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
 
           return _buildBody(snapshot.data!);
         },
-      ),
+      )),
     );
   }
 
@@ -204,9 +204,9 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
         const SizedBox(height: 10),
         TextField(
           controller: _searchCtrl,
-          decoration: const InputDecoration(
-            hintText: 'Buscar hechizo (en inglés)...',
-            prefixIcon: Icon(Icons.search),
+          decoration: InputDecoration(
+            hintText: tr('Buscar hechizo...'),
+            prefixIcon: const Icon(Icons.search),
             border: OutlineInputBorder(),
             isDense: true,
           ),

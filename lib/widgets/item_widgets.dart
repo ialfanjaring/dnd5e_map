@@ -232,7 +232,7 @@ class CharacterItemsCard extends StatelessWidget {
             DropdownMenuItem<String?>(
               value: i,
               child: Text(
-                '${data[i]!.name} · ${_oneLine(data[i]!)}',
+                '${data[i]!.displayName} · ${_oneLine(data[i]!)}',
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -306,7 +306,7 @@ class CharacterItemsCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    '${a.weapon.name}: ${Character.signed(a.attackBonus)} para '
+                    '${a.weapon.displayName}: ${Character.signed(a.attackBonus)} para '
                     'impactar · ${a.damage}',
                   ),
                 ),
@@ -333,7 +333,7 @@ class CharacterItemsCard extends StatelessWidget {
 
   Widget _tile(BuildContext context, String index) {
     final it = data[index];
-    final name = it?.name ?? index.replaceFirst(ApiItem.magicPrefix, '');
+    final name = it?.displayName ?? index.replaceFirst(ApiItem.magicPrefix, '');
     final isEquipped = character.equipped.contains(index);
 
     return ListTile(
@@ -383,6 +383,6 @@ class CharacterItemsCard extends StatelessWidget {
       final r = EquipmentApiService.rarities[it.rarity] ?? it.rarity;
       return it.magicBonus != 0 ? '$r · +${it.magicBonus}' : r;
     }
-    return it.category;
+    return EquipmentApiService.term(it.category);
   }
 }

@@ -17,7 +17,7 @@ class SettingsScreen extends StatelessWidget {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(title: const Tx('Opciones')),
-          body: ListView(
+          body: SafeArea(top: false, child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
               _header(context, tr('Idioma')),
@@ -73,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+          )),
         );
       },
     );

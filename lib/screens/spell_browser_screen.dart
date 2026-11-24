@@ -31,7 +31,7 @@ class SpellBrowserScreen extends StatelessWidget {
         title: Tx('Hechizos', style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: const SpellBrowserView(),
+      body: SafeArea(top: false, child: const SpellBrowserView()),
     );
   }
 }
