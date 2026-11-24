@@ -34,7 +34,7 @@ class _ReferenceScreenState extends State<ReferenceScreen> {
               centerTitle: true,
               actions: const [OptionsButton()],
             ),
-      body: Column(
+      body: SafeArea(top: false, child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -69,7 +69,7 @@ class _ReferenceScreenState extends State<ReferenceScreen> {
             },
           ),
         ],
-      ),
+      )),
     );
   }
 }

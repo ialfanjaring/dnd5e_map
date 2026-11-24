@@ -126,7 +126,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<_PickerData>(
+      body: SafeArea(top: false, child: FutureBuilder<_PickerData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -160,7 +160,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
 
           return _buildBody(snapshot.data!);
         },
-      ),
+      )),
     );
   }
 

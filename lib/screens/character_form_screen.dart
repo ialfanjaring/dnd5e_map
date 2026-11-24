@@ -336,7 +336,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar personaje' : 'Nuevo personaje'),
       ),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Form(
@@ -373,7 +373,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -883,7 +883,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               for (var i = 0; i < _items.length; i++)
                 InputChip(
                   label: Text(
-                    EquipmentApiService().cachedItem(_items[i])?.name ??
+                    EquipmentApiService().cachedItem(_items[i])?.displayName ??
                         _items[i].replaceFirst(RegExp(r'^[mc]:'), ''),
                   ),
                   onDeleted: () => setState(() {

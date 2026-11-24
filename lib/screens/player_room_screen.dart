@@ -144,7 +144,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<Map<String, dynamic>?>(
+      body: SafeArea(top: false, child: StreamBuilder<Map<String, dynamic>?>(
         stream: _gameService.gameStream(widget.gameCode),
         builder: (context, gameSnap) {
           if (gameSnap.hasError) {
@@ -175,7 +175,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 

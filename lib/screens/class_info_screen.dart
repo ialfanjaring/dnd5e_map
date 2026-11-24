@@ -45,7 +45,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<List<ApiRef>>(
+      body: SafeArea(top: false, child: FutureBuilder<List<ApiRef>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -92,7 +92,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -163,7 +163,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           centerTitle: true,
           bottom: TabBar(tabs: tabs),
         ),
-        body: TabBarView(
+        body: SafeArea(top: false, child: TabBarView(
           children: [
             _async<ApiClass>(_classFuture, _summaryTab),
             _async<List<ApiClassLevel>>(_levelsFuture, _levelsTab),
@@ -171,7 +171,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
               _async<List<ApiSpellRef>>(_spellsFuture, _spellsTab),
             _async<ApiClass>(_classFuture, _subclassesTab),
           ],
-        ),
+        )),
       ),
     );
   }

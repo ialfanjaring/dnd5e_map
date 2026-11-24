@@ -20,7 +20,7 @@ class CharacterSheetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(character.name)),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: SingleChildScrollView(
@@ -28,7 +28,7 @@ class CharacterSheetScreen extends StatelessWidget {
             child: CharacterSheetView(character: character),
           ),
         ),
-      ),
+      )),
     );
   }
 }

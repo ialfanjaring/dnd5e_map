@@ -47,7 +47,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Tx('Recuperar contraseña')),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -55,7 +55,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: _sent ? _buildSent() : _buildForm(),
           ),
         ),
-      ),
+      )),
     );
   }
 

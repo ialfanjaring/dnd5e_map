@@ -1422,7 +1422,7 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
       // El mapa ocupa todo el espacio; los paneles se superponen
-      body: LayoutBuilder(
+      body: SafeArea(top: false, child: LayoutBuilder(
         builder: (context, constraints) {
           final w = constraints.maxWidth;
           final h = constraints.maxHeight;
@@ -1626,7 +1626,7 @@ class _GameScreenState extends State<GameScreen>
             ],
           );
         },
-      ),
+      )),
     );
   }
 

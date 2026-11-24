@@ -324,7 +324,7 @@ class PlayerSheetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: PlayerLiveSheet(
@@ -334,7 +334,7 @@ class PlayerSheetScreen extends StatelessWidget {
             isMaster: isMaster,
           ),
         ),
-      ),
+      )),
     );
   }
 }

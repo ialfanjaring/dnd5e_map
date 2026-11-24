@@ -60,7 +60,7 @@ class CharactersScreen extends StatelessWidget {
         icon: const Icon(Icons.add),
         label: const Tx('Nuevo personaje'),
       ),
-      body: StreamBuilder<List<Character>>(
+      body: SafeArea(top: false, child: StreamBuilder<List<Character>>(
         stream: service.myCharacters(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -144,7 +144,7 @@ class CharactersScreen extends StatelessWidget {
             ),
           );
         },
-      ),
+      )),
     );
   }
 

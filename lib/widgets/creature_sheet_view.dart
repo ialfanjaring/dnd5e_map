@@ -16,7 +16,7 @@ class CreatureSheetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title ?? creature.name)),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: SingleChildScrollView(
@@ -24,7 +24,7 @@ class CreatureSheetScreen extends StatelessWidget {
             child: CreatureSheetView(creature: creature),
           ),
         ),
-      ),
+      )),
     );
   }
 }

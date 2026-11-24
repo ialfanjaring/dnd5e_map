@@ -37,6 +37,7 @@ class AuthService {
   static const String _tokenProxyUrl = 'https://dnd5e-google-token.dnd5emap.workers.dev';
   static const int _redirectPort = 61797;
 
+
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -134,7 +135,12 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return false;
     await user.reload();
-    return _auth.currentUser?.emailVerified ?? false;
+    final ok = _auth.currentUser?.emailVerified ?? false;
+    // El token de acceso guarda «email_verified» del momento en que se emitió.
+    // Sin renovarlo, Firestore sigue viendo la cuenta como no verificada
+    // (permission-denied) hasta que caduca, en hasta una hora.
+    if (ok) await _auth.currentUser?.getIdToken(true);
+    return ok;
   }
 
   Future<void> resendVerification() async {

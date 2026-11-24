@@ -44,7 +44,7 @@ class _RacesScreenState extends State<RacesScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<List<ApiRef>>(
+      body: SafeArea(top: false, child: FutureBuilder<List<ApiRef>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -87,7 +87,7 @@ class _RacesScreenState extends State<RacesScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -127,7 +127,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<ApiRace>(
+      body: SafeArea(top: false, child: FutureBuilder<ApiRace>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -166,7 +166,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             ),
           );
         },
-      ),
+      )),
     );
   }
 

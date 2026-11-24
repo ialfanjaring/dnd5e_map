@@ -45,7 +45,7 @@ class MasterRoomScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
+      body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: ListView(
@@ -276,7 +276,7 @@ class MasterRoomScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 

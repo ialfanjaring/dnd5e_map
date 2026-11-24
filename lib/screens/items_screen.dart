@@ -4,6 +4,7 @@ import '../services/custom_item_service.dart';
 import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import '../services/translation_service.dart';
+import '../settings/app_settings.dart';
 import '../widgets/item_widgets.dart';
 import 'item_form_screen.dart';
 import 'spell_browser_screen.dart';
@@ -322,13 +323,20 @@ class _ItemsScreenState extends State<ItemsScreen> {
     if (it == null) return '';
     final parts = <String>[];
     if (it.damageDice.isNotEmpty) {
-      parts.add('${it.damageDice} ${it.damageType}'.trim());
+      parts.add('${it.damageDice} ${AppSettings.instance.lang == 'es' ? (EquipmentApiService.damageTypes[it.damageType] ?? it.damageType) : it.damageType}'
+          .trim());
     }
     if (it.acBase != null) parts.add('CA ${it.acBase}');
-    if (it.weaponCategory.isNotEmpty) parts.add(it.weaponCategory);
-    if (it.armorCategory.isNotEmpty) parts.add(it.armorCategory);
-    if (it.cost.isNotEmpty) parts.add(it.cost);
-    if (parts.isEmpty && it.category.isNotEmpty) parts.add(it.category);
+    if (it.weaponCategory.isNotEmpty) {
+      parts.add(EquipmentApiService.term(it.weaponCategory));
+    }
+    if (it.armorCategory.isNotEmpty) {
+      parts.add(EquipmentApiService.term(it.armorCategory));
+    }
+    if (it.cost.isNotEmpty) parts.add(EquipmentApiService.cost(it.cost));
+    if (parts.isEmpty && it.category.isNotEmpty) {
+      parts.add(EquipmentApiService.term(it.category));
+    }
     return parts.join(' · ');
   }
 
@@ -514,10 +522,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
       }
       if (it == null) return '…';
       if (it.weaponCategory.isNotEmpty) {
-        return '${it.weaponCategory} · ${it.weaponRange}';
+        return '${EquipmentApiService.term(it.weaponCategory)} · '
+            '${EquipmentApiService.term(it.weaponRange)}';
       }
-      if (it.armorCategory.isNotEmpty) return it.armorCategory;
-      return it.category.isEmpty ? '' : it.category;
+      if (it.armorCategory.isNotEmpty) {
+        return EquipmentApiService.term(it.armorCategory);
+      }
+      return it.category.isEmpty ? '' : EquipmentApiService.term(it.category);
     }
 
     if (_sort == 'group') {
@@ -706,7 +717,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
               label: const Tx('Crear objeto'),
             )
           : null,
-      body: Column(
+      body: SafeArea(top: false, child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
@@ -851,7 +862,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

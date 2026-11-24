@@ -2,6 +2,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../settings/app_settings.dart';
+import 'translation_service.dart';
+
 /// Referencia mínima a un objeto de la API (índice + nombre).
 /// Los objetos mágicos llevan el prefijo "m:" en su índice (ver [ApiItem.magicPrefix]).
 class ApiItemRef {
@@ -124,6 +127,11 @@ class ApiItem {
   /// Ranura en la que se puede tener activo: 'weapon', 'armor', 'shield' o ''.
   /// Los objetos mágicos de la API entran por su categoría, aunque no traigan
   /// estadísticas.
+  /// Nombre para mostrar: en español si hay traducción (nunca para objetos
+  /// propios del usuario, que se muestran tal como los escribió).
+  String get displayName =>
+      isCustom ? name : (SrdEs.item(name, 'n') ?? name);
+
   String get slot {
     if (isWeapon) return 'weapon';
     if (isShield) return 'shield';
@@ -380,6 +388,69 @@ class EquipmentApiService {
   }
 
   // ---------- Traducciones de términos frecuentes ----------
+
+  static bool get _es => AppSettings.instance.lang == 'es';
+
+  static const Map<String, String> _termsEs = {
+    // Armaduras
+    'Light': 'Ligera',
+    'Medium': 'Media',
+    'Heavy': 'Pesada',
+    'Shield': 'Escudo',
+    // Armas
+    'Simple': 'Sencilla',
+    'Martial': 'Marcial',
+    'Melee': 'Cuerpo a cuerpo',
+    'Ranged': 'A distancia',
+    // Categorías de equipo
+    'Adventuring Gear': 'Equipo de aventurero',
+    'Armor': 'Armadura',
+    'Weapon': 'Arma',
+    'Tools': 'Herramientas',
+    'Mounts and Vehicles': 'Monturas y vehículos',
+    'Ammunition': 'Munición',
+    'Arcane Foci': 'Focos arcanos',
+    'Druidic Foci': 'Focos druídicos',
+    'Holy Symbols': 'Símbolos sagrados',
+    'Equipment Packs': 'Paquetes de equipo',
+    'Standard Gear': 'Equipo estándar',
+    'Kits': 'Kits',
+    "Artisan's Tools": 'Herramientas de artesano',
+    'Gaming Sets': 'Juegos',
+    'Musical Instruments': 'Instrumentos musicales',
+    'Other Tools': 'Otras herramientas',
+    'Mounts and Other Animals': 'Monturas y otros animales',
+    'Tack, Harness, and Drawn Vehicles':
+        'Arreos, arneses y vehículos de tiro',
+    'Waterborne Vehicles': 'Vehículos acuáticos',
+    'Potion': 'Poción',
+    'Ring': 'Anillo',
+    'Rod': 'Cetro',
+    'Scroll': 'Pergamino',
+    'Staff': 'Bastón',
+    'Wand': 'Varita',
+    'Wondrous Items': 'Objetos maravillosos',
+  };
+
+  /// Traduce una categoría o tipo de objeto de la API (armadura ligera, arma
+  /// marcial, cuerpo a cuerpo…). Devuelve el original en inglés o si no se
+  /// conoce.
+  static String term(String en) => _es ? (_termsEs[en] ?? en) : en;
+
+  static const Map<String, String> _coinsEs = {
+    'cp': 'pc',
+    'sp': 'pp',
+    'ep': 'pe',
+    'gp': 'po',
+    'pp': 'ppt',
+  };
+
+  /// Precio en la moneda del idioma: «5 gp» -> «5 po».
+  static String cost(String en) {
+    if (!_es || en.isEmpty) return en;
+    final m = RegExp(r'^(.*?)\s*\b(cp|sp|ep|gp|pp)$').firstMatch(en.trim());
+    return m == null ? en : '${m[1]} ${_coinsEs[m[2]]}';
+  }
 
   static const Map<String, String> damageTypes = {
     'Slashing': 'cortante',

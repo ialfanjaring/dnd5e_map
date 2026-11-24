@@ -160,7 +160,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
           ],
         ),
       ),
-      body: StreamBuilder<List<Creature>>(
+      body: SafeArea(top: false, child: StreamBuilder<List<Creature>>(
         stream: _creatureService.myCreatures(),
         builder: (context, mineSnap) {
           final mine = mineSnap.data ?? const <Creature>[];
@@ -307,7 +307,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
             ],
           );
         },
-      ),
+      )),
     );
   }
 

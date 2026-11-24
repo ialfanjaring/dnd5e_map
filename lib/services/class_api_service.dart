@@ -450,7 +450,11 @@ class ApiSpell {
   factory ApiSpell.fromJson(Map<String, dynamic> m) {
     final schoolName = ((m['school'] as Map?)?['name'] ?? '').toString();
     final comps = ((m['components'] as List?) ?? const []).join(', ');
-    final material = (m['material'] ?? '').toString();
+    final enMaterial = (m['material'] ?? '').toString();
+    final material = enMaterial.isEmpty
+        ? ''
+        : (SrdEs.get('spells', (m['name'] ?? '').toString(), 'm') ??
+            enMaterial);
 
     List<String> strings(dynamic v) =>
         v is List ? v.map((e) => e.toString()).toList() : const [];
