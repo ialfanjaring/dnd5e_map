@@ -134,7 +134,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cargar "${m.name}": $e')),
+        SnackBar(content: Text('${tr('No se pudo cargar')} "${m.name}": $e')),
       );
     } finally {
       if (mounted) setState(() => _previewing = null);
@@ -154,8 +154,8 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Mi bestiario'),
+          tabs: [
+            Tab(text: tr('Mi bestiario')),
             Tab(text: 'API (SRD)'),
           ],
         ),
@@ -299,7 +299,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                               );
                             },
                       icon: const Icon(Icons.check),
-                      label: Text('Añadir a la partida ($_total)'),
+                      label: Text('${tr('Añadir a la partida')} ($_total)'),
                     ),
                   ),
                 ),

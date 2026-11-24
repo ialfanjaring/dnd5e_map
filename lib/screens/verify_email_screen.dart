@@ -143,8 +143,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                     icon: const Icon(Icons.send_outlined),
                     label: Text(
                       _cooldown > 0
-                          ? 'Reenviar correo ($_cooldown s)'
-                          : 'Reenviar correo',
+                          ? '${tr('Reenviar correo')} ($_cooldown s)'
+                          : tr('Reenviar correo'),
                     ),
                   ),
                 ),

@@ -229,7 +229,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(
-                    label: Text(level == 0 ? 'Trucos' : 'Nv. $level'),
+                    label: Text(level == 0 ? tr('Trucos') : '${tr('Nv.')} $level'),
                     selected: _levelFilter == level,
                     onSelected: (_) => setState(() => _levelFilter = level),
                   ),
@@ -241,7 +241,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            title: Text('Solo hasta nivel $maxLevel (los que puedes lanzar)'),
+            title: Text(tr('Solo hasta nivel {n} (los que puedes lanzar)').replaceAll('{n}', '$maxLevel')),
             value: _onlyCastable,
             onChanged: (v) => setState(() => _onlyCastable = v),
           ),
@@ -301,7 +301,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                       Navigator.pop(context, result);
                     },
                     icon: const Icon(Icons.check),
-                    label: Text('Guardar selección (${_selected.length})'),
+                    label: Text('${tr('Guardar selección')} (${_selected.length})'),
                   ),
                 ),
               ),
@@ -324,7 +324,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
           'consultan siempre en la API; solo se guarda la lista.',
         ),
         const SizedBox(height: 4),
-        Text('Elegidos: $cantrips trucos, $spells conjuros'),
+        Text(tr('Elegidos: {c} trucos, {s} conjuros').replaceAll('{c}', '$cantrips').replaceAll('{s}', '$spells')),
       ];
     }
 
@@ -332,10 +332,10 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
     final lines = <String>[];
 
     if (l?.cantripsKnown != null) {
-      lines.add('Trucos conocidos: ${l!.cantripsKnown}  (elegidos: $cantrips)');
+      lines.add('${tr('Trucos conocidos')}: ${l!.cantripsKnown}  (${tr('elegidos')}: $cantrips)');
     }
     if (l?.spellsKnown != null) {
-      lines.add('Conjuros conocidos: ${l!.spellsKnown}  (elegidos: $spells)');
+      lines.add('${tr('Conjuros conocidos')}: ${l!.spellsKnown}  (${tr('elegidos')}: $spells)');
     }
     if (l != null && l.slots.isNotEmpty) {
       lines.add(
@@ -358,7 +358,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
 
     return [
       Text(
-        'Nivel ${widget.characterLevel}',
+        '${tr('Nivel')} ${widget.characterLevel}',
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       for (final line in lines) Text(line),

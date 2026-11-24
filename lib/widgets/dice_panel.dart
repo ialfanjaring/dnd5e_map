@@ -64,8 +64,8 @@ class _DicePanelState extends State<DicePanel> {
   /// daño de hielo…) con su modificador cada uno.
   bool _compose = false;
   final List<_GroupDraft> _drafts = [
-    _GroupDraft(die: 'd20', label: 'Ataque'),
-    _GroupDraft(die: 'd8', label: 'Cortante'),
+    _GroupDraft(die: 'd20', label: tr('Ataque')),
+    _GroupDraft(die: 'd8', label: tr('Cortante')),
   ];
   final _titleCtl = TextEditingController();
 
@@ -138,9 +138,9 @@ class _DicePanelState extends State<DicePanel> {
       // La ven quien la hace y el Master
       try {
         await _service.postHiddenRoll(widget.gameCode, roll);
-        _snack('Tirada oculta · ${roll.label}: ${roll.resultText}');
+        _snack('${tr('Tirada oculta')} · ${roll.label}: ${roll.resultText}');
       } catch (e) {
-        _snack('No se pudo guardar la tirada oculta: $e');
+        _snack('${tr('No se pudo guardar la tirada oculta')}: $e');
       }
       return;
     }
@@ -149,7 +149,7 @@ class _DicePanelState extends State<DicePanel> {
     try {
       await _service.postRoll(widget.gameCode, roll);
     } catch (e) {
-      _snack('No se pudo publicar la tirada: $e');
+      _snack('${tr('No se pudo publicar la tirada')}: $e');
     } finally {
       if (mounted) setState(() => _rolling = false);
     }
@@ -186,7 +186,7 @@ class _DicePanelState extends State<DicePanel> {
               onPressed: _drafts.length >= 6
                   ? null
                   : () => setState(
-                      () => _drafts.add(_GroupDraft(die: 'd6', label: 'Hielo'))),
+                      () => _drafts.add(_GroupDraft(die: 'd6', label: tr('Hielo')))),
               icon: const Icon(Icons.add, size: 18),
               label: Text(tr('Añadir grupo de dados')),
             ),
@@ -398,9 +398,9 @@ class _DicePanelState extends State<DicePanel> {
           child: Row(
             children: [
               for (final (m, label, icon, color) in [
-                ('normal', 'Normal', Icons.casino_outlined, Colors.grey),
-                ('adv', 'Ventaja', Icons.keyboard_double_arrow_up, Colors.green),
-                ('dis', 'Desventaja', Icons.keyboard_double_arrow_down, Colors.red),
+                ('normal', tr('Normal'), Icons.casino_outlined, Colors.grey),
+                ('adv', tr('Ventaja'), Icons.keyboard_double_arrow_up, Colors.green),
+                ('dis', tr('Desventaja'), Icons.keyboard_double_arrow_down, Colors.red),
               ])
                 Expanded(
                   child: Padding(
@@ -436,12 +436,12 @@ class _DicePanelState extends State<DicePanel> {
               icon: AppIcon(_hidden ? 'ojo' : 'd20_vacio', size: 22),
               label: Text(
                 _compose
-                    ? 'Tirar combinada${_hidden ? ' (oculta)' : ''}'
-                    : 'Tirar ${_count > 1 ? '$_count × ' : ''}'
+                    ? '${tr('Tirar combinada')}${_hidden ? ' (${tr('oculta')})' : ''}'
+                    : '${tr('Tirar')} ${_count > 1 ? '$_count × ' : ''}'
                 '${DiceRoll.dieName(_die)}'
-                '${!_compose && _canMode && _mode == 'adv' ? ' con ventaja' : ''}'
-                '${!_compose && _canMode && _mode == 'dis' ? ' con desventaja' : ''}'
-                '${!_compose && _hidden ? ' (oculta)' : ''}',
+                '${!_compose && _canMode && _mode == 'adv' ? ' ${tr('con ventaja')}' : ''}'
+                '${!_compose && _canMode && _mode == 'dis' ? ' ${tr('con desventaja')}' : ''}'
+                '${!_compose && _hidden ? ' (${tr('oculta')})' : ''}',
               ),
             ),
           ),
@@ -450,8 +450,8 @@ class _DicePanelState extends State<DicePanel> {
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
           child: Text(
             _hidden
-                ? 'La verás tú y el Master.'
-                : 'El resultado se publica en el registro para todos.',
+                ? tr('La verás tú y el Master.')
+                : tr('El resultado se publica en el registro para todos.'),
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
         ),

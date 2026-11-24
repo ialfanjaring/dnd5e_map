@@ -186,28 +186,28 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (r.speed != null) _kv('Velocidad', '${r.speed} ${tr('pies')}'),
-                if (r.size.isNotEmpty) _kv('Tamaño', r.size),
-                _kv('Bonificadores', bonuses.isEmpty ? '—' : bonuses),
+                if (r.speed != null) _kv(tr('Velocidad'), '${r.speed} ${tr('pies')}'),
+                if (r.size.isNotEmpty) _kv(tr('Tamaño'), r.size),
+                _kv(tr('Bonificadores'), bonuses.isEmpty ? '—' : bonuses),
                 if (r.languages.isNotEmpty)
-                  _kv('Idiomas', r.languages.join(', ')),
+                  _kv(tr('Idiomas'), r.languages.join(', ')),
                 if (r.proficiencies.isNotEmpty)
-                  _kv('Competencias', r.proficiencies.join(', ')),
+                  _kv(tr('Competencias'), r.proficiencies.join(', ')),
               ],
             ),
           ),
         ),
         if (widget.subraceIndex != null && widget.subraceIndex!.isNotEmpty)
           _chosenSubrace(widget.subraceIndex!),
-        if (r.age.isNotEmpty) _expandable('Edad', r.age),
-        if (r.alignment.isNotEmpty) _expandable('Alineamiento', r.alignment),
+        if (r.age.isNotEmpty) _expandable(tr('Edad'), r.age),
+        if (r.alignment.isNotEmpty) _expandable(tr('Alineamiento'), r.alignment),
         if (r.sizeDescription.isNotEmpty)
-          _expandable('Tamaño', r.sizeDescription),
+          _expandable(tr('Tamaño'), r.sizeDescription),
         if (r.languageDescription.isNotEmpty)
-          _expandable('Idiomas', r.languageDescription),
+          _expandable(tr('Idiomas'), r.languageDescription),
         if (r.traits.isNotEmpty)
           _section(
-            'Rasgos raciales (toca para leerlos)',
+            tr('Rasgos raciales (toca para leerlos)'),
             Wrap(
               spacing: 6,
               children: [
@@ -225,7 +225,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
           ),
         if (r.subraces.isNotEmpty)
           _section(
-            'Subrazas',
+            tr('Subrazas'),
             Column(
               children: [
                 for (final s in r.subraces)
@@ -301,7 +301,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
                 ),
                 if (bonuses.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _kv('Bonificadores', bonuses),
+                  _kv(tr('Bonificadores'), bonuses),
                 ],
                 if (sub.description.isNotEmpty) ...[
                   const SizedBox(height: 6),

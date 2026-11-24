@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../security/password_policy.dart';
+import '../i18n/i18n.dart';
 
 /// Campo de contraseña.
 ///
@@ -44,11 +45,11 @@ class _PasswordFieldState extends State<PasswordField> {
   String? _validate(String? value) {
     final v = value ?? '';
 
-    if (v.isEmpty) return 'Introduce la contraseña';
+    if (v.isEmpty) return tr('Introduce la contraseña');
 
     if (widget.enforcePolicy &&
         !PasswordPolicy.isValid(v, email: widget.emailProvider?.call())) {
-      return 'La contraseña no cumple todos los requisitos';
+      return tr('La contraseña no cumple todos los requisitos');
     }
     return null;
   }
@@ -88,7 +89,7 @@ class _PasswordFieldState extends State<PasswordField> {
             border: const OutlineInputBorder(),
             counterText: '',
             suffixIcon: IconButton(
-              tooltip: _obscure ? 'Mostrar contraseña' : 'Ocultar contraseña',
+              tooltip: _obscure ? tr('Mostrar contraseña') : tr('Ocultar contraseña'),
               icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),

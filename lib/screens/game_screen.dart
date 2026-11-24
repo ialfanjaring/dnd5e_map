@@ -126,8 +126,8 @@ class _GameScreenState extends State<GameScreen>
       : (_playerOf(_uid)?.color ?? GameColors.palette.first);
 
   String get _myName => widget.isMaster
-      ? 'Master'
-      : (_playerOf(_uid)?.character.name ?? 'Jugador');
+      ? tr('Master')
+      : (_playerOf(_uid)?.character.name ?? tr('Jugador'));
 
   GameToken? get _selected {
     for (final t in _tokens) {
@@ -395,12 +395,12 @@ class _GameScreenState extends State<GameScreen>
     try {
       await runBlocking(
         context,
-        'Reiniciando la sala…',
+        tr('Reiniciando la sala…'),
         () => _service.resetRoom(_code),
       );
       // La propia suscripción al estado nos devuelve a la sala
     } catch (e) {
-      _snack('No se pudo reiniciar la sala: $e');
+      _snack('${tr('No se pudo reiniciar la sala')}: $e');
     }
   }
 
@@ -436,7 +436,7 @@ class _GameScreenState extends State<GameScreen>
     try {
       await runBlocking(
         context,
-        'Terminando la sesión…',
+        tr('Terminando la sesión…'),
         () => _service.endGame(_code),
       );
       navigator.popUntil((r) => r.isFirst);
@@ -445,7 +445,7 @@ class _GameScreenState extends State<GameScreen>
       );
     } catch (e) {
       _ended = false;
-      _snack('No se pudo terminar la sesión: $e');
+      _snack('${tr('No se pudo terminar la sesión')}: $e');
     }
   }
 
@@ -760,7 +760,7 @@ class _GameScreenState extends State<GameScreen>
         ),
     ];
     if (candidates.isEmpty) {
-      _snack('Todavía no hay fichas en la partida.');
+      _snack(tr('Todavía no hay fichas en la partida.'));
       return;
     }
 
@@ -834,7 +834,7 @@ class _GameScreenState extends State<GameScreen>
       await _service.startInitiativePhase(_code, entries);
       _openInitiative();
     } catch (e) {
-      _snack('No se pudo preparar el combate: $e');
+      _snack('${tr('No se pudo preparar el combate')}: $e');
     }
   }
 
@@ -922,7 +922,7 @@ class _GameScreenState extends State<GameScreen>
     try {
       await _service.setTurn(_code, n.id, n.round);
     } catch (e) {
-      _snack('No se pudo pasar el turno: $e');
+      _snack('${tr('No se pudo pasar el turno')}: $e');
     }
   }
 
@@ -937,7 +937,7 @@ class _GameScreenState extends State<GameScreen>
     if (st.rolling) {
       final iRoll = st.entries.any((e) => e.id == 'p_$_uid' && !e.rolled);
       bg = iRoll ? Colors.amber.shade300 : Colors.blueGrey.shade100;
-      text = iRoll ? '¡Tira tu iniciativa!' : 'Tiradas de iniciativa';
+      text = iRoll ? tr('¡Tira tu iniciativa!') : tr('Tiradas de iniciativa');
     } else {
       final cur = st.currentEntry;
       final mine = st.current == 'p_$_uid';
@@ -947,8 +947,8 @@ class _GameScreenState extends State<GameScreen>
                   cur.members.any(_visibleIds.value.contains)));
       bg = mine ? Colors.green.shade300 : Colors.blueGrey.shade100;
       text = mine
-          ? '¡Tu turno!'
-          : 'Turno: ${cur == null ? '—' : (visible ? cur.name : 'Algo en las sombras…')}';
+          ? tr('¡Tu turno!')
+          : '${tr('Turno')}: ${cur == null ? '—' : (visible ? cur.name : tr('Algo en las sombras…'))}';
     }
 
     return Material(
@@ -1001,7 +1001,7 @@ class _GameScreenState extends State<GameScreen>
             onPressed: () {
               Clipboard.setData(ClipboardData(text: _code));
               Navigator.pop(ctx);
-              _snack('Código copiado');
+              _snack(tr('Código copiado'));
             },
             child: const Tx('Copiar'),
           ),
@@ -1092,9 +1092,16 @@ class _GameScreenState extends State<GameScreen>
     final onLink = dests.isNotEmpty;
 
     final text = sel.hidden
-        ? '¿Colocar a ${_nameOf(sel)} en la casilla (${nx + 1}, ${ny + 1})?'
-        : '¿Mover a ${_nameOf(sel)} de (${sel.x + 1}, ${sel.y + 1}) '
-            'a (${nx + 1}, ${ny + 1})?';
+        ? tr('¿Colocar a {n} en la casilla ({x}, {y})?')
+            .replaceAll('{n}', _nameOf(sel))
+            .replaceAll('{x}', '${nx + 1}')
+            .replaceAll('{y}', '${ny + 1}')
+        : tr('¿Mover a {n} de ({a}, {b}) a ({x}, {y})?')
+            .replaceAll('{n}', _nameOf(sel))
+            .replaceAll('{a}', '${sel.x + 1}')
+            .replaceAll('{b}', '${sel.y + 1}')
+            .replaceAll('{x}', '${nx + 1}')
+            .replaceAll('{y}', '${ny + 1}');
 
     // Punto en la casilla elegida mientras se confirma
     setState(() => _marker = (x: nx, y: ny, span: sel.span));
@@ -1103,7 +1110,7 @@ class _GameScreenState extends State<GameScreen>
     final target = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(sel.hidden ? 'Colocar ficha' : 'Mover ficha'),
+        title: Text(sel.hidden ? tr('Colocar ficha') : tr('Mover ficha')),
         content: Text(
           onLink
               ? '$text\n\n${tr('Hay una escalera: puedes cambiar de piso.')}'
@@ -1206,7 +1213,7 @@ class _GameScreenState extends State<GameScreen>
     try {
       final gc = await _service.getGameCreature(_code, t.id);
       if (gc == null) {
-        _snack('Esa criatura ya no está en la partida.');
+        _snack(tr('Esa criatura ya no está en la partida.'));
         return;
       }
 
@@ -1222,7 +1229,7 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
     } catch (e) {
-      _snack('No se pudo abrir la ficha: $e');
+      _snack('${tr('No se pudo abrir la ficha')}: $e');
     }
   }
 
@@ -1237,8 +1244,8 @@ class _GameScreenState extends State<GameScreen>
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Vacío = nombre original',
+          decoration: InputDecoration(
+            hintText: tr('Vacío = nombre original'),
             border: OutlineInputBorder(),
           ),
         ),
@@ -1264,7 +1271,7 @@ class _GameScreenState extends State<GameScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Tx('Quitar de la partida'),
-        content: Text('¿Quitar "${_nameOf(t)}" de la partida y del mapa?'),
+        content: Text(tr('¿Quitar "{n}" de la partida y del mapa?').replaceAll('{n}', _nameOf(t))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1386,7 +1393,7 @@ class _GameScreenState extends State<GameScreen>
           : AppBar(
         backgroundColor: tint?.withOpacity(0.55),
         title: Text(
-          (_game['name'] ?? 'Partida').toString(),
+          (_game['name'] ?? tr('Partida')).toString(),
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -1486,7 +1493,7 @@ class _GameScreenState extends State<GameScreen>
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Problema con la partida: $_error\n'
+                                  '${tr('Problema con la partida')}: $_error\n'
                                   'Si es un error de permisos, publica las '
                                   'reglas de Firestore más recientes.',
                                   style: const TextStyle(fontSize: 12),
@@ -2053,8 +2060,8 @@ class _GameScreenState extends State<GameScreen>
             if (widget.isMaster && !t.isPlayer) ...[
               IconButton(
                 tooltip: t.hidden
-                    ? 'Colocar en el mapa'
-                    : 'Sacar del mapa (oculta a los jugadores)',
+                    ? tr('Colocar en el mapa')
+                    : tr('Sacar del mapa (oculta a los jugadores)'),
                 icon: Icon(t.hidden ? Icons.login : Icons.logout),
                 onPressed: () => (t.hidden
                         ? _service.placeTokenOnMap(_code, t.id, floor: _floor)
@@ -2070,7 +2077,7 @@ class _GameScreenState extends State<GameScreen>
                   for (final v in const [1, 2, 3, 4])
                     PopupMenuItem(
                       value: v,
-                      child: Text(v == 1 ? 'Normal (1×1)' : '$v×$v casillas'),
+                      child: Text(v == 1 ? tr('Normal (1×1)') : '$v×$v ${tr('casillas')}'),
                     ),
                 ],
               ),
@@ -2194,12 +2201,12 @@ class _GameScreenState extends State<GameScreen>
   /// para el Master, criaturas y fichas fuera del mapa.
   Widget _buildRightPanel() {
     final tabs = <Tab>[
-      const Tab(text: 'Dados'),
-      const Tab(text: 'Iniciativa'),
-      Tab(text: widget.isMaster ? 'Jugadores' : 'Mi ficha'),
-      if (widget.isMaster) const Tab(text: 'Objetos'),
-      const Tab(text: 'Libro'),
-      if (widget.isMaster) const Tab(text: 'Criaturas'),
+      Tab(text: tr('Dados')),
+      Tab(text: tr('Iniciativa')),
+      Tab(text: widget.isMaster ? tr('Jugadores') : tr('Mi ficha')),
+      if (widget.isMaster) Tab(text: tr('Objetos')),
+      Tab(text: tr('Libro')),
+      if (widget.isMaster) Tab(text: tr('Criaturas')),
     ];
 
     return Column(
@@ -2286,9 +2293,9 @@ class _GridSizeDialogState extends State<_GridSizeDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _field('Columnas', _colsCtrl),
+            _field(tr('Columnas'), _colsCtrl),
             const SizedBox(height: 12),
-            _field('Filas', _rowsCtrl),
+            _field(tr('Filas'), _rowsCtrl),
             const SizedBox(height: 8),
             const Text(
               'Entre $_min y $_max. Las fichas que queden fuera se acercarán '

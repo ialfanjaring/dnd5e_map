@@ -58,7 +58,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cargar "${m.name}": $e')),
+        SnackBar(content: Text('${tr('No se pudo cargar')} "${m.name}": $e')),
       );
     } finally {
       if (mounted) setState(() => _loadingIndex = null);
@@ -171,7 +171,7 @@ class _DefaultMonstersViewState extends State<DefaultMonstersView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'No se pudo conectar con la API.\n'
+                              tr('No se pudo conectar con la API.\n')
                               '${snapshot.error}',
                               textAlign: TextAlign.center,
                             ),

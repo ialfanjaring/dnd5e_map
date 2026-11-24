@@ -66,7 +66,7 @@ class InitiativePanel extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+            .showSnackBar(SnackBar(content: Text('${tr('No se pudo guardar')}: $e')));
       }
     }
   }
@@ -81,7 +81,7 @@ class InitiativePanel extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: Text('Iniciativa de ${e.name}'),
+        title: Text('${tr('Iniciativa de')} ${e.name}'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -90,8 +90,8 @@ class InitiativePanel extends StatelessWidget {
             FilteringTextInputFormatter.allow(RegExp(r'[0-9-]')),
             LengthLimitingTextInputFormatter(4),
           ],
-          decoration: const InputDecoration(
-            labelText: 'Resultado final',
+          decoration: InputDecoration(
+            labelText: tr('Resultado final'),
             border: OutlineInputBorder(),
           ),
         ),
@@ -288,8 +288,8 @@ class InitiativePanel extends StatelessWidget {
                               avatar: const Icon(Icons.person_add_alt, size: 18),
                               label: Text(
                                 missing(st).isEmpty
-                                    ? 'No faltan fichas'
-                                    : 'Añadir ficha (${missing(st).length})',
+                                    ? tr('No faltan fichas')
+                                    : '${tr('Añadir ficha')} (${missing(st).length})',
                               ),
                             ),
                           ),

@@ -55,7 +55,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cambiar los PG: $e')),
+        SnackBar(content: Text('${tr('No se pudo cambiar los PG')}: $e')),
       );
     }
   }
@@ -87,7 +87,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudieron añadir los objetos: $e')),
+        SnackBar(content: Text('${tr('No se pudieron añadir los objetos')}: $e')),
       );
     }
   }
@@ -196,8 +196,8 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             stat('CA', '${c.effectiveAc}'),
-                            stat('Iniciativa', Character.signed(c.initiative)),
-                            stat('Velocidad', '${c.effectiveSpeed} pies'),
+                            stat(tr('Iniciativa'), Character.signed(c.initiative)),
+                            stat(tr('Velocidad'), '${c.effectiveSpeed} pies'),
                           ],
                         );
                       },

@@ -268,7 +268,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   void _suggestHp() {
     final die = _classInfo?.hitDie ?? DndData.classHitDie[_class];
     if (die == null) {
-      _snack('Elige primero una clase para calcular los puntos de golpe.');
+      _snack(tr('Elige primero una clase para calcular los puntos de golpe.'));
       return;
     }
     final conMod = Character.modifier(_total('con'));
@@ -324,7 +324,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      _snack('No se pudo guardar el personaje: $e');
+      _snack('${tr('No se pudo guardar el personaje')}: $e');
     }
   }
 
@@ -334,7 +334,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar personaje' : 'Nuevo personaje'),
+        title: Text(_isEditing ? tr('Editar personaje') : tr('Nuevo personaje')),
       ),
       body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
@@ -344,13 +344,13 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _section('Identidad', _buildIdentity()),
-                _section('Características', _buildAbilities()),
-                _section('Combate', _buildCombat()),
-                _section('Tiradas de salvación', _buildSaves()),
-                _section('Habilidades', _buildSkills()),
-                if (_isCaster) _section('Hechizos', _buildSpells()),
-                _section('Equipo', _buildEquipment()),
+                _section(tr('Identidad'), _buildIdentity()),
+                _section(tr('Características'), _buildAbilities()),
+                _section(tr('Combate'), _buildCombat()),
+                _section(tr('Tiradas de salvación'), _buildSaves()),
+                _section(tr('Habilidades'), _buildSkills()),
+                if (_isCaster) _section(tr('Hechizos'), _buildSpells()),
+                _section(tr('Equipo'), _buildEquipment()),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 50,
@@ -364,7 +364,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
                           )
                         : const Icon(Icons.save),
                     label: Text(
-                      _isEditing ? 'Guardar cambios' : 'Crear personaje',
+                      _isEditing ? tr('Guardar cambios') : tr('Crear personaje'),
                     ),
                   ),
                 ),
@@ -402,20 +402,20 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       children: [
         TextFormField(
           controller: _nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Nombre del personaje',
+          decoration: InputDecoration(
+            labelText: tr('Nombre del personaje'),
             border: OutlineInputBorder(),
           ),
           validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Introduce un nombre' : null,
+              (v == null || v.trim().isEmpty) ? tr('Introduce un nombre') : null,
         ),
         const SizedBox(height: 12),
         _apiDropdown(
-          label: 'Raza',
+          label: tr('Raza'),
           future: _racesFuture,
           value: _race,
           nameOf: DndData.raceName,
-          errorText: 'Elige una raza',
+          errorText: tr('Elige una raza'),
           onChanged: (v) {
             setState(() {
               _race = v;
@@ -430,11 +430,11 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         _raceExtras(),
         const SizedBox(height: 12),
         _apiDropdown(
-          label: 'Clase',
+          label: tr('Clase'),
           future: _classesFuture,
           value: _class,
           nameOf: DndData.className,
-          errorText: 'Elige una clase',
+          errorText: tr('Elige una clase'),
           onChanged: (v) {
             setState(() {
               // Los hechizos elegidos pertenecen a la clase anterior
@@ -471,17 +471,17 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         const SizedBox(height: 4),
         TextFormField(
           controller: _backgroundCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Trasfondo',
-            hintText: 'Ej. Soldado, Acólito, Criminal...',
+          decoration: InputDecoration(
+            labelText: tr('Trasfondo'),
+            hintText: tr('Ej. Soldado, Acólito, Criminal...'),
             border: OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           value: _alignment,
-          decoration: const InputDecoration(
-            labelText: 'Alineamiento',
+          decoration: InputDecoration(
+            labelText: tr('Alineamiento'),
             border: OutlineInputBorder(),
           ),
           items: [
@@ -530,16 +530,16 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _numberField(_acCtrl, 'Clase de armadura')),
+            Expanded(child: _numberField(_acCtrl, tr('Clase de armadura'))),
             const SizedBox(width: 12),
-            Expanded(child: _numberField(_speedCtrl, 'Velocidad (pies)')),
+            Expanded(child: _numberField(_speedCtrl, tr('Velocidad (pies)'))),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _numberField(_hpCtrl, 'Puntos de golpe máx.')),
+            Expanded(child: _numberField(_hpCtrl, tr('Puntos de golpe máx.'))),
             const SizedBox(width: 12),
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -583,7 +583,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         border: const OutlineInputBorder(),
       ),
       validator: (v) =>
-          int.tryParse(v ?? '') == null ? 'Número no válido' : null,
+          int.tryParse(v ?? '') == null ? tr('Número no válido') : null,
     );
   }
 
@@ -709,8 +709,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
             value: info.subraces.any((r) => r.index == _subrace)
                 ? _subrace
                 : null,
-            decoration: const InputDecoration(
-              labelText: 'Subraza (opcional)',
+            decoration: InputDecoration(
+              labelText: tr('Subraza (opcional)'),
               border: OutlineInputBorder(),
             ),
             items: [
@@ -754,7 +754,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               ),
             ),
             icon: const Icon(Icons.menu_book_outlined),
-            label: Text('Ver raza: ${DndData.raceName(race)}'),
+            label: Text('${tr('Ver raza')}: ${DndData.raceName(race)}'),
           ),
         ),
       ],
@@ -778,7 +778,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ),
         ),
         icon: const Icon(Icons.menu_book_outlined),
-        label: Text('Ver clase: ${DndData.className(cls)}'),
+        label: Text('${tr('Ver clase')}: ${DndData.className(cls)}'),
       ),
     );
   }
@@ -788,7 +788,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => SpellPickerScreen(
-          title: 'Hechizos de ${DndData.className(_class!)}',
+          title: '${tr('Hechizos de')} ${DndData.className(_class!)}',
           classIndex: _class!,
           characterLevel: _level,
           initial: _spells,
@@ -820,7 +820,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           onPressed: _pickSpells,
           icon: const Icon(Icons.auto_fix_high),
           label: Text(
-            _spells.isEmpty ? 'Elegir hechizos' : 'Editar hechizos',
+            _spells.isEmpty ? tr('Elegir hechizos') : tr('Editar hechizos'),
           ),
         ),
         const SizedBox(height: 6),
@@ -908,8 +908,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         TextFormField(
           controller: _equipmentCtrl,
           maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Equipo y objetos',
+          decoration: InputDecoration(
+            labelText: tr('Equipo y objetos'),
             alignLabelWithHint: true,
             border: OutlineInputBorder(),
           ),
@@ -918,8 +918,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
         TextFormField(
           controller: _notesCtrl,
           maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: 'Notas, rasgos e historia',
+          decoration: InputDecoration(
+            labelText: tr('Notas, rasgos e historia'),
             alignLabelWithHint: true,
             border: OutlineInputBorder(),
           ),

@@ -232,19 +232,19 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _kv('Dado de golpe', 'd${c.hitDie}'),
-                _kv('Salvaciones', c.savingThrows.join(', ')),
+                _kv(tr('Dado de golpe'), 'd${c.hitDie}'),
+                _kv(tr('Salvaciones'), c.savingThrows.join(', ')),
                 if (_isCaster && c.spellcastingAbility != null)
-                  _kv('Característica de conjuros', c.spellcastingAbility!),
+                  _kv(tr('Característica de conjuros'), c.spellcastingAbility!),
                 if (_isCaster && c.spellcastingLevel != null)
-                  _kv('Conjuros desde el nivel', '${c.spellcastingLevel}'),
+                  _kv(tr('Conjuros desde el nivel'), '${c.spellcastingLevel}'),
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
         _section(
-          'Competencias',
+          tr('Competencias'),
           c.proficiencies.isEmpty
               ? const Tx('—')
               : Wrap(
@@ -257,7 +257,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
         ),
         if (c.startingEquipment.isNotEmpty)
           _section(
-            'Equipo inicial',
+            tr('Equipo inicial'),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -267,7 +267,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
           ),
         if (_isCaster && c.spellcastingInfo.isNotEmpty)
           _section(
-            'Lanzamiento de conjuros',
+            tr('Lanzamiento de conjuros'),
             Column(
               children: [
                 for (final info in c.spellcastingInfo)
@@ -343,23 +343,23 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _kv('Bonificador de competencia', '+${l.profBonus}'),
+              _kv(tr('Bonificador de competencia'), '+${l.profBonus}'),
               if (l.abilityScoreImprovement)
                 _kv(
-                  'Mejora de características',
+                  tr('Mejora de características'),
                   tr('+2 a repartir (o dote, si tu Master lo permite)'),
                 ),
               if (l.cantripsKnown != null)
-                _kv('Trucos conocidos', '${l.cantripsKnown}'),
+                _kv(tr('Trucos conocidos'), '${l.cantripsKnown}'),
               if (l.spellsKnown != null)
-                _kv('Conjuros conocidos', '${l.spellsKnown}'),
+                _kv(tr('Conjuros conocidos'), '${l.spellsKnown}'),
               if (l.slots.isNotEmpty)
                 _kv(
-                  'Espacios de conjuro',
+                  tr('Espacios de conjuro'),
                   l.slots.entries.map((e) => '${e.key}º ×${e.value}').join(', '),
                 ),
               if (l.classSpecific.isNotEmpty)
-                _kv('Datos de la clase', l.classSpecific.join(' · ')),
+                _kv(tr('Datos de la clase'), l.classSpecific.join(' · ')),
               if (l.features.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 const Tx(
@@ -416,7 +416,7 @@ class _ClassInfoScreenState extends State<ClassInfoScreen> {
             child: ExpansionTile(
               title: Text(
                 level < 0
-                    ? 'Nivel sin indicar'
+                    ? tr('Nivel sin indicar')
                     : (level == 0 ? tr('Trucos') : '${tr('Nivel')} $level'),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),

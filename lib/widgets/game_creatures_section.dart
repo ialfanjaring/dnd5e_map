@@ -58,7 +58,7 @@ class GameCreaturesSection extends StatelessWidget {
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudieron añadir las criaturas: $e')),
+        SnackBar(content: Text('${tr('No se pudieron añadir las criaturas')}: $e')),
       );
     }
   }
@@ -71,7 +71,7 @@ class GameCreaturesSection extends StatelessWidget {
       stream: service.creatures(gameCode),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Text('No se pudieron cargar las criaturas: ${snapshot.error}');
+          return Text('${tr('No se pudieron cargar las criaturas')}: ${snapshot.error}');
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -93,7 +93,7 @@ class GameCreaturesSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'NPC y monstruos (${creatures.length})',
+                    '${tr('NPC y monstruos')} (${creatures.length})',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
@@ -187,7 +187,7 @@ class _GameCreatureTile extends StatelessWidget {
         if (snapshot.hasError) {
           return Card(
             child: ListTile(
-              title: Text(gc.apiIndex ?? 'Criatura'),
+              title: Text(gc.apiIndex ?? tr('Criatura')),
               subtitle: const Tx('No se pudo cargar de la API.'),
               trailing: removeButton,
             ),
@@ -317,8 +317,8 @@ class _GameCreatureTile extends StatelessWidget {
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             tooltip: t.hidden
-                                ? 'Colocar en el mapa'
-                                : 'Sacar del mapa (oculta a los jugadores)',
+                                ? tr('Colocar en el mapa')
+                                : tr('Sacar del mapa (oculta a los jugadores)'),
                             icon: Icon(t.hidden ? Icons.login : Icons.logout),
                             onPressed: () => (t.hidden
                                 ? service.placeTokenOnMap(gameCode, t.id, floor: floor)

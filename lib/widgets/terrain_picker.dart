@@ -14,10 +14,10 @@ class TerrainPicker extends StatelessWidget {
   const TerrainPicker({super.key, required this.brush, required this.onChanged});
 
   static const _flags = <(String?, String, IconData)>[
-    (null, 'Según terreno', Icons.auto_awesome),
-    ('n', 'Libre', Icons.directions_walk),
-    ('d', 'Difícil', Icons.terrain),
-    ('b', 'Sin fichas', Icons.block),
+    (null, tr('Según terreno'), Icons.auto_awesome),
+    ('n', tr('Libre'), Icons.directions_walk),
+    ('d', tr('Difícil'), Icons.terrain),
+    ('b', tr('Sin fichas'), Icons.block),
   ];
 
   @override
@@ -103,9 +103,9 @@ class TerrainPicker extends StatelessWidget {
 
   static String _help(MoveRule r, bool auto) {
     final what = switch (r) {
-      MoveRule.normal => 'Se camina con normalidad.',
-      MoveRule.difficult => 'Terreno difícil: cuesta el doble moverse.',
-      MoveRule.blocked => 'No se puede cruzar ni colocar fichas.',
+      MoveRule.normal => tr('Se camina con normalidad.'),
+      MoveRule.difficult => tr('Terreno difícil: cuesta el doble moverse.'),
+      MoveRule.blocked => tr('No se puede cruzar ni colocar fichas.'),
     };
     return what;
   }

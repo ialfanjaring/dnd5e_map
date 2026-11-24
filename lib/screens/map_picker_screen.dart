@@ -25,12 +25,12 @@ class MapPickerScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(gameCode == null ? 'Mapas' : 'Elegir mapa'),
+          title: Text(gameCode == null ? tr('Mapas') : tr('Elegir mapa')),
           actions: [if (embedded) const OptionsButton()],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Predeterminados'),
-              Tab(text: 'Mis mapas'),
+              Tab(text: tr('Predeterminados')),
+              Tab(text: tr('Mis mapas')),
             ],
           ),
         ),
@@ -105,7 +105,7 @@ class _MapGrid extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Usar «${m.name}»'),
+        title: Text(tr('Usar «{n}»').replaceAll('{n}', m.name)),
         content: const Tx(
           'Sustituye el mapa actual de la partida. Las fichas se mantienen '
           'y, si quedan fuera, se acercan al borde.',
@@ -129,9 +129,9 @@ class _MapGrid extends StatelessWidget {
     try {
       await MapService().applyToGame(code, m);
       navigator.pop(true);
-      messenger.showSnackBar(SnackBar(content: Text('Mapa «${m.name}» cargado.')));
+      messenger.showSnackBar(SnackBar(content: Text(tr('Mapa «{n}» cargado.').replaceAll('{n}', m.name))));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('No se pudo cargar: $e')));
+      messenger.showSnackBar(SnackBar(content: Text('${tr('No se pudo cargar')}: $e')));
     }
   }
 
@@ -140,7 +140,7 @@ class _MapGrid extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Tx('Eliminar mapa'),
-        content: Text('¿Eliminar «${m.name}»? No afecta a partidas ya creadas.'),
+        content: Text(tr('¿Eliminar «{n}»? No afecta a partidas ya creadas.').replaceAll('{n}', m.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),

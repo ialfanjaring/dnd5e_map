@@ -94,20 +94,20 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height: 12),
       _MenuCard(
         asset: 'castillo',
-        title: 'Crear partida',
+        title: tr('Crear partida'),
         description: 'Crea una nueva campaña, prepara el mapa '
             'y administra tu aventura como Master.',
-        buttonText: 'Crear partida',
+        buttonText: tr('Crear partida'),
         color: Colors.deepPurple,
         onTap: () => _open(const CreateGameScreen()),
       ),
       const SizedBox(height: 12),
       _MenuCard(
         asset: 'llave',
-        title: 'Unirse a partida',
+        title: tr('Unirse a partida'),
         description: 'Introduce el código de una campaña '
             'para unirte a la aventura como jugador.',
-        buttonText: 'Unirse a partida',
+        buttonText: tr('Unirse a partida'),
         color: Colors.teal,
         onTap: () => _open(const JoinGameScreen()),
       ),
@@ -305,7 +305,7 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Tx('Terminar la sesión'),
-        content: Text('Se borrará la partida «${g.name}» por completo.'),
+        content: Text(tr('Se borrará la partida «{n}» por completo.').replaceAll('{n}', g.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -325,14 +325,14 @@ class _ActiveGameBannerState extends State<_ActiveGameBanner> {
     try {
       await runBlocking(
         context,
-        'Terminando la sesión…',
+        tr('Terminando la sesión…'),
         () => GameService().endGame(g.code),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _dismissed.remove(g.code));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo terminar la sesión: $e')),
+        SnackBar(content: Text('${tr('No se pudo terminar la sesión')}: $e')),
       );
       _refresh();
     }

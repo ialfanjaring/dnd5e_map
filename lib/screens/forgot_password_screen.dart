@@ -106,8 +106,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             maxLength: 254,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _loading ? null : _send(),
-            decoration: const InputDecoration(
-              labelText: 'Correo electrónico',
+            decoration: InputDecoration(
+              labelText: tr('Correo electrónico'),
               prefixIcon: Icon(Icons.email_outlined),
               border: OutlineInputBorder(),
               counterText: '',

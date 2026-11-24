@@ -112,15 +112,15 @@ class MasterRoomScreen extends StatelessWidget {
                 stream: service.gameStream(gameCode),
                 builder: (context, snap) {
                   final g = snap.data ?? const <String, dynamic>{};
-                  final name = (g['mapName'] ?? 'Cuadrícula vacía') as String;
+                  final name = (g['mapName'] ?? tr('Cuadrícula vacía')) as String;
                   final cols = (g['cols'] ?? 20) as num;
                   final rows = (g['rows'] ?? 14) as num;
 
                   return Card(
                     child: ListTile(
                       leading: const AppIcon('mapa', size: 36),
-                      title: Text('Mapa: $name'),
-                      subtitle: Text('$cols × $rows casillas'),
+                      title: Text('${tr('Mapa')}: ${tr(name)}'),
+                      subtitle: Text('$cols × $rows ${tr('casillas')}'),
                       // Con la partida en juego no se puede cambiar el mapa
                       // (para ello hay que reiniciar la sala desde el mapa)
                       trailing: ElevatedButton(
@@ -134,7 +134,7 @@ class MasterRoomScreen extends StatelessWidget {
                                   ),
                                 ),
                         child: Text(
-                          g['status'] == 'playing' ? 'En juego' : 'Elegir mapa',
+                          g['status'] == 'playing' ? tr('En juego') : tr('Elegir mapa'),
                         ),
                       ),
                     ),
@@ -150,7 +150,7 @@ class MasterRoomScreen extends StatelessWidget {
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Text(
-                      'No se pudieron cargar los jugadores: ${snapshot.error}',
+                      '${tr('No se pudieron cargar los jugadores')}: ${snapshot.error}',
                     );
                   }
                   if (!snapshot.hasData) {
@@ -163,7 +163,7 @@ class MasterRoomScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Jugadores (${players.length})',
+                        '${tr('Jugadores')} (${players.length})',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -256,7 +256,7 @@ class MasterRoomScreen extends StatelessWidget {
                                 playing ? Icons.login : Icons.play_arrow,
                               ),
                               label: Text(
-                                playing ? 'Unirme de nuevo' : 'Iniciar partida',
+                                playing ? tr('Unirme de nuevo') : tr('Iniciar partida'),
                               ),
                             ),
                           );
@@ -308,7 +308,7 @@ class MasterRoomScreen extends StatelessWidget {
     try {
       await runBlocking(
         context,
-        'Terminando la sesión…',
+        tr('Terminando la sesión…'),
         () => GameService().endGame(gameCode),
       );
       navigator.popUntil((r) => r.isFirst);
@@ -317,7 +317,7 @@ class MasterRoomScreen extends StatelessWidget {
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo terminar la sesión: $e')),
+        SnackBar(content: Text('${tr('No se pudo terminar la sesión')}: $e')),
       );
     }
   }
@@ -337,7 +337,7 @@ class MasterRoomScreen extends StatelessWidget {
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo iniciar la partida: $e')),
+        SnackBar(content: Text('${tr('No se pudo iniciar la partida')}: $e')),
       );
     }
   }
@@ -353,7 +353,7 @@ class MasterRoomScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Tx('Expulsar jugador'),
-        content: Text('¿Quitar a "${p.character.name}" de la sala?'),
+        content: Text(tr('¿Quitar a "{n}" de la sala?').replaceAll('{n}', p.character.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -373,7 +373,7 @@ class MasterRoomScreen extends StatelessWidget {
       await service.removePlayer(gameCode, p.uid);
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo expulsar al jugador: $e')),
+        SnackBar(content: Text('${tr('No se pudo expulsar al jugador')}: $e')),
       );
     }
   }

@@ -83,11 +83,11 @@ class _CreaturesScreenState extends State<CreaturesScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          tabs: const [
-            Tab(text: 'Todos'),
-            Tab(text: 'Monstruos'),
+          tabs: [
+            Tab(text: tr('Todos')),
+            Tab(text: tr('Monstruos')),
             Tab(text: 'NPC'),
-            Tab(text: 'Predeterminados'),
+            Tab(text: tr('Predeterminados')),
           ],
         ),
       ),
@@ -98,7 +98,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
               onPressed: _openCreateForm,
               icon: const Icon(Icons.add),
               label: Text(
-                _currentKind == 'npc' ? 'Nuevo NPC' : 'Nueva criatura',
+                _currentKind == 'npc' ? tr('Nuevo NPC') : tr('Nueva criatura'),
               ),
             ),
       body: SafeArea(top: false, child: _tabController.index == 3
@@ -255,7 +255,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Tx('Eliminar criatura'),
-        content: Text('¿Seguro que quieres eliminar "${c.name}"?'),
+        content: Text(tr('¿Seguro que quieres eliminar "{n}"?').replaceAll('{n}', c.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -275,7 +275,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
       await _service.delete(c.id!);
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar: $e')),
+        SnackBar(content: Text('${tr('No se pudo eliminar')}: $e')),
       );
     }
   }

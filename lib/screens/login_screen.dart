@@ -11,9 +11,9 @@ final RegExp emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
 /// Validación de correo compartida por las pantallas de acceso.
 String? validateEmail(String? value) {
   final v = (value ?? '').trim();
-  if (v.isEmpty) return 'Introduce tu correo';
+  if (v.isEmpty) return tr('Introduce tu correo');
   if (v.length > 254 || !emailPattern.hasMatch(v)) {
-    return 'Introduce un correo válido';
+    return tr('Introduce un correo válido');
   }
   return null;
 }
@@ -117,8 +117,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       autocorrect: false,
                       enableSuggestions: false,
                       maxLength: 254,
-                      decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
+                      decoration: InputDecoration(
+                        labelText: tr('Correo electrónico'),
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                         counterText: '',

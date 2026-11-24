@@ -99,7 +99,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     if (_floors.length >= 6) return;
     setState(() {
       _floors.add({});
-      _names.add('Piso ${_floors.length}');
+      _names.add('${tr('Piso')} ${_floors.length}');
       _cur = _floors.length - 1;
     });
   }
@@ -222,7 +222,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+          .showSnackBar(SnackBar(content: Text('${tr('No se pudo guardar')}: $e')));
     }
   }
 
@@ -266,9 +266,9 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
             ),
           );
           final steppers = [
-            _stepper('Columnas', _cols, MapTemplate.minSize,
+            _stepper(tr('Columnas'), _cols, MapTemplate.minSize,
                 MapTemplate.maxCols, (v) => _resize(v, _rows)),
-            _stepper('Filas', _rows, MapTemplate.minSize,
+            _stepper(tr('Filas'), _rows, MapTemplate.minSize,
                 MapTemplate.maxRows, (v) => _resize(_cols, v)),
           ];
           final erase = ChoiceChip(

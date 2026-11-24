@@ -104,7 +104,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     final item = ApiItem(
       index: widget.item?.index ?? ApiItem.customPrefix,
       name: _name.text.trim(),
-      category: 'Personalizado',
+      category: tr('Personalizado'),
       isMagic: _magic || _bonus != 0,
       rarity: (_magic || _bonus != 0) ? _rarity : '',
       desc: _desc.text.trim().isEmpty ? const [] : [_desc.text.trim()],
@@ -138,7 +138,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('No se pudo guardar: $e')));
+          .showSnackBar(SnackBar(content: Text('${tr('No se pudo guardar')}: $e')));
     }
   }
 
@@ -150,7 +150,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.item == null ? 'Nuevo objeto' : 'Editar objeto'),
+        title: Text(widget.item == null ? tr('Nuevo objeto') : tr('Editar objeto')),
         actions: [
           TextButton.icon(
             onPressed: _saving ? null : _save,
@@ -170,18 +170,18 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 TextFormField(
                   controller: _name,
                   maxLength: 60,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre',
+                  decoration: InputDecoration(
+                    labelText: tr('Nombre'),
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Pon un nombre' : null,
+                      (v == null || v.trim().isEmpty) ? tr('Pon un nombre') : null,
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _kind,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de objeto',
+                  decoration: InputDecoration(
+                    labelText: tr('Tipo de objeto'),
                     border: OutlineInputBorder(),
                   ),
                   items: const [
@@ -200,22 +200,22 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _dice,
-                          decoration: const InputDecoration(
-                            labelText: 'Daño (ej. 1d8)',
+                          decoration: InputDecoration(
+                            labelText: tr('Daño (ej. 1d8)'),
                             border: OutlineInputBorder(),
                           ),
                           validator: (v) => RegExp(r'^\d+d\d+$')
                                   .hasMatch((v ?? '').trim())
                               ? null
-                              : 'Formato: 1d8',
+                              : tr('Formato: 1d8'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _damageType,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo de daño',
+                          decoration: InputDecoration(
+                            labelText: tr('Tipo de daño'),
                             border: OutlineInputBorder(),
                           ),
                           items: [
@@ -233,11 +233,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _weaponRange,
-                          decoration: const InputDecoration(
-                            labelText: 'Alcance',
+                          decoration: InputDecoration(
+                            labelText: tr('Alcance'),
                             border: OutlineInputBorder(),
                           ),
-                          items: const [
+                          items: [
                             DropdownMenuItem(value: 'Melee', child: Tx('Cuerpo a cuerpo')),
                             DropdownMenuItem(value: 'Ranged', child: Tx('A distancia')),
                           ],
@@ -248,11 +248,11 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _weaponCategory,
-                          decoration: const InputDecoration(
-                            labelText: 'Categoría',
+                          decoration: InputDecoration(
+                            labelText: tr('Categoría'),
                             border: OutlineInputBorder(),
                           ),
-                          items: const [
+                          items: [
                             DropdownMenuItem(value: 'Simple', child: Tx('Sencilla')),
                             DropdownMenuItem(value: 'Martial', child: Tx('Marcial')),
                           ],
@@ -267,8 +267,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       controller: _range,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: 'Alcance normal (pies)',
+                      decoration: InputDecoration(
+                        labelText: tr('Alcance normal (pies)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -295,8 +295,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   if (isArmor)
                     DropdownButtonFormField<String>(
                       value: _armorCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de armadura',
+                      decoration: InputDecoration(
+                        labelText: tr('Tipo de armadura'),
                         border: OutlineInputBorder(),
                       ),
                       items: [
@@ -312,7 +312,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
-                      labelText: isShield ? 'Bonificador a la CA' : 'CA base',
+                      labelText: isShield ? tr('Bonificador a la CA') : 'CA base',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -335,8 +335,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                         controller: _maxDex,
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: const InputDecoration(
-                          labelText: 'Máximo de Destreza',
+                        decoration: InputDecoration(
+                          labelText: tr('Máximo de Destreza'),
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -345,8 +345,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       controller: _strMin,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: 'Fuerza mínima (0 = sin requisito)',
+                      decoration: InputDecoration(
+                        labelText: tr('Fuerza mínima (0 = sin requisito)'),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -364,8 +364,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                   Row(
                     children: [
                       Text(isWeapon
-                          ? 'Bonificador mágico (ataque y daño)'
-                          : 'Bonificador mágico (CA)'),
+                          ? tr('Bonificador mágico (ataque y daño)')
+                          : tr('Bonificador mágico (CA)')),
                       const Spacer(),
                       IconButton(
                         onPressed: _bonus > 0 ? () => setState(() => _bonus--) : null,
@@ -389,8 +389,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 if (_magic || _bonus != 0)
                   DropdownButtonFormField<String>(
                     value: _rarity,
-                    decoration: const InputDecoration(
-                      labelText: 'Rareza',
+                    decoration: InputDecoration(
+                      labelText: tr('Rareza'),
                       border: OutlineInputBorder(),
                     ),
                     items: [
@@ -406,8 +406,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _cost,
-                        decoration: const InputDecoration(
-                          labelText: 'Coste (ej. 15 gp)',
+                        decoration: InputDecoration(
+                          labelText: tr('Coste (ej. 15 gp)'),
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -420,8 +420,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'Peso (lb)',
+                        decoration: InputDecoration(
+                          labelText: tr('Peso (lb)'),
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -432,8 +432,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 TextFormField(
                   controller: _desc,
                   maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Descripción',
+                  decoration: InputDecoration(
+                    labelText: tr('Descripción'),
                     alignLabelWithHint: true,
                     border: OutlineInputBorder(),
                   ),

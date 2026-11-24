@@ -282,9 +282,9 @@ class CharacterItemsCard extends StatelessWidget {
                 'Equipo activo',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-              _slot('Arma activa', Icons.gavel, (it) => it.slot == 'weapon'),
-              _slot('Armadura activa', Icons.checkroom, (it) => it.slot == 'armor'),
-              _slot('Escudo activo', Icons.shield_outlined, (it) => it.slot == 'shield'),
+              _slot(tr('Arma activa'), Icons.gavel, (it) => it.slot == 'weapon'),
+              _slot(tr('Armadura activa'), Icons.checkroom, (it) => it.slot == 'armor'),
+              _slot(tr('Escudo activo'), Icons.shield_outlined, (it) => it.slot == 'shield'),
               if (showList) ...[
                 const Divider(height: 24),
                 const Tx(
@@ -320,7 +320,7 @@ class CharacterItemsCard extends StatelessWidget {
                 effects.notes.isNotEmpty) ...[
               const Divider(),
               if (effects.armorClass != null)
-                Text('CA con el equipo: ${effects.armorClass}'),
+                Text('${tr('CA con el equipo')}: ${effects.armorClass}'),
               if (effects.stealthDisadvantage)
                 const Tx('Desventaja en Sigilo por la armadura.'),
               for (final n in effects.notes) Text(n),
@@ -359,8 +359,8 @@ class CharacterItemsCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isEquipped)
-            const Tooltip(
-              message: 'Activo',
+            Tooltip(
+              message: tr('Activo'),
               child: Icon(Icons.check_circle, color: Colors.green),
             ),
           if (onRemove != null)
@@ -376,7 +376,7 @@ class CharacterItemsCard extends StatelessWidget {
   }
 
   String _oneLine(ApiItem it) {
-    if (it.isShield) return 'Escudo +${it.acBase} CA';
+    if (it.isShield) return '${tr('Escudo')} +${it.acBase} ${tr('CA')}';
     if (it.isArmor) return 'CA ${it.acBase}${it.acDexBonus ? ' + Des' : ''}';
     if (it.isWeapon) return '${it.damageDice} ${EquipmentApiService.damageTypes[it.damageType] ?? it.damageType.toLowerCase()}';
     if (it.isMagic) {

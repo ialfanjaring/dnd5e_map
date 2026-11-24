@@ -77,7 +77,7 @@ Future<void> showTextDialog(
               );
             }
             if (snapshot.hasError) {
-              return Text('No se pudo cargar: ${snapshot.error}');
+              return Text('${tr('No se pudo cargar')}: ${snapshot.error}');
             }
             final text = (snapshot.data ?? const <String>[]).join('\n\n');
             return SingleChildScrollView(
@@ -120,7 +120,7 @@ Future<void> showSpellDetail(
               );
             }
             if (snapshot.hasError) {
-              return Text('No se pudo cargar el hechizo: ${snapshot.error}');
+              return Text('${tr('No se pudo cargar el hechizo')}: ${snapshot.error}');
             }
 
             final s = snapshot.data!;

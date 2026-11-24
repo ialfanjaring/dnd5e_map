@@ -80,8 +80,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       autocorrect: false,
                       enableSuggestions: false,
                       maxLength: 254,
-                      decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
+                      decoration: InputDecoration(
+                        labelText: tr('Correo electrónico'),
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                         counterText: '',
@@ -91,7 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 12),
                     PasswordField(
                       controller: _passCtrl,
-                      label: 'Contraseña',
+                      label: tr('Contraseña'),
                       showRequirements: true,
                       enforcePolicy: true,
                       emailProvider: () => _emailCtrl.text.trim(),
@@ -101,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 12),
                     PasswordField(
                       controller: _confirmCtrl,
-                      label: 'Repite la contraseña',
+                      label: tr('Repite la contraseña'),
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _loading ? null : _register(),
                     ),
@@ -109,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     FormField<String>(
                       validator: (_) => _passCtrl.text == _confirmCtrl.text
                           ? null
-                          : 'Las contraseñas no coinciden',
+                          : tr('Las contraseñas no coinciden'),
                       builder: (state) => state.hasError
                           ? Padding(
                               padding: const EdgeInsets.only(top: 4),

@@ -159,7 +159,7 @@ class CharactersScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Tx('Eliminar personaje'),
-        content: Text('¿Seguro que quieres eliminar a "${c.name}"?'),
+        content: Text(tr('¿Seguro que quieres eliminar a "{n}"?').replaceAll('{n}', c.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -179,7 +179,7 @@ class CharactersScreen extends StatelessWidget {
       await service.delete(c.id!);
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar: $e')),
+        SnackBar(content: Text('${tr('No se pudo eliminar')}: $e')),
       );
     }
   }

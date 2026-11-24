@@ -139,7 +139,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo guardar: $e')),
+        SnackBar(content: Text('${tr('No se pudo guardar')}: $e')),
       );
     }
   }
@@ -150,7 +150,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar $label' : 'Nuevo $label'),
+        title: Text(_isEditing ? '${tr('Editar')} $label' : '${tr('Nuevo')} $label'),
       ),
       body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
@@ -160,11 +160,11 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _section('General', _buildGeneral()),
-                _section('Características', _buildAbilities()),
-                _section('Combate', _buildCombat()),
-                _section('Rasgos y acciones', _buildText()),
-                _section('Hechizos', _buildSpells()),
+                _section(tr('General'), _buildGeneral()),
+                _section(tr('Características'), _buildAbilities()),
+                _section(tr('Combate'), _buildCombat()),
+                _section(tr('Rasgos y acciones'), _buildText()),
+                _section(tr('Hechizos'), _buildSpells()),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 50,
@@ -177,7 +177,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save),
-                    label: Text(_isEditing ? 'Guardar cambios' : 'Crear $label'),
+                    label: Text(_isEditing ? tr('Guardar cambios') : '${tr('Crear')} $label'),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -258,27 +258,27 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         const SizedBox(height: 12),
         TextFormField(
           controller: _nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Nombre',
+          decoration: InputDecoration(
+            labelText: tr('Nombre'),
             border: OutlineInputBorder(),
           ),
           validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Introduce un nombre' : null,
+              (v == null || v.trim().isEmpty) ? tr('Introduce un nombre') : null,
         ),
         const SizedBox(height: 12),
-        _dropdown('Tamaño', _size, CreatureData.sizes, (v) => _size = v),
+        _dropdown(tr('Tamaño'), _size, CreatureData.sizes, (v) => _size = v),
         const SizedBox(height: 12),
-        _dropdown('Tipo', _type, CreatureData.types, (v) => _type = v),
+        _dropdown(tr('Tipo'), _type, CreatureData.types, (v) => _type = v),
         const SizedBox(height: 12),
         _dropdown(
-          'Alineamiento',
+          tr('Alineamiento'),
           _alignment,
           CreatureData.alignments,
           (v) => _alignment = v,
         ),
         const SizedBox(height: 12),
         _dropdown(
-          'Valor de desafío (FP)',
+          tr('Valor de desafío (FP)'),
           _cr,
           CreatureData.challengeRatings.keys.toList(),
           (v) => _cr = v,
@@ -287,7 +287,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Experiencia: ${CreatureData.challengeRatings[_cr] ?? 0} PX',
+            '${tr('Experiencia')}: ${CreatureData.challengeRatings[_cr] ?? 0} PX',
             style: TextStyle(color: Colors.grey.shade600),
           ),
         ),
@@ -316,7 +316,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         border: const OutlineInputBorder(),
       ),
       validator: (v) =>
-          int.tryParse(v ?? '') == null ? 'Número no válido' : null,
+          int.tryParse(v ?? '') == null ? tr('Número no válido') : null,
     );
   }
 
@@ -325,9 +325,9 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _numberField(_acCtrl, 'Clase de armadura')),
+            Expanded(child: _numberField(_acCtrl, tr('Clase de armadura'))),
             const SizedBox(width: 12),
-            Expanded(child: _numberField(_hpCtrl, 'Puntos de golpe')),
+            Expanded(child: _numberField(_hpCtrl, tr('Puntos de golpe'))),
           ],
         ),
         const SizedBox(height: 12),
@@ -336,8 +336,8 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
             Expanded(
               child: TextFormField(
                 controller: _hitDiceCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Dados de golpe',
+                decoration: InputDecoration(
+                  labelText: tr('Dados de golpe'),
                   hintText: '2d8+2',
                   border: OutlineInputBorder(),
                 ),
@@ -347,8 +347,8 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
             Expanded(
               child: TextFormField(
                 controller: _speedCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Velocidad',
+                decoration: InputDecoration(
+                  labelText: tr('Velocidad'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -364,7 +364,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => SpellPickerScreen(
-          title: 'Hechizos del NPC',
+          title: tr('Hechizos del NPC'),
           initial: _spells,
         ),
       ),
@@ -393,7 +393,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         OutlinedButton.icon(
           onPressed: _pickSpells,
           icon: const Icon(Icons.auto_fix_high),
-          label: Text(_spells.isEmpty ? 'Elegir hechizos' : 'Editar hechizos'),
+          label: Text(_spells.isEmpty ? tr('Elegir hechizos') : tr('Editar hechizos')),
         ),
         const SizedBox(height: 6),
         Tx(
@@ -417,38 +417,38 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
       children: [
         TextFormField(
           controller: _skillsCtrl,
-          decoration: deco('Habilidades y salvaciones', hint: 'Sigilo +6'),
+          decoration: deco(tr('Habilidades y salvaciones'), hint: tr('Sigilo +6')),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _sensesCtrl,
           decoration: deco(
-            'Sentidos',
-            hint: 'Visión en la oscuridad 60 pies; Percepción pasiva 10',
+            tr('Sentidos'),
+            hint: tr('Visión en la oscuridad 60 pies; Percepción pasiva 10'),
           ),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _languagesCtrl,
-          decoration: deco('Idiomas', hint: 'Común, goblin'),
+          decoration: deco(tr('Idiomas'), hint: tr('Común, goblin')),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _traitsCtrl,
           maxLines: 5,
-          decoration: deco('Rasgos especiales'),
+          decoration: deco(tr('Rasgos especiales')),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _actionsCtrl,
           maxLines: 6,
-          decoration: deco('Acciones'),
+          decoration: deco(tr('Acciones')),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _notesCtrl,
           maxLines: 3,
-          decoration: deco('Notas del Master'),
+          decoration: deco(tr('Notas del Master')),
         ),
       ],
     );

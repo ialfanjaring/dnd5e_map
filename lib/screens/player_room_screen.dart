@@ -105,12 +105,12 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Entras como ${selected.first.name}.')),
+        SnackBar(content: Text('${tr('Entras como')} ${selected.first.name}.')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo entrar a la sala: $e')),
+        SnackBar(content: Text('${tr('No se pudo entrar a la sala')}: $e')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -148,7 +148,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
         stream: _gameService.gameStream(widget.gameCode),
         builder: (context, gameSnap) {
           if (gameSnap.hasError) {
-            return Center(child: Text('Error: ${gameSnap.error}'));
+            return Center(child: Text('${tr('Error')}: ${gameSnap.error}'));
           }
           if (gameSnap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -186,18 +186,18 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
         child: Column(
           children: [
             Text(
-              (game['name'] ?? 'Partida') as String,
+              (game['name'] ?? tr('Partida')) as String,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              'Master: ${game['masterEmail'] ?? ''}',
+              '${tr('Master')}: ${game['masterEmail'] ?? ''}',
               style: TextStyle(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 4),
             Text(
-              'Código: ${widget.gameCode}',
+              '${tr('Código')}: ${widget.gameCode}',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2,
@@ -214,7 +214,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
       stream: _characterService.myCharacters(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Text('No se pudieron cargar tus personajes: ${snapshot.error}');
+          return Text('${tr('No se pudieron cargar tus personajes')}: ${snapshot.error}');
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -380,7 +380,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
       stream: _gameService.players(widget.gameCode),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Text('No se pudieron cargar los jugadores: ${snapshot.error}');
+          return Text('${tr('No se pudieron cargar los jugadores')}: ${snapshot.error}');
         }
 
         final players = snapshot.data ?? [];
@@ -412,7 +412,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Jugadores en la sala (${players.length})',
+              '${tr('Jugadores en la sala')} (${players.length})',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),

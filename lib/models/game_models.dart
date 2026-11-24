@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../i18n/i18n.dart';
 import 'package:flutter/material.dart';
 
 /// Clave de una casilla del mapa ("x_y").
@@ -549,7 +550,7 @@ class DiceRoll {
   static int sides(String die) =>
       die == 'coin' ? 2 : (int.tryParse(die.substring(1)) ?? 20);
 
-  static String dieName(String die) => die == 'coin' ? 'Moneda' : die.toUpperCase();
+  static String dieName(String die) => die == 'coin' ? tr('Moneda') : die.toUpperCase();
 
   static List<int> roll(String die, int count, Random rnd) {
     final s = sides(die);
@@ -568,7 +569,7 @@ class DiceRoll {
       return title.isNotEmpty ? title : groups.map((g) => g.formula).join(' + ');
     }
     if (die == 'coin') {
-      return values.length > 1 ? '${values.length} monedas' : 'Moneda';
+      return values.length > 1 ? '${values.length} ${tr('monedas')}' : tr('Moneda');
     }
     if (hasMode) return '$die ${isAdv ? 'con ventaja' : 'con desventaja'}';
     return values.length > 1 ? '${values.length}$die' : die;

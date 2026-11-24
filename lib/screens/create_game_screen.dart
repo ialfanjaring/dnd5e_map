@@ -49,7 +49,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
       if (!mounted) return;
       setState(() => _creating = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo crear la partida: $e')),
+        SnackBar(content: Text('${tr('No se pudo crear la partida')}: $e')),
       );
     }
   }
@@ -75,8 +75,8 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _create(),
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de la partida',
+                    decoration: InputDecoration(
+                      labelText: tr('Nombre de la partida'),
                       border: OutlineInputBorder(),
                     ),
                   ),
