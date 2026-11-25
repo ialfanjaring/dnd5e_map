@@ -25,12 +25,16 @@ class PlayerLiveSheet extends StatefulWidget {
   /// true: el Master puede asignar y quitar objetos a este jugador
   final bool isMaster;
 
+  /// true: sin hechizos ni ataques (van en sus propias pestañas)
+  final bool compact;
+
   const PlayerLiveSheet({
     super.key,
     required this.gameCode,
     required this.uid,
     required this.canEdit,
     this.isMaster = false,
+    this.compact = false,
   });
 
   @override
@@ -257,6 +261,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
               ),
 
             // ESPACIOS DE CONJURO Y HECHIZOS
+            if (!widget.compact)
             FutureBuilder<Map<int, int>>(
               future: _classSlots(p),
               builder: (context, s) {
@@ -283,6 +288,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
             // FICHA COMPLETA
             CharacterSheetView(
               character: p.character,
+              compact: widget.compact,
               onEquippedChanged: canManage
                   ? (list) => _service
                       .setPlayerEquipped(widget.gameCode, widget.uid, list)

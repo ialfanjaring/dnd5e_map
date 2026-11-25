@@ -219,7 +219,7 @@ class MasterRoomScreen extends StatelessWidget {
                                 CharacterQuickStats(
                                   character: p.character,
                                   prefix: '${p.character.summary}\n',
-                                  suffix: ' · ${p.email}',
+                                  suffix: p.nickname.isEmpty ? '' : ' · ${p.nickname}',
                                 ),
                                 SpellSummaryText(indexes: p.character.spells),
                               ],

@@ -70,10 +70,11 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
   void _paint(int x, int y) {
     setState(() {
       final key = cellKey(x, y);
-      if (_brush == null) {
+      final v = Terrains.applyBrush(_cells[key], _brush);
+      if (v == null) {
         _cells.remove(key);
       } else {
-        _cells[key] = _brush!;
+        _cells[key] = v;
       }
     });
   }
@@ -253,6 +254,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
             fitSignal: _fit,
             onCellTap: (_, __) {},
             onCellPaint: _paint,
+            showZones: true,
           );
 
           final nameField = TextField(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../i18n/i18n.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
+import 'nickname_screen.dart';
 import '../settings/app_settings.dart';
 
 /// Opciones: idioma, tema y cerrar sesión.
@@ -63,13 +65,35 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _header(context, tr('Cuenta')),
               Card(
-                child: ListTile(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.badge_outlined),
+                      title: const Tx('Nickname'),
+                      subtitle: Text(ProfileService.instance.nickname),
+                      trailing: const Icon(Icons.edit),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NicknameScreen(
+                              initial: ProfileService.instance.nickname,
+                            ),
+                          ),
+                        );
+                        if (context.mounted) (context as Element).markNeedsBuild();
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
                   leading: const Icon(Icons.logout),
                   title: const Tx('Cerrar sesión'),
                   onTap: () async {
                     Navigator.of(context).popUntil((r) => r.isFirst);
                     await AuthService().logout();
                   },
+                ),
+                  ],
                 ),
               ),
             ],

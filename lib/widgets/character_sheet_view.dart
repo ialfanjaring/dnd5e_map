@@ -41,12 +41,16 @@ class CharacterSheetView extends StatefulWidget {
   final VoidCallback? onAddItems;
   final void Function(String index)? onRemoveItem;
 
+  /// true: sin hechizos ni ataques (en la partida tienen su propia pestaña)
+  final bool compact;
+
   const CharacterSheetView({
     super.key,
     required this.character,
     this.onEquippedChanged,
     this.onAddItems,
     this.onRemoveItem,
+    this.compact = false,
   });
 
   @override
@@ -267,8 +271,9 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
           child: _Subclasses(classIndex: c.characterClass),
         ),
 
-        if (c.spells.isNotEmpty ||
-            DndData.spellcastingClasses.contains(c.characterClass))
+        if (!widget.compact &&
+            (c.spells.isNotEmpty ||
+                DndData.spellcastingClasses.contains(c.characterClass)))
           CharacterSpellsCard(spells: c.spells),
 
         // OBJETOS (API): equipar, CA, ataques...
@@ -282,6 +287,7 @@ class _CharacterSheetViewState extends State<CharacterSheetView> {
             onEquippedChanged: widget.onEquippedChanged,
             onAdd: widget.onAddItems,
             onRemove: widget.onRemoveItem,
+            showCombat: !widget.compact,
           ),
 
         if (c.equipment.isNotEmpty)

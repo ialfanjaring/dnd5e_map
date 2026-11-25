@@ -8,6 +8,14 @@ import 'translation_service.dart';
 
 int? _int(dynamic v) => v is num ? v.toInt() : null;
 
+/// Lee un objeto JSON sin fallar: si viene como lista, usa su primer
+/// elemento; si no es un objeto, null.
+Map? _asMap(dynamic v) {
+  if (v is Map) return v;
+  if (v is List && v.isNotEmpty && v.first is Map) return v.first as Map;
+  return null;
+}
+
 List<String> _names(dynamic list) {
   if (list is! List) return const [];
   return list
@@ -167,6 +175,17 @@ class ApiClass {
   final String? spellcastingAbility;
   final List<({String name, String text})> spellcastingInfo;
 
+  /// Salvaciones como claves internas ('str', 'dex'…)
+  final List<String> saveKeys;
+
+  /// Equipo inicial por defecto: el fijo de la clase más la primera opción
+  /// de cada elección (índices de objetos de la API y cantidad)
+  final List<({String index, int qty})> defaultEquipment;
+
+  /// Habilidades a elegir: cuántas y entre cuáles (claves de DndData.skills)
+  final int skillChoose;
+  final List<String> skillOptions;
+
   const ApiClass({
     required this.index,
     required this.name,
@@ -178,12 +197,92 @@ class ApiClass {
     this.spellcastingLevel,
     this.spellcastingAbility,
     this.spellcastingInfo = const [],
+    this.saveKeys = const [],
+    this.defaultEquipment = const [],
+    this.skillChoose = 0,
+    this.skillOptions = const [],
   });
+
+  /// Índice de habilidad de la API -> clave de la app
+  static const Map<String, String> skillKeyOf = {
+    'skill-acrobatics': 'Acrobacias',
+    'skill-arcana': 'Arcanos',
+    'skill-athletics': 'Atletismo',
+    'skill-deception': 'Engaño',
+    'skill-history': 'Historia',
+    'skill-performance': 'Interpretación',
+    'skill-intimidation': 'Intimidación',
+    'skill-investigation': 'Investigación',
+    'skill-sleight-of-hand': 'Juego de manos',
+    'skill-medicine': 'Medicina',
+    'skill-nature': 'Naturaleza',
+    'skill-perception': 'Percepción',
+    'skill-insight': 'Perspicacia',
+    'skill-persuasion': 'Persuasión',
+    'skill-religion': 'Religión',
+    'skill-stealth': 'Sigilo',
+    'skill-survival': 'Supervivencia',
+    'skill-animal-handling': 'Trato con animales',
+  };
+
+  static List<({String index, int qty})> _defaultEquipment(Map m) {
+    final out = <({String index, int qty})>[];
+    void add(dynamic ref) {
+      if (ref is! Map) return;
+      final eq = ref['of'] ?? ref['equipment'];
+      final idx = (eq is Map ? eq['index'] : null)?.toString() ?? '';
+      if (idx.isNotEmpty) out.add((index: idx, qty: _int(ref['count'] ?? ref['quantity']) ?? 1));
+    }
+
+    for (final e in ((m['starting_equipment'] as List?) ?? const [])) {
+      add(e);
+    }
+    // De cada elección, la primera opción (si es un objeto concreto)
+    for (final ch in ((m['starting_equipment_options'] as List?) ?? const []).whereType<Map>()) {
+      final opts = ((ch['from'] as Map?)?['options'] as List?) ?? const [];
+      if (opts.isEmpty || opts.first is! Map) continue;
+      final o = opts.first as Map;
+      switch (o['option_type']) {
+        case 'counted_reference':
+          add(o);
+        case 'multiple':
+          for (final it in ((o['items'] as List?) ?? const [])) {
+            if (it is Map && it['option_type'] == 'counted_reference') add(it);
+          }
+      }
+    }
+    return out;
+  }
+
+  static ({int choose, List<String> options}) _skillChoice(dynamic raw) {
+    if (raw is! List) return (choose: 0, options: const []);
+    for (final ch in raw.whereType<Map>()) {
+      final items = ((ch['from'] as Map?)?['options'] as List?) ?? const [];
+      final opts = <String>[];
+      for (final o in items.whereType<Map>()) {
+        final idx = ((o['item'] as Map?)?['index'] ?? '').toString();
+        final k = skillKeyOf[idx];
+        if (k != null) opts.add(k);
+      }
+      if (opts.isNotEmpty) {
+        return (choose: _int(ch['choose']) ?? 0, options: opts);
+      }
+    }
+    return (choose: 0, options: const []);
+  }
 
   factory ApiClass.fromJson(Map<String, dynamic> m) {
     final sc = m['spellcasting'];
 
+    final skillChoice = _skillChoice(m['proficiency_choices']);
     return ApiClass(
+      saveKeys: [
+        for (final e in ((m['saving_throws'] as List?) ?? const []).whereType<Map>())
+          (e['index'] ?? '').toString(),
+      ],
+      skillChoose: skillChoice.choose,
+      defaultEquipment: _defaultEquipment(m),
+      skillOptions: skillChoice.options,
       index: (m['index'] ?? '') as String,
       name: _trName('classes', (m['name'] ?? '') as String),
       hitDie: _int(m['hit_die']) ?? 8,
@@ -421,6 +520,24 @@ class ApiSpell {
   final List<String> desc;
   final List<String> higherLevel;
 
+  /// 'melee', 'ranged' o '' (sin tirada de ataque)
+  final String attackType;
+
+  /// Característica de la salvación ('dex', 'wis'…) o '' si no hay
+  final String dcType;
+
+  /// 'half' (mitad de daño al salvar), 'none'…
+  final String dcSuccess;
+
+  /// Tipo de daño en inglés ('Fire'…) o ''
+  final String damageType;
+
+  /// Daño por nivel de espacio ({3: '8d6'}) y por nivel del personaje
+  /// (trucos: {1: '1d10', 5: '2d10'…}). Curación por nivel de espacio.
+  final Map<int, String> damageAtSlot;
+  final Map<int, String> damageAtCharLevel;
+  final Map<int, String> healAtSlot;
+
   const ApiSpell({
     required this.index,
     required this.name,
@@ -434,7 +551,50 @@ class ApiSpell {
     required this.concentration,
     required this.desc,
     required this.higherLevel,
+    this.attackType = '',
+    this.dcType = '',
+    this.dcSuccess = '',
+    this.damageType = '',
+    this.damageAtSlot = const {},
+    this.damageAtCharLevel = const {},
+    this.healAtSlot = const {},
   });
+
+  bool get hasAttack => attackType.isNotEmpty;
+  bool get hasSave => dcType.isNotEmpty;
+  bool get hasDamage => damageAtSlot.isNotEmpty || damageAtCharLevel.isNotEmpty;
+  bool get heals => healAtSlot.isNotEmpty;
+
+  /// Dados de daño al lanzarlo con un espacio de [slot] (o, en los trucos,
+  /// según el nivel del personaje [charLevel]).
+  String damageFor({int slot = 0, int charLevel = 1}) {
+    if (damageAtCharLevel.isNotEmpty) return _pick(damageAtCharLevel, charLevel);
+    return _pick(damageAtSlot, slot <= 0 ? level : slot);
+  }
+
+  String healFor(int slot) => _pick(healAtSlot, slot <= 0 ? level : slot);
+
+  /// Valor de la clave más alta que no supere [n] (o la menor si ninguna).
+  static String _pick(Map<int, String> m, int n) {
+    if (m.isEmpty) return '';
+    final keys = m.keys.toList()..sort();
+    var best = keys.first;
+    for (final k in keys) {
+      if (k <= n) best = k;
+    }
+    return m[best]!;
+  }
+
+  static Map<int, String> _levelMap(dynamic raw) {
+    final out = <int, String>{};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        final l = int.tryParse(k.toString());
+        if (l != null) out[l] = v.toString();
+      });
+    }
+    return out;
+  }
 
   static const Map<String, String> _schools = {
     'Abjuration': 'Abjuración',
@@ -448,8 +608,8 @@ class ApiSpell {
   };
 
   factory ApiSpell.fromJson(Map<String, dynamic> m) {
-    final schoolName = ((m['school'] as Map?)?['name'] ?? '').toString();
-    final comps = ((m['components'] as List?) ?? const []).join(', ');
+    final schoolName = (_asMap(m['school'])?['name'] ?? '').toString();
+    final comps = (m['components'] is List ? m['components'] as List : const []).join(', ');
     final enMaterial = (m['material'] ?? '').toString();
     final material = enMaterial.isEmpty
         ? ''
@@ -472,6 +632,15 @@ class ApiSpell {
       concentration: m['concentration'] == true,
       desc: strings(m['desc']),
       higherLevel: strings(m['higher_level']),
+      attackType: (m['attack_type'] ?? '').toString(),
+      dcType: (_asMap(_asMap(m['dc'])?['dc_type'])?['index'] ?? '').toString(),
+      dcSuccess: (_asMap(m['dc'])?['dc_success'] ?? '').toString(),
+      damageType:
+          (_asMap(_asMap(m['damage'])?['damage_type'])?['name'] ?? '').toString(),
+      damageAtSlot: _levelMap(_asMap(m['damage'])?['damage_at_slot_level']),
+      damageAtCharLevel:
+          _levelMap(_asMap(m['damage'])?['damage_at_character_level']),
+      healAtSlot: _levelMap(m['heal_at_slot_level']),
     );
   }
 }

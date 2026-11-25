@@ -48,6 +48,37 @@ class GameBoard extends StatefulWidget {
   /// (x, y y tamaño de la ficha); se dibuja como un punto.
   final ({int x, int y, int span})? marker;
 
+  /// Movimiento dibujado: arrastrar desde la ficha traza el recorrido casilla
+  /// a casilla. null = desactivado.
+  final void Function(int x, int y)? onPathStart;
+  final void Function(int x, int y)? onPathExtend;
+  final VoidCallback? onPathEnd;
+
+  /// Recorrido que se está dibujando (casillas) y su texto ("15/30 pies")
+  final List<({int x, int y})> path;
+  final String pathLabel;
+
+  /// true: el recorrido supera el movimiento que queda (se pinta en rojo)
+  final bool pathOver;
+
+  /// Recorridos que están dibujando los demás (en directo)
+  final List<({List<({int x, int y})> cells, String label, bool over})> otherPaths;
+
+  /// Marcas de los jugadores en casillas (atacar, mover…)
+  final List<CellPing> pings;
+
+  /// Mantener pulsada una casilla (para marcarla)
+  final void Function(int x, int y)? onCellLongPress;
+
+  /// Se dibujan las zonas (Master y editor de mapas)
+  final bool showZones;
+
+  /// Casillas ocultas por niebla (zonas que el jugador no ve)
+  final Set<String> fogged;
+
+  /// Parte del mapa que se encaja en pantalla (null = todo)
+  final ({int x0, int y0, int x1, int y1})? viewRect;
+
   const GameBoard({
     super.key,
     required this.cols,
@@ -68,6 +99,18 @@ class GameBoard extends StatefulWidget {
     this.reachable = const {},
     this.turnIds = const {},
     this.marker,
+    this.onPathStart,
+    this.onPathExtend,
+    this.onPathEnd,
+    this.path = const [],
+    this.pathLabel = '',
+    this.pathOver = false,
+    this.otherPaths = const [],
+    this.pings = const [],
+    this.onCellLongPress,
+    this.showZones = false,
+    this.fogged = const {},
+    this.viewRect,
   });
 
   @override
@@ -93,7 +136,8 @@ class _GameBoardState extends State<GameBoard> {
     super.didUpdateWidget(old);
     if (old.fitSignal != widget.fitSignal ||
         old.cols != widget.cols ||
-        old.rows != widget.rows) {
+        old.rows != widget.rows ||
+        old.viewRect != widget.viewRect) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _fit();
       });
@@ -104,8 +148,11 @@ class _GameBoardState extends State<GameBoard> {
     final vp = _viewport;
     if (vp == null || vp.width <= 0 || vp.height <= 0) return;
 
-    final w = widget.cols * cell;
-    final h = widget.rows * cell;
+    final vr = widget.viewRect;
+    final ox = (vr?.x0 ?? 0) * cell;
+    final oy = (vr?.y0 ?? 0) * cell;
+    final w = vr == null ? widget.cols * cell : (vr.x1 - vr.x0 + 1) * cell;
+    final h = vr == null ? widget.rows * cell : (vr.y1 - vr.y0 + 1) * cell;
 
     // Margen alrededor para que el mapa no quede pegado a los bordes
     const margin = 16.0;
@@ -114,8 +161,8 @@ class _GameBoardState extends State<GameBoard> {
     final scale = min(availW / w, availH / h).clamp(0.1, 2.0).toDouble();
 
     // Centrado en el visor
-    final dx = (vp.width - w * scale) / 2;
-    final dy = (vp.height - h * scale) / 2;
+    final dx = (vp.width - w * scale) / 2 - ox * scale;
+    final dy = (vp.height - h * scale) / 2 - oy * scale;
 
     _controller.value = Matrix4.identity()
       ..translate(dx, dy)
@@ -138,6 +185,22 @@ class _GameBoardState extends State<GameBoard> {
     } else {
       widget.onCellTap(c.x, c.y);
     }
+  }
+
+  ({int x, int y})? _lastPathCell;
+
+  void _pathStart(Offset p) {
+    final c = _cellAt(p);
+    if (c == null) return;
+    _lastPathCell = c;
+    widget.onPathStart?.call(c.x, c.y);
+  }
+
+  void _pathUpdate(Offset p) {
+    final c = _cellAt(p);
+    if (c == null || c == _lastPathCell) return;
+    _lastPathCell = c;
+    widget.onPathExtend?.call(c.x, c.y);
   }
 
   void _paint(Offset p) {
@@ -186,13 +249,30 @@ class _GameBoardState extends State<GameBoard> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapUp: (d) => _tap(d.localPosition),
-                  onPanStart:
-                      widget.paintMode ? (d) => _paint(d.localPosition) : null,
-                  onPanUpdate:
-                      widget.paintMode ? (d) => _paint(d.localPosition) : null,
+                  onLongPressStart: widget.onCellLongPress == null
+                      ? null
+                      : (d) {
+                          final c = _cellAt(d.localPosition);
+                          if (c != null) widget.onCellLongPress!(c.x, c.y);
+                        },
+                  onPanStart: widget.paintMode
+                      ? (d) => _paint(d.localPosition)
+                      : (widget.onPathStart != null
+                          ? (d) => _pathStart(d.localPosition)
+                          : null),
+                  onPanUpdate: widget.paintMode
+                      ? (d) => _paint(d.localPosition)
+                      : (widget.onPathExtend != null
+                          ? (d) => _pathUpdate(d.localPosition)
+                          : null),
                   onPanEnd: widget.paintMode
                       ? (_) => _lastPaintedCell = null
-                      : null,
+                      : (widget.onPathEnd != null
+                          ? (_) {
+                              _lastPathCell = null;
+                              widget.onPathEnd!();
+                            }
+                          : null),
                   child: Stack(
                     children: [
                       CustomPaint(
@@ -203,6 +283,8 @@ class _GameBoardState extends State<GameBoard> {
                           terrain: widget.terrain,
                           reachable: widget.reachable,
                           cell: cell,
+                          showZones: widget.showZones,
+                          fogged: widget.fogged,
                         ),
                       ),
                       for (final t in widget.tokens)
@@ -223,6 +305,100 @@ class _GameBoardState extends State<GameBoard> {
               icon: widget.iconOf?.call(t),
                               selected: widget.selectedId == t.id,
                               turn: widget.turnIds.contains(t.id),
+                            ),
+                          ),
+                        ),
+                      // Marcas de los jugadores en casillas
+                      for (final pg in widget.pings)
+                        Positioned(
+                          left: pg.x * cell,
+                          top: pg.y * cell,
+                          width: cell,
+                          height: cell,
+                          child: IgnorePointer(child: _PingView(ping: pg)),
+                        ),
+                      // Recorridos de los demás jugadores
+                      for (final op in widget.otherPaths) ...[
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _PathPainter(
+                                path: op.cells,
+                                cell: cell,
+                                over: op.over,
+                                faded: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (op.label.isNotEmpty)
+                          Positioned(
+                            left: op.cells.last.x * cell - cell * 0.5,
+                            top: op.cells.last.y * cell - cell * 0.55,
+                            width: cell * 2,
+                            child: IgnorePointer(
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (op.over
+                                            ? Colors.red.shade700
+                                            : Colors.black87)
+                                        .withOpacity(0.75),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    op.label,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                      // Recorrido dibujado
+                      if (widget.path.length > 1)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _PathPainter(
+                                path: widget.path,
+                                cell: cell,
+                                over: widget.pathOver,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (widget.path.length > 1 && widget.pathLabel.isNotEmpty)
+                        Positioned(
+                          left: widget.path.last.x * cell - cell * 0.5,
+                          top: widget.path.last.y * cell - cell * 0.55,
+                          width: cell * 2,
+                          child: IgnorePointer(
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: widget.pathOver
+                                      ? Colors.red.shade700
+                                      : Colors.black87,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  widget.pathLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -270,6 +446,8 @@ class _GridPainter extends CustomPainter {
   final Map<String, String> terrain;
   final Set<String> reachable;
   final double cell;
+  final bool showZones;
+  final Set<String> fogged;
 
   _GridPainter({
     required this.cols,
@@ -277,6 +455,8 @@ class _GridPainter extends CustomPainter {
     required this.terrain,
     required this.reachable,
     required this.cell,
+    this.showZones = false,
+    this.fogged = const {},
   });
 
   @override
@@ -303,7 +483,60 @@ class _GridPainter extends CustomPainter {
         x,
         y,
       );
+
+      // Número de grupo de escaleras y teletransportadores
+      final g = Terrains.groupOf(type);
+      if (g != null) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: '$g',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: cell * 0.3,
+              fontWeight: FontWeight.bold,
+              shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(x * cell + cell * 0.06, y * cell + cell * 0.02));
+      }
     });
+
+    // Zonas (solo para quien diseña el mapa): tinte y número
+    if (showZones) {
+      terrain.forEach((key, v) {
+        final z = Terrains.zoneOf(v);
+        if (z == null) return;
+        final p = key.split('_');
+        final x = int.tryParse(p[0]);
+        final y = int.tryParse(p.length > 1 ? p[1] : '');
+        if (x == null || y == null || x >= cols || y >= rows) return;
+        final color = Color(Terrains.zoneColors[(z - 1) % Terrains.zoneColors.length]);
+        final r = Rect.fromLTWH(x * cell, y * cell, cell, cell);
+        canvas.drawRect(r, Paint()..color = color.withOpacity(0.22));
+        canvas.drawRect(
+          r.deflate(1),
+          Paint()
+            ..color = color.withOpacity(0.8)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+        final tp = TextPainter(
+          text: TextSpan(
+            text: 'Z$z',
+            style: TextStyle(
+              color: color,
+              fontSize: cell * 0.22,
+              fontWeight: FontWeight.bold,
+              shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(r.right - tp.width - 3, r.bottom - tp.height - 1));
+      });
+    }
 
     paintWallOutlines(canvas, terrain, cols, rows, cell, cell);
     paintDoorGroups(canvas, terrain, cols, rows, cell, cell);
@@ -338,6 +571,17 @@ class _GridPainter extends CustomPainter {
     for (var r = 0; r <= rows; r++) {
       canvas.drawLine(Offset(0, r * cell), Offset(cols * cell, r * cell), line);
     }
+    // Niebla: zonas ocultas para este jugador
+    if (fogged.isNotEmpty) {
+      final fog = Paint()..color = const Color(0xFF15181C);
+      for (final key in fogged) {
+        final p = key.split('_');
+        final x = int.tryParse(p[0]);
+        final y = int.tryParse(p.length > 1 ? p[1] : '');
+        if (x == null || y == null) continue;
+        canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell, cell), fog);
+      }
+    }
   }
 
   @override
@@ -345,7 +589,9 @@ class _GridPainter extends CustomPainter {
       old.cols != cols ||
       old.rows != rows ||
       old.terrain != terrain ||
-      old.reachable != reachable;
+      old.reachable != reachable ||
+      old.showZones != showZones ||
+      old.fogged != fogged;
 }
 
 class _TokenView extends StatelessWidget {
@@ -465,4 +711,117 @@ class _TokenView extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// Marca de un jugador en una casilla (atacar aquí, ir aquí…).
+class CellPing {
+  final String id;
+  final String uid;
+  final int x;
+  final int y;
+  final int floor;
+
+  /// 'attack', 'move', 'look', 'danger', 'help'
+  final String kind;
+  final String author;
+  final int color;
+
+  const CellPing({
+    this.id = '',
+    this.uid = '',
+    required this.x,
+    required this.y,
+    this.floor = 0,
+    required this.kind,
+    required this.author,
+    required this.color,
+  });
+
+  static const List<String> kinds = ['attack', 'move', 'look', 'danger', 'help'];
+
+  static IconData iconOf(String kind) => switch (kind) {
+        'attack' => Icons.gps_fixed,
+        'move' => Icons.directions_walk,
+        'look' => Icons.visibility,
+        'danger' => Icons.warning_amber_rounded,
+        'help' => Icons.pan_tool_alt,
+        _ => Icons.location_on,
+      };
+
+  /// Clave de traducción (español) del tipo de marca
+  static String labelOf(String kind) => switch (kind) {
+        'attack' => 'Atacar aquí',
+        'move' => 'Ir aquí',
+        'look' => 'Mirar aquí',
+        'danger' => 'Peligro',
+        'help' => 'Ayuda',
+        _ => 'Marca',
+      };
+}
+
+class _PingView extends StatelessWidget {
+  final CellPing ping;
+  const _PingView({required this.ping});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Color(ping.color);
+    return Center(
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: c.withOpacity(0.85),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
+        ),
+        child: Icon(CellPing.iconOf(ping.kind), size: 18, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Línea del recorrido dibujado, con un punto en cada casilla.
+class _PathPainter extends CustomPainter {
+  final List<({int x, int y})> path;
+  final double cell;
+  final bool over;
+  final bool faded;
+
+  _PathPainter({
+    required this.path,
+    required this.cell,
+    required this.over,
+    this.faded = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final base = over ? const Color(0xFFD32F2F) : const Color(0xFF1E88E5);
+    final color = faded ? base.withOpacity(0.55) : base;
+    final line = Paint()
+      ..color = color.withOpacity(0.85)
+      ..strokeWidth = cell * 0.14
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    Offset center(({int x, int y}) c) =>
+        Offset((c.x + 0.5) * cell, (c.y + 0.5) * cell);
+    final p = Path()..moveTo(center(path.first).dx, center(path.first).dy);
+    for (final c in path.skip(1)) {
+      final o = center(c);
+      p.lineTo(o.dx, o.dy);
+    }
+    canvas.drawPath(p, line);
+    final dot = Paint()..color = color;
+    for (final c in path.skip(1)) {
+      canvas.drawCircle(center(c), cell * 0.12, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PathPainter old) =>
+      old.path != path || old.over != over;
 }

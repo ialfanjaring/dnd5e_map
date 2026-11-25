@@ -9,10 +9,18 @@ class WeaponAttack {
   final int attackBonus;
   final String damage; // "1d8+3 cortante"
 
+  /// Para tirar el daño: dados ("1d8"), modificador y tipo (en inglés, de la API)
+  final String damageDice;
+  final int damageMod;
+  final String damageType;
+
   const WeaponAttack({
     required this.weapon,
     required this.attackBonus,
     required this.damage,
+    this.damageDice = '',
+    this.damageMod = 0,
+    this.damageType = '',
   });
 }
 
@@ -27,12 +35,16 @@ class EquipmentEffects {
   /// Avisos (por ejemplo, fuerza insuficiente para la armadura).
   final List<String> notes;
 
+  /// Desglose de la CA con el equipo ("Cota de malla 16", "Escudo +2"…)
+  final List<String> acParts;
+
   const EquipmentEffects({
     this.armorClass,
     this.speedPenalty = 0,
     this.stealthDisadvantage = false,
     this.attacks = const [],
     this.notes = const [],
+    this.acParts = const [],
   });
 
   /// [c] debe llevar ya los bonificadores de raza, para usar las
@@ -63,7 +75,30 @@ class EquipmentEffects {
     final notes = <String>[];
 
     int? ac;
+    final acParts = <String>[];
     if (armor != null || shield != null) {
+      if (armor == null) {
+        acParts.add('10 ${Character.signed(dex)} DES');
+      } else {
+        var dexPart = 0;
+        if (armor.acDexBonus) {
+          dexPart = armor.acMaxBonus == null ? dex : min(dex, armor.acMaxBonus!);
+        }
+        acParts.add('${armor.displayName} ${armor.acBase}');
+        if (armor.acDexBonus) {
+          acParts.add('${Character.signed(dexPart)} DES'
+              '${armor.acMaxBonus != null ? ' (máx. ${armor.acMaxBonus})' : ''}');
+        }
+        if (armor.magicBonus != 0) {
+          acParts.add('${Character.signed(armor.magicBonus)} mágica');
+        }
+      }
+      if (shield != null) {
+        acParts.add('${shield.displayName} ${Character.signed(shield.acBase ?? 0)}');
+        if (shield.magicBonus != 0) {
+          acParts.add('${Character.signed(shield.magicBonus)} mágico');
+        }
+      }
       var base = 10 + dex;
       if (armor != null) {
         var dexPart = 0;
@@ -76,7 +111,9 @@ class EquipmentEffects {
     }
     if (extraAcBonus != 0) {
       // Sin armadura con estadísticas: se parte de la CA de la ficha
+      if (ac == null) acParts.add('${c.armorClass} ficha');
       ac = (ac ?? c.armorClass) + extraAcBonus;
+      acParts.add('${Character.signed(extraAcBonus)} objetos mágicos');
     }
 
     var penalty = 0;
@@ -103,6 +140,9 @@ class EquipmentEffects {
         // Se asume competencia con el arma
         attackBonus: ability + c.proficiencyBonus + w.magicBonus,
         damage: '${w.damageDice}$modText $type',
+        damageDice: w.damageDice,
+        damageMod: dmgMod,
+        damageType: w.damageType,
       ));
     }
 
@@ -112,6 +152,7 @@ class EquipmentEffects {
       stealthDisadvantage: armor?.stealthDisadvantage ?? false,
       attacks: attacks,
       notes: notes,
+      acParts: acParts,
     );
   }
 }

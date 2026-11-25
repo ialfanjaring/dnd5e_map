@@ -14,6 +14,7 @@ import '../services/class_api_service.dart';
 import '../services/equipment_api_service.dart';
 import '../models/game_models.dart';
 import '../services/game_service.dart';
+import '../services/profile_service.dart';
 import 'items_screen.dart';
 import 'player_room_screen.dart';
 import '../services/monster_api_service.dart';
@@ -27,6 +28,7 @@ import '../widgets/combatant_dialog.dart';
 import '../widgets/death_saves_card.dart';
 import '../widgets/game_sheet_widgets.dart';
 import '../widgets/initiative_panel.dart';
+import '../widgets/player_panels.dart';
 import '../i18n/i18n.dart';
 import '../widgets/app_icon.dart';
 import '../utils/orientation.dart';
@@ -51,7 +53,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _service = GameService();
   final _monsterApi = MonsterApiService();
   final List<StreamSubscription<dynamic>> _subs = [];
@@ -80,6 +82,13 @@ class _GameScreenState extends State<GameScreen>
   late final TabController _tabs;
   bool _fullMap = false; // mapa a pantalla completa (sin barra ni paneles)
   bool _panelOpen = false;
+
+  /// Pestañas del panel izquierdo del jugador: Ficha, Acciones, Armas, Hechizos
+  late TabController _leftTabs;
+
+  /// Ficha que muestra la pestaña Ficha del jugador: la de la última ficha
+  /// tocada en el mapa (null = la suya).
+  String? _sheetTarget;
   bool _bottomOpen = false;
   static const int _tabInitiative = 1;
 
@@ -125,6 +134,228 @@ class _GameScreenState extends State<GameScreen>
       ? _masterColor
       : (_playerOf(_uid)?.color ?? GameColors.palette.first);
 
+  // ---- Movimiento dibujado ----
+  /// Ficha que se está moviendo y recorrido (casillas, empezando en la ficha)
+  String? _pathToken;
+  List<({int x, int y})> _path = const [];
+
+  /// Pies ya movidos en el turno actual, por ficha (se reinicia en su turno)
+  final Map<String, int> _movedFeet = {};
+  String _lastTurnId = '';
+
+  // ---- Zonas ----
+  /// Zonas que el jugador ha ocultado en su pantalla (para ver el mapa más grande)
+  final Set<int> _localHiddenZones = {};
+
+  /// Visibilidad de cada zona (del documento de la partida)
+  Object? _zoneVisOf(int z) => (_game['zoneVis'] as Map?)?['$z'];
+
+  /// ¿Ve este usuario la zona [z]? El Master las ve todas.
+  bool _zoneVisibleToMe(int z) {
+    if (widget.isMaster) return true;
+    final v = _zoneVisOf(z);
+    if (v == null || v == 'all') return true;
+    if (v == 'none') return false;
+    if (v is List) return v.contains(_uid);
+    return true;
+  }
+
+  /// Zonas presentes en el piso actual
+  List<int> get _zonesHere {
+    final out = <int>{};
+    for (final v in _displayTerrain.values) {
+      final z = Terrains.zoneOf(v);
+      if (z != null) out.add(z);
+    }
+    return out.toList()..sort();
+  }
+
+  /// Casillas tapadas por la niebla para este jugador
+  Set<String> get _fogged {
+    if (widget.isMaster) return const {};
+    final out = <String>{};
+    _displayTerrain.forEach((k, v) {
+      final z = Terrains.zoneOf(v);
+      if (z == null) return;
+      if (!_zoneVisibleToMe(z) || _localHiddenZones.contains(z)) out.add(k);
+    });
+    return out;
+  }
+
+  /// Si hay zonas ocultas, el mapa se encaja en lo que queda visible.
+  ({int x0, int y0, int x1, int y1})? _viewRectFor(Set<String> fog) {
+    if (fog.isEmpty) return null;
+    int? x0, y0, x1, y1;
+    for (var y = 0; y < _rows; y++) {
+      for (var x = 0; x < _cols; x++) {
+        if (fog.contains(cellKey(x, y))) continue;
+        x0 = x0 == null ? x : min(x0, x);
+        y0 = y0 == null ? y : min(y0, y);
+        x1 = x1 == null ? x : max(x1, x);
+        y1 = y1 == null ? y : max(y1, y);
+      }
+    }
+    if (x0 == null) return null;
+    return (x0: x0, y0: y0!, x1: x1!, y1: y1!);
+  }
+
+  String _zoneVisLabel(int z) {
+    final v = _zoneVisOf(z);
+    if (v == null || v == 'all') return tr('Visible para todos');
+    if (v == 'none') return tr('Oculta para todos');
+    if (v is List) {
+      final names = [
+        for (final p in _players)
+          if (v.contains(p.uid)) p.character.name,
+      ];
+      return names.isEmpty ? tr('Oculta para todos') : '${tr('La ven')}: ${names.join(', ')}';
+    }
+    return '';
+  }
+
+  Future<void> _pickZonePlayers(int z) async {
+    final v = _zoneVisOf(z);
+    final chosen = <String>{
+      if (v is List) ...v.map((e) => e.toString()),
+      if (v == null || v == 'all') ..._players.map((p) => p.uid),
+    };
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: Text('${tr('Zona')} $z: ${tr('quién la ve')}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final p in _players)
+                CheckboxListTile(
+                  value: chosen.contains(p.uid),
+                  title: Text(p.character.name),
+                  subtitle: p.nickname.isEmpty ? null : Text(p.nickname),
+                  onChanged: (on) => setS(() =>
+                      on == true ? chosen.add(p.uid) : chosen.remove(p.uid)),
+                ),
+              if (_players.isEmpty) Tx('Todavía no hay jugadores.'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Tx('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, chosen),
+              child: const Tx('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    await _service
+        .setZoneVisibility(_code, z, result.toList())
+        .catchError(_onError);
+  }
+
+  /// Panel de zonas: el Master decide quién las ve; el jugador puede
+  /// ocultar las que ve para que el mapa se vea más grande.
+  Widget _zonesSection() {
+    final zones = _zonesHere;
+    if (zones.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Tx('Zonas', style: const TextStyle(fontWeight: FontWeight.bold)),
+          for (final z in zones)
+            if (widget.isMaster)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  radius: 10,
+                  backgroundColor: Color(Terrains.zoneColors[(z - 1) % Terrains.zoneColors.length]),
+                ),
+                title: Text('${tr('Zona')} $z'),
+                subtitle: Text(_zoneVisLabel(z), maxLines: 2, overflow: TextOverflow.ellipsis),
+                trailing: PopupMenuButton<String>(
+                  icon: Icon(
+                    _zoneVisOf(z) == 'none' ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onSelected: (v) {
+                    if (v == 'pick') {
+                      _pickZonePlayers(z);
+                    } else {
+                      _service.setZoneVisibility(_code, z, v).catchError(_onError);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: 'all', child: Tx('Visible para todos')),
+                    PopupMenuItem(value: 'none', child: Tx('Oculta para todos')),
+                    PopupMenuItem(value: 'pick', child: Tx('Elegir jugadores…')),
+                  ],
+                ),
+              )
+            else if (_zoneVisibleToMe(z))
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text('${tr('Zona')} $z'),
+                subtitle: Tx('Ocúltala para ver el resto del mapa más grande.'),
+                value: !_localHiddenZones.contains(z),
+                onChanged: (on) => setState(() {
+                  on ? _localHiddenZones.remove(z) : _localHiddenZones.add(z);
+                  _fitSignal++;
+                }),
+              ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Marcas en casillas ----
+  List<CellPing> _pings = const [];
+
+  // ---- Recorridos de los demás (en directo) ----
+  List<SharedPath> _otherPaths = const [];
+  Timer? _pathTimer;
+  bool _pathDirty = false;
+
+  /// Publica el recorrido que se está dibujando (como mucho cada 150 ms).
+  void _sharePath() {
+    _pathDirty = true;
+    if (_pathTimer?.isActive ?? false) return;
+    _pathTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!_pathDirty || !mounted) return;
+      _pathDirty = false;
+      if (_path.length < 2) return;
+      _service
+          .setPath(_code,
+              floor: _floor, cells: _path, label: _pathLabel, over: _pathOver)
+          .catchError((_) {});
+    });
+  }
+
+  void _unsharePath() {
+    _pathTimer?.cancel();
+    _pathDirty = false;
+    _service.clearPath(_code).catchError((_) {});
+  }
+
+  /// Acciones gastadas en el turno del jugador (se reinicia en su turno).
+  final ValueNotifier<Map<String, bool>> _turnUsed = ValueNotifier({});
+  bool _wasMyTurn = false;
+
+  late final CombatRoller _roller = CombatRoller(
+    gameCode: _code,
+    nameProvider: () => _myName,
+    colorProvider: () => _myColor,
+  );
+
+  void _markUsed(String key) =>
+      _turnUsed.value = {..._turnUsed.value, key: true};
+
   String get _myName => widget.isMaster
       ? tr('Master')
       : (_playerOf(_uid)?.character.name ?? tr('Jugador'));
@@ -155,7 +386,8 @@ class _GameScreenState extends State<GameScreen>
     AppOrientation.landscape();
     // Master: Dados, Iniciativa, Jugadores, Criaturas
     // Jugador: Dados, Iniciativa, Mi ficha
-    _tabs = TabController(length: widget.isMaster ? 6 : 4, vsync: this);
+    _tabs = TabController(length: widget.isMaster ? 6 : 3, vsync: this);
+    _leftTabs = TabController(length: 4, vsync: this);
     _listen();
 
     // Marca la partida como activa mientras el mapa está abierto
@@ -173,6 +405,8 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    _pathTimer?.cancel();
+    if (_path.length > 1) _service.clearPath(_code).catchError((_) {});
     // Al salir de la partida, la app vuelve a vertical
     AppOrientation.portrait();
     _heartbeat?.cancel();
@@ -187,6 +421,7 @@ class _GameScreenState extends State<GameScreen>
           _code, Map<String, String?>.from(_paintBuffer), _terrainFloor);
     }
     _tabs.dispose();
+    _leftTabs.dispose();
     _hiddenRolls.dispose();
     _visibleIds.dispose();
     super.dispose();
@@ -277,9 +512,30 @@ class _GameScreenState extends State<GameScreen>
       _resolvePlayers();
     }, onError: _onError));
 
+    _subs.add(_service.paths(_code).listen((list) {
+      if (mounted) setState(() => _otherPaths = list);
+    }, onError: (_) {}));
+
+    _subs.add(_service.pings(_code).listen((list) {
+      if (mounted) setState(() => _pings = list);
+    }, onError: (_) {}));
+
     _subs.add(_service.combat(_code).listen((c) {
       if (!mounted) return;
       setState(() => _combat = c);
+      // Al empezar el turno de alguien se reinicia su movimiento
+      final turnId = (c?.inTurns ?? false) ? '${c!.round}|${c.current}' : '';
+      if (turnId != _lastTurnId) {
+        _lastTurnId = turnId;
+        for (final id in c?.currentTokenIds ?? const <String>{}) {
+          _movedFeet.remove(id);
+        }
+        if (turnId.isEmpty) _movedFeet.clear();
+      }
+      // Empieza tu turno: se reinicia la lista de acciones
+      final mine = (c?.inTurns ?? false) && c!.current == 'p_$_uid';
+      if (mine && !_wasMyTurn) _turnUsed.value = {};
+      _wasMyTurn = mine;
     }, onError: _onError));
 
     if (widget.isMaster) {
@@ -632,6 +888,8 @@ class _GameScreenState extends State<GameScreen>
       c.abilities.entries.map((e) => '${e.key}${e.value}').join(),
       c.speed,
       c.armorClass,
+      c.acBonus,
+      c.initiativeBonus,
     ].join('|');
 
     final cached = _resolvedChars[p.uid];
@@ -945,7 +1203,7 @@ class _GameScreenState extends State<GameScreen>
           (cur != null &&
               (_visibleIds.value.contains(cur.id) ||
                   cur.members.any(_visibleIds.value.contains)));
-      bg = mine ? Colors.green.shade300 : Colors.blueGrey.shade100;
+      bg = mine ? Colors.amber.shade300 : Colors.blueGrey.shade100;
       text = mine
           ? tr('¡Tu turno!')
           : '${tr('Turno')}: ${cur == null ? '—' : (visible ? cur.name : tr('Algo en las sombras…'))}';
@@ -986,15 +1244,23 @@ class _GameScreenState extends State<GameScreen>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Tx('Código de la sala'),
-        content: SelectableText(
-          _code,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 4,
-          ),
+        title: Text((_game['name'] ?? tr('Partida')).toString()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tx('Código de la sala',
+                style: TextStyle(color: Colors.grey.shade500)),
+            const SizedBox(height: 6),
+            SelectableText(
+              _code,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1046,6 +1312,15 @@ class _GameScreenState extends State<GameScreen>
     // Tocar una ficha la selecciona (o la deselecciona). Los jugadores
     // solo pueden seleccionar la suya; el Master, cualquiera.
     if (hit != null) {
+      // Jugador: tocar cualquier ficha la muestra en la pestaña Ficha
+      if (!widget.isMaster) {
+        setState(() => _sheetTarget = hit.id == 'p_$_uid' ? null : hit.id);
+        // Tocar otra ficha abre el panel izquierdo en la pestaña Ficha
+        if (hit.id != 'p_$_uid') {
+          setState(() => _bottomOpen = true);
+          _leftTabs.animateTo(0);
+        }
+      }
       if (!_canSelect(hit)) return;
       setState(() {
         _selectedId = hit.id == _selectedId ? null : hit.id;
@@ -1054,9 +1329,13 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    // Tocar una casilla vacía mueve la ficha seleccionada (pide confirmación).
-    // Si estaba fuera del mapa, la coloca en esa casilla.
+    // Tocar una casilla vacía: el Master teletransporta la ficha seleccionada
+    // (pide confirmación). Los jugadores mueven dibujando el recorrido.
     final sel = _selected;
+    if (sel != null && _canMove(sel) && !widget.isMaster && !sel.hidden) {
+      _snack(tr('Arrastra desde tu ficha para dibujar el recorrido.'));
+      return;
+    }
     if (sel != null && _canMove(sel)) {
       final nx = x > _cols - sel.span ? _cols - sel.span : x;
       final ny = y > _rows - sel.span ? _rows - sel.span : y;
@@ -1081,9 +1360,92 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  /// Casillas conectadas con el grupo [group] (escaleras o portales con el
+  /// mismo número), en todos los pisos, salvo la casilla de origen.
+  Future<List<({int floor, int x, int y})>> _linkTargets(
+      int group, int fromFloor, int fx, int fy) async {
+    final out = <({int floor, int x, int y})>[];
+    for (var f = 0; f < _floorCount; f++) {
+      final cells = f == _floor
+          ? _displayTerrain
+          : await _service.terrainOnce(_code, f).catchError((_) => <String, String>{});
+      cells.forEach((k, v) {
+        if (Terrains.groupOf(v) != group || !Terrains.isLink(v)) return;
+        final p = k.split('_');
+        final x = int.tryParse(p[0]);
+        final y = int.tryParse(p.length > 1 ? p[1] : '');
+        if (x == null || y == null) return;
+        if (f == fromFloor && x == fx && y == fy) return;
+        out.add((floor: f, x: x, y: y));
+      });
+    }
+    out.sort((a, b) => a.floor != b.floor
+        ? a.floor.compareTo(b.floor)
+        : (a.y != b.y ? a.y.compareTo(b.y) : a.x.compareTo(b.x)));
+    return out;
+  }
+
+  /// Escalera o portal con número: elegir a cuál de las conectadas ir.
+  Future<bool> _useNumberedLink(GameToken sel, int nx, int ny, int group) async {
+    final targets = await _linkTargets(group, _floor, nx, ny);
+    if (!mounted) return false;
+    final picked = await showDialog<({int floor, int x, int y})?>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text('${tr('Conexión')} #$group'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, (floor: _floor, x: nx, y: ny)),
+            child: Row(children: [
+              const Icon(Icons.place_outlined, size: 18),
+              const SizedBox(width: 8),
+              Tx('Quedarse aquí'),
+            ]),
+          ),
+          for (final t in targets)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, t),
+              child: Row(children: [
+                Icon(
+                  t.floor == _floor
+                      ? Icons.blur_circular
+                      : (t.floor > _floor ? Icons.arrow_upward : Icons.arrow_downward),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${_floorName(t.floor)} · (${t.x + 1}, ${t.y + 1})'),
+                ),
+              ]),
+            ),
+          if (targets.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Tx('No hay otras casillas con este número.'),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return false;
+    setState(() => _selectedId = null);
+    if (picked.floor == sel.floor) {
+      await _service.moveToken(_code, sel.id, picked.x, picked.y).catchError(_onError);
+    } else {
+      await _service
+          .moveTokenToFloor(_code, sel.id, picked.x, picked.y, picked.floor)
+          .catchError(_onError);
+    }
+    return true;
+  }
+
   Future<void> _confirmAndMove(GameToken sel, int nx, int ny) async {
     final here = _floor;
     final cellValue = _displayTerrain[cellKey(nx, ny)];
+    final group = Terrains.groupOf(cellValue);
+    if (!sel.hidden && group != null && Terrains.isLink(cellValue)) {
+      await _useNumberedLink(sel, nx, ny, group);
+      return;
+    }
     final dests = <int>[
       if (!sel.hidden && _floorCount > 1)
         for (var i = 0; i < _floorCount; i++)
@@ -1155,11 +1517,255 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  // ---------------------------------------------------------------
+  // MOVIMIENTO DIBUJADO
+  // ---------------------------------------------------------------
+
+  /// Coste en casillas de entrar en (x, y) con la ficha; -1 si no se puede.
+  int _stepCost(GameToken t, int x, int y) {
+    if (x < 0 || y < 0 || x + t.span > _cols || y + t.span > _rows) return -1;
+    var worst = 1;
+    for (var dx = 0; dx < t.span; dx++) {
+      for (var dy = 0; dy < t.span; dy++) {
+        final rule = Terrains.parse(_displayTerrain[cellKey(x + dx, y + dy)]).rule;
+        if (rule == MoveRule.blocked) return -1;
+        if (rule == MoveRule.difficult) worst = 2;
+      }
+    }
+    return worst;
+  }
+
+  /// Pies que cuesta el recorrido dibujado.
+  int get _pathFeet {
+    final t = _tokens.where((e) => e.id == _pathToken).firstOrNull;
+    if (t == null) return 0;
+    var cost = 0;
+    for (final c in _path.skip(1)) {
+      final s = _stepCost(t, c.x, c.y);
+      cost += s < 0 ? 1 : s;
+    }
+    return cost * 5;
+  }
+
+  /// En combate el movimiento está limitado a la velocidad del turno.
+  bool get _limitMove => _combat?.inTurns ?? false;
+
+  int _feetLeft(GameToken t) => max(0, _speedOf(t) - (_movedFeet[t.id] ?? 0));
+
+  String get _pathLabel {
+    final t = _tokens.where((e) => e.id == _pathToken).firstOrNull;
+    if (t == null || _path.length < 2) return '';
+    return _limitMove
+        ? '$_pathFeet / ${_feetLeft(t)} ${tr('pies')}'
+        : '$_pathFeet ${tr('pies')}';
+  }
+
+  bool get _pathOver {
+    final t = _tokens.where((e) => e.id == _pathToken).firstOrNull;
+    return t != null && _limitMove && _pathFeet > _feetLeft(t);
+  }
+
+  void _onPathStart(int x, int y) {
+    final hit = _tokenAt(x, y);
+    if (hit == null || !_canMove(hit) || hit.hidden) return;
+    setState(() {
+      _selectedId = hit.id;
+      _pathToken = hit.id;
+      _path = [(x: hit.x, y: hit.y)];
+    });
+  }
+
+  void _onPathExtend(int x, int y) {
+    final t = _tokens.where((e) => e.id == _pathToken).firstOrNull;
+    if (t == null || _path.isEmpty) return;
+    // La casilla del dedo es la esquina superior izquierda de la ficha
+    final last = _path.last;
+    // Volver atrás borra el último paso
+    if (_path.length > 1 &&
+        _path[_path.length - 2].x == x &&
+        _path[_path.length - 2].y == y) {
+      setState(() => _path = _path.sublist(0, _path.length - 1));
+      _sharePath();
+      return;
+    }
+    // Solo casillas contiguas (también en diagonal); si el dedo salta varias,
+    // se rellena el camino en línea recta
+    var cx = last.x;
+    var cy = last.y;
+    final next = [..._path];
+    var guard = 0;
+    while ((cx != x || cy != y) && guard++ < 60) {
+      final nx = cx + (x - cx).sign;
+      final ny = cy + (y - cy).sign;
+      if (_stepCost(t, nx, ny) < 0) break; // muro: el recorrido se detiene
+      cx = nx;
+      cy = ny;
+      next.add((x: cx, y: cy));
+    }
+    if (next.length != _path.length) {
+      setState(() => _path = next);
+      _sharePath();
+    }
+  }
+
+  Future<void> _onPathEnd() async {
+    final t = _tokens.where((e) => e.id == _pathToken).firstOrNull;
+    final path = _path;
+    void clear() {
+      _unsharePath();
+      if (mounted) {
+        setState(() {
+          _path = const [];
+          _pathToken = null;
+        });
+      }
+    }
+
+    if (t == null || path.length < 2) {
+      clear();
+      return;
+    }
+    final end = path.last;
+
+    // No se puede terminar encima de otra ficha
+    for (final o in _onFloor) {
+      if (o.id == t.id) continue;
+      final overlap = end.x < o.x + o.span &&
+          o.x < end.x + t.span &&
+          end.y < o.y + o.span &&
+          o.y < end.y + t.span;
+      if (overlap) {
+        _snack(tr('No puedes terminar el movimiento encima de otra ficha.'));
+        clear();
+        return;
+      }
+    }
+
+    final feet = _pathFeet;
+    if (_limitMove) {
+      final left = _feetLeft(t);
+      final cur = _combat?.currentTokenIds ?? const <String>{};
+      final notMyTurn = !widget.isMaster && !cur.contains(t.id);
+      if (feet > left || notMyTurn) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Tx(notMyTurn ? 'No es tu turno' : 'Te pasas de tu movimiento'),
+            content: Text(notMyTurn
+                ? tr('¿Mover igualmente fuera de tu turno?')
+                : tr('El recorrido cuesta {a} pies y te quedan {b}. ¿Mover igualmente?')
+                    .replaceAll('{a}', '$feet')
+                    .replaceAll('{b}', '$left')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Tx('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Tx('Mover igualmente'),
+              ),
+            ],
+          ),
+        );
+        if (go != true) {
+          clear();
+          return;
+        }
+      }
+    }
+
+    clear();
+    if (!mounted) return;
+
+    // Escaleras y teletransportes: se pregunta a qué piso ir
+    final cellValue = _displayTerrain[cellKey(end.x, end.y)];
+    final onLink = (Terrains.groupOf(cellValue) != null &&
+            Terrains.isLink(cellValue)) ||
+        (_floorCount > 1 &&
+            List.generate(_floorCount, (i) => i)
+                .any((i) => Terrains.canChangeFloor(cellValue, _floor, i)));
+    if (onLink) {
+      await _confirmAndMove(t, end.x, end.y);
+    } else {
+      setState(() => _selectedId = null);
+      await _service.moveToken(_code, t.id, end.x, end.y).catchError(_onError);
+    }
+
+    if (_limitMove) {
+      _movedFeet[t.id] = (_movedFeet[t.id] ?? 0) + feet;
+      if (t.id == 'p_$_uid') {
+        _markUsed('move');
+        final left = _feetLeft(t);
+        _snack(left > 0
+            ? tr('Te quedan {n} pies de movimiento.').replaceAll('{n}', '$left')
+            : tr('Has gastado todo tu movimiento.'));
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // MARCAS EN CASILLAS
+  // ---------------------------------------------------------------
+
+  Future<void> _onCellLongPress(int x, int y) async {
+    final kind = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              title: Text(
+                '${tr('Marcar la casilla')} (${x + 1}, ${y + 1})',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            for (final k in CellPing.kinds)
+              ListTile(
+                leading: Icon(CellPing.iconOf(k)),
+                title: Text(tr(CellPing.labelOf(k))),
+                onTap: () => Navigator.pop(ctx, k),
+              ),
+            ListTile(
+              leading: const Icon(Icons.layers_clear_outlined),
+              title: Tx(widget.isMaster
+                  ? 'Quitar todas las marcas'
+                  : 'Quitar mis marcas'),
+              onTap: () => Navigator.pop(ctx, '-'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (kind == null) return;
+    try {
+      if (kind == '-') {
+        await _service.clearMyPings(_code, all: widget.isMaster);
+      } else {
+        await _service.addPing(
+          _code,
+          x: x,
+          y: y,
+          floor: _floor,
+          kind: kind,
+          author: _myName,
+          color: _myColor,
+        );
+      }
+    } catch (e) {
+      _snack('${tr('No se pudo guardar')}: $e');
+    }
+  }
+
   void _onCellPaint(int x, int y) {
     if (!widget.isMaster || _tool == _Tool.move) return;
 
     final key = cellKey(x, y);
-    final value = _tool == _Tool.erase ? null : _brush;
+    final value = _tool == _Tool.erase
+        ? null
+        : Terrains.applyBrush(_displayTerrain[key], _brush);
 
     if (_paintBuffer.containsKey(key) && _paintBuffer[key] == value) return;
 
@@ -1267,6 +1873,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _removeCreature(GameToken t) async {
+    if (_combat?.active ?? false) {
+      if (_combat!.entries.any((e) => e.covers(t.id))) {
+        _snack(tr('No se puede quitar una criatura que está en el combate.'));
+        return;
+      }
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1373,17 +1985,117 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  /// Ficha de un jugador: nombre del personaje y nickname de quien lo lleva.
+  void _showPlayerInfo(String uid) {
+    final p = _playerOf(uid);
+    if (p == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(p.character.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(p.character.summary),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.person_outline, size: 18),
+                const SizedBox(width: 6),
+                Text(p.nickname.isEmpty ? '—' : p.nickname,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Tx('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Texto principal de la barra: de quién es el turno en combate o, fuera
+  /// de combate, el nombre de tu personaje (el Master ve su nickname).
+  String _titleText() {
+    final st = _combat;
+    if (st != null && st.rolling) {
+      final iRoll = st.entries.any((e) => e.id == 'p_$_uid' && !e.rolled);
+      return iRoll ? tr('¡Tira tu iniciativa!') : tr('Tiradas de iniciativa');
+    }
+    if (st != null && st.inTurns) {
+      if (st.current == 'p_$_uid') return tr('¡Tu turno!');
+      final cur = st.currentEntry;
+      if (cur == null) return '${tr('Turno')}: —';
+      final visible = widget.isMaster ||
+          _visibleIds.value.contains(cur.id) ||
+          cur.members.any(_visibleIds.value.contains);
+      return '${tr('Turno')}: ${visible ? cur.name : tr('Algo en las sombras…')}';
+    }
+    if (widget.isMaster) {
+      final nick = ProfileService.instance.nickname;
+      return nick.isEmpty ? tr('Master') : '${tr('Master')} · $nick';
+    }
+    return _playerOf(_uid)?.character.name ?? tr('Jugador');
+  }
+
+  bool _leaving = false;
+
+  /// Un jugador confirma antes de salir de la sala.
+  Future<void> _confirmLeave() async {
+    if (widget.isMaster) {
+      Navigator.pop(context);
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Tx('Salir de la partida'),
+        content: const Tx(
+          '¿Seguro que quieres salir? Podrás volver a entrar con el código de la sala.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Tx('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Tx('Salir'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      setState(() => _leaving = true);
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inCombat = _combat?.active ?? false;
     final cur = _combat?.current ?? '';
     final turnNow = (_combat?.inTurns ?? false) &&
         (widget.isMaster ? !cur.startsWith('p_') : cur == 'p_$_uid');
-    // Combate: rojo. Tu turno: verde.
-    final Color? tint = turnNow
-        ? Colors.green
-        : (inCombat ? Colors.red : null);
-    return Scaffold(
+    // Combate: fondo rojo. Tu turno: marco dorado alrededor de la pantalla.
+    // Sin filtro de color en combate (el turno se marca con el borde dorado)
+    const Color? tint = null;
+    const gold = Color(0xFFFFC107);
+    return PopScope(
+      canPop: widget.isMaster || _leaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Container(
+      foregroundDecoration: turnNow
+          ? BoxDecoration(border: Border.all(color: gold, width: 5))
+          : null,
+      child: Scaffold(
       backgroundColor: tint == null
           ? null
           : Color.alphaBlend(tint.withOpacity(0.28),
@@ -1393,8 +2105,13 @@ class _GameScreenState extends State<GameScreen>
           : AppBar(
         backgroundColor: tint?.withOpacity(0.55),
         title: Text(
-          (_game['name'] ?? tr('Partida')).toString(),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          _titleText(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: turnNow ? gold : null,
+          ),
         ),
         centerTitle: true,
         bottom: widget.isMaster ? _modeBar() : null,
@@ -1424,7 +2141,7 @@ class _GameScreenState extends State<GameScreen>
           IconButton(
             tooltip: tr('Salir del mapa'),
             icon: const Icon(Icons.exit_to_app),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _confirmLeave,
           ),
         ],
       ),
@@ -1514,7 +2231,9 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
 
-              if (!_fullMap) ...[
+              // En pantalla completa se quita la barra de arriba, pero los
+              // paneles laterales se pueden seguir abriendo
+              ...[
               // Izquierda: herramientas y ficha seleccionada (desplegable)
               AnimatedPositioned(
                 duration: anim,
@@ -1527,7 +2246,11 @@ class _GameScreenState extends State<GameScreen>
                   elevation: 10,
                   color: Theme.of(context).colorScheme.surface,
                   child: Padding(
-                    padding: EdgeInsets.only(left: pad.left, bottom: pad.bottom),
+                    padding: EdgeInsets.only(
+                      left: pad.left,
+                      bottom: pad.bottom,
+                      top: _fullMap ? pad.top : 0,
+                    ),
                     child: _buildToolsPanel(),
                   ),
                 ),
@@ -1585,6 +2308,7 @@ class _GameScreenState extends State<GameScreen>
                     padding: EdgeInsets.only(
                       right: pad.right,
                       bottom: pad.bottom,
+                      top: _fullMap ? pad.top : 0,
                     ),
                     child: _buildRightPanel(),
                   ),
@@ -1602,7 +2326,7 @@ class _GameScreenState extends State<GameScreen>
                   alignment: Alignment.centerRight,
                   child: Material(
                     color: (myTurn || myRoll) && !_panelOpen
-                        ? Colors.green
+                        ? gold
                         : Theme.of(context).colorScheme.primary,
                     elevation: 4,
                     borderRadius: const BorderRadius.horizontal(
@@ -1634,15 +2358,26 @@ class _GameScreenState extends State<GameScreen>
           );
         },
       )),
+    ),
+    ),
     );
   }
 
   Widget _buildBoard() {
+    final fog = _fogged;
     return GameBoard(
       cols: _cols,
       rows: _rows,
       terrain: _displayTerrain,
-      tokens: _onFloor,
+      // Fichas dentro de zonas ocultas: el jugador no las ve (salvo la suya)
+      tokens: fog.isEmpty
+          ? _onFloor
+          : _onFloor
+              .where((t) => t.id == 'p_$_uid' || !fog.contains(cellKey(t.x, t.y)))
+              .toList(),
+      fogged: fog,
+      viewRect: _viewRectFor(fog),
+      showZones: widget.isMaster,
       selectedId: _selectedId,
       colorOf: _colorOf,
       color2Of: _color2Of,
@@ -1654,14 +2389,83 @@ class _GameScreenState extends State<GameScreen>
       fitSignal: _fitSignal,
       onCellTap: _onCellTap,
       onCellPaint: _onCellPaint,
-      reachable: _reach,
+      reachable: _path.length > 1 ? const {} : _reach,
       marker: _marker,
+      onPathStart: _onPathStart,
+      onPathExtend: _onPathExtend,
+      onPathEnd: _onPathEnd,
+      path: _path,
+      pathLabel: _pathLabel,
+      pathOver: _pathOver,
+      otherPaths: [
+        for (final op in _otherPaths)
+          if (op.floor == _floor)
+            (cells: op.cells, label: op.label, over: op.over),
+      ],
+      pings: [
+        for (final p in _pings)
+          if (p.floor == _floor) p,
+      ],
+      onCellLongPress: _onCellLongPress,
       turnIds: _combat?.currentTokenIds ?? const {},
+    );
+  }
+
+  /// Panel izquierdo del jugador: su ficha en el mapa, zonas y las pestañas
+  /// Ficha, Acciones, Armas y Hechizos.
+  Widget _buildPlayerPanel() {
+    final zones = _zonesHere.where(_zoneVisibleToMe).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildToolbar(),
+        _buildSelectedBar(),
+        if (zones.isNotEmpty)
+          ExpansionTile(
+            dense: true,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+            title: Text('${tr('Zonas')} (${zones.length})'),
+            children: [_zonesSection()],
+          ),
+        TabBar(
+          controller: _leftTabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          tabs: [
+            Tab(text: tr('Ficha')),
+            Tab(text: tr('Acciones')),
+            Tab(text: tr('Armas')),
+            Tab(text: tr('Hechizos')),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _leftTabs,
+            children: [
+              _sheetPanel(),
+              ActionsPanel(used: _turnUsed),
+              WeaponsPanel(
+                gameCode: _code,
+                uid: _uid,
+                roller: _roller,
+                onAction: () => _markUsed('action'),
+              ),
+              SpellsPanel(
+                gameCode: _code,
+                uid: _uid,
+                roller: _roller,
+                onAction: () => _markUsed('action'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   /// Panel izquierdo desplegable: herramientas del Master y ficha seleccionada.
   Widget _buildToolsPanel() {
+    if (!widget.isMaster) return _buildPlayerPanel();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1679,6 +2483,7 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 _buildToolbar(),
                 if (widget.isMaster) _floorsSection(),
+                _zonesSection(),
                 if (widget.isMaster && _tool == _Tool.paint)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
@@ -1944,7 +2749,7 @@ class _GameScreenState extends State<GameScreen>
               Padding(
                 padding: const EdgeInsets.only(left: 4),
                 child: Tx(
-                  'Toca tu ficha y luego una casilla para moverla',
+                  'Arrastra desde tu ficha para moverla. Mantén pulsada una casilla para marcarla.',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ),
@@ -2051,7 +2856,7 @@ class _GameScreenState extends State<GameScreen>
                       PopupMenuItem(value: i, child: Text(_floorName(i))),
                 ],
               ),
-            if (canOpenSheet)
+            if (canOpenSheet && widget.isMaster)
               IconButton(
                 tooltip: tr('Ver ficha'),
                 icon: const Icon(Icons.description_outlined),
@@ -2112,9 +2917,88 @@ class _GameScreenState extends State<GameScreen>
         colorProvider: () => _myColor,
       );
 
-  Widget _sheetPanel() => widget.isMaster
-      ? PlayersPanel(gameCode: _code)
-      : PlayerLiveSheet(gameCode: _code, uid: _uid, canEdit: true);
+  Widget _sheetPanel() {
+    if (widget.isMaster) return PlayersPanel(gameCode: _code);
+    final target = _tokens.where((t) => t.id == _sheetTarget).firstOrNull;
+    // Sin nada tocado (o tocando la suya): su ficha
+    if (target == null || target.id == 'p_$_uid') {
+      return PlayerLiveSheet(
+          gameCode: _code, uid: _uid, canEdit: true, compact: true);
+    }
+    Widget header(String title, String sub) => Material(
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          child: ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              radius: 14,
+              backgroundColor: _colorOf(target),
+              child: Icon(_iconOf(target), size: 16, color: _color2Of(target)),
+            ),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: sub.isEmpty ? null : Text(sub),
+            trailing: TextButton(
+              onPressed: () => setState(() => _sheetTarget = null),
+              child: const Tx('Mi ficha'),
+            ),
+          ),
+        );
+    // Otro jugador: su ficha completa (solo lectura) con su nickname
+    if (target.isPlayer) {
+      final p = _playerOf(target.refId);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header(p?.character.name ?? _plainNameOf(target), p?.nickname ?? ''),
+          Expanded(
+            child: PlayerLiveSheet(
+              gameCode: _code,
+              uid: target.refId,
+              canEdit: false,
+              compact: true,
+            ),
+          ),
+        ],
+      );
+    }
+    // Criatura: solo el nombre y la barra de salud
+    final ratio = (target.hpPct / 100.0).clamp(0.0, 1.0).toDouble();
+    final bar = ratio > 0.5
+        ? Colors.green
+        : (ratio > 0.25 ? Colors.orange : Colors.red);
+    return ListView(
+      children: [
+        header(_plainNameOf(target), ''),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Tx('Salud', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: ratio,
+                  minHeight: 14,
+                  color: bar,
+                  backgroundColor: Colors.grey.withAlpha(90),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Tx(
+                ratio <= 0
+                    ? 'Fuera de combate'
+                    : (ratio > 0.5
+                        ? 'En buen estado'
+                        : (ratio > 0.25 ? 'Herido' : 'Malherido')),
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   /// Criaturas de la partida: lista única con las que están en el mapa y
   /// las que esperan fuera de él, y el botón para añadir nuevas.
@@ -2203,7 +3087,7 @@ class _GameScreenState extends State<GameScreen>
     final tabs = <Tab>[
       Tab(text: tr('Dados')),
       Tab(text: tr('Iniciativa')),
-      Tab(text: widget.isMaster ? tr('Jugadores') : tr('Mi ficha')),
+      if (widget.isMaster) Tab(text: tr('Jugadores')),
       if (widget.isMaster) Tab(text: tr('Objetos')),
       Tab(text: tr('Libro')),
       if (widget.isMaster) Tab(text: tr('Criaturas')),
@@ -2220,7 +3104,7 @@ class _GameScreenState extends State<GameScreen>
             children: [
               _dicePanel(),
               _initiativePanel(),
-              _sheetPanel(),
+              if (widget.isMaster) _sheetPanel(),
               if (widget.isMaster)
                 ItemsScreen(gameCode: _code, inPanel: true),
               const ReferenceScreen(inPanel: true),

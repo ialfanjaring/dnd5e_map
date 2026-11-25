@@ -8,11 +8,15 @@ import '../models/combat.dart';
 import '../models/creature.dart';
 import '../models/game_models.dart';
 import '../widgets/avatars.dart';
+import '../widgets/game_board.dart' show CellPing;
+import 'profile_service.dart';
 
 /// Jugador dentro de una partida, con una copia de su personaje.
 class GamePlayer {
   final String uid;
-  final String email;
+
+  /// Nickname del jugador (lo único de su cuenta que ven los demás).
+  final String nickname;
   final Character character;
 
   /// Color asignado al jugador (ARGB); null hasta que el Master lo asigna.
@@ -23,6 +27,9 @@ class GamePlayer {
 
   /// Espacios de conjuro gastados por nivel
   final Map<int, int> slotsUsed;
+
+  /// Hechizos preparados (índices de la API)
+  final List<String> prepared;
 
   /// Avatar elegido por el jugador (vacío = el de su clase) y segundo color
   final String avatar;
@@ -35,11 +42,12 @@ class GamePlayer {
 
   const GamePlayer({
     required this.uid,
-    required this.email,
+    required this.nickname,
     required this.character,
     this.color,
     required this.currentHp,
     this.slotsUsed = const {},
+    this.prepared = const [],
     this.avatar = '',
     this.color2,
     this.deathSuccess = 0,
@@ -128,7 +136,8 @@ class GameService {
         await ref.set({
           'name': name,
           'masterUid': _user.uid,
-          'masterEmail': _user.email ?? '',
+          // Solo el nickname: el correo no se comparte con los jugadores.
+          'masterNick': ProfileService.instance.nickname,
           'status': 'lobby',
           'cols': 20,
           'rows': 14,
@@ -164,7 +173,9 @@ class GameService {
       if (color != null) 'color': color,
       if (color2 != null) 'color2': color2,
       'playerUid': _user.uid,
-      'playerEmail': _user.email ?? '',
+      'playerNick': ProfileService.instance.nickname,
+      // Partidas antiguas guardaban el correo: se borra.
+      'playerEmail': FieldValue.delete(),
       'characterId': c.id,
       'character': c.toMap(),
       'currentHp': c.maxHp,
@@ -196,11 +207,14 @@ class GameService {
         );
         return GamePlayer(
           uid: d.id,
-          email: (data['playerEmail'] ?? '') as String,
+          nickname: (data['playerNick'] ?? '') as String,
           character: character,
           color: (data['color'] as num?)?.toInt(),
           currentHp: ((data['currentHp'] ?? character.maxHp) as num).toInt(),
           slotsUsed: parseSlotMap(data['slotsUsed']),
+          prepared: ((data['prepared'] as List?) ?? const [])
+              .map((e) => e.toString())
+              .toList(),
           avatar: (data['avatar'] ?? '') as String,
           color2: (data['color2'] as num?)?.toInt(),
           deathSuccess: ((data['deathSuccess'] ?? 0) as num).toInt(),
@@ -368,6 +382,11 @@ class GameService {
       _games.doc(code).update({'playersSelectCreatures': value});
 
   /// Espacios de conjuro gastados por un jugador (él mismo o el Master).
+  /// Hechizos preparados del jugador (clases que preparan: clérigo, druida,
+  /// paladín, mago).
+  Future<void> setPrepared(String code, String uid, List<String> prepared) =>
+      _playersCol(code).doc(uid).update({'prepared': prepared});
+
   Future<void> updatePlayerSlots(String code, String uid, Map<int, int> used) =>
       _playersCol(code).doc(uid).update({
         'slotsUsed': {for (final e in used.entries) '${e.key}': e.value},
@@ -558,6 +577,13 @@ class GameService {
     });
   }
 
+  /// Terreno de un piso, leído una vez.
+  Future<Map<String, String>> terrainOnce(String code, [int floor = 0]) async {
+    final snap = await _terrainDoc(code, floor).get();
+    final raw = (snap.data()?['cells'] as Map?) ?? {};
+    return {for (final e in raw.entries) e.key.toString(): e.value.toString()};
+  }
+
   /// Pinta (o borra, si el valor es null) varias casillas a la vez.
   Future<void> paintCells(String code, Map<String, String?> cells,
       [int floor = 0]) {
@@ -577,6 +603,11 @@ class GameService {
 
   /// Cambia los nombres de los pisos (añadir o renombrar). La cantidad no
   /// puede bajar: para quitar un piso, usa [removeLastFloor].
+  /// Visibilidad de una zona del mapa para los jugadores:
+  /// 'all' (todos), 'none' (nadie) o la lista de uid que la ven.
+  Future<void> setZoneVisibility(String code, int zone, Object value) =>
+      _games.doc(code).update({'zoneVis.$zone': value});
+
   Future<void> setFloorNames(String code, List<String> names) =>
       _games.doc(code).update({'floorNames': names});
 
@@ -606,6 +637,121 @@ class GameService {
     int floor,
   ) =>
       _tokensCol(code).doc(tokenId).update({'x': x, 'y': y, 'floor': floor});
+
+  // ==========================================
+  // RECORRIDOS QUE SE ESTÁN DIBUJANDO (los ven todos)
+  // ==========================================
+
+  CollectionReference<Map<String, dynamic>> _pathsCol(String code) =>
+      _games.doc(code).collection('paths');
+
+  /// Recorridos de los demás mientras los dibujan.
+  Stream<List<SharedPath>> paths(String code) {
+    return _pathsCol(code).snapshots().map((snap) {
+      final out = <SharedPath>[];
+      for (final d in snap.docs) {
+        if (d.id == _user.uid) continue;
+        final m = d.data();
+        final raw = ((m['cells'] as List?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList();
+        final cells = <({int x, int y})>[
+          for (var i = 0; i + 1 < raw.length; i += 2) (x: raw[i], y: raw[i + 1]),
+        ];
+        if (cells.length < 2) continue;
+        out.add(SharedPath(
+          uid: d.id,
+          floor: ((m['floor'] ?? 0) as num).toInt(),
+          cells: cells,
+          label: (m['label'] ?? '').toString(),
+          over: m['over'] == true,
+        ));
+      }
+      return out;
+    });
+  }
+
+  Future<void> setPath(
+    String code, {
+    required int floor,
+    required List<({int x, int y})> cells,
+    required String label,
+    required bool over,
+  }) =>
+      _pathsCol(code).doc(_user.uid).set({
+        'floor': floor,
+        'cells': [for (final c in cells) ...[c.x, c.y]],
+        'label': label,
+        'over': over,
+        'at': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> clearPath(String code) => _pathsCol(code).doc(_user.uid).delete();
+
+  // ==========================================
+  // MARCAS EN CASILLAS
+  // ==========================================
+
+  CollectionReference<Map<String, dynamic>> _pingsCol(String code) =>
+      _games.doc(code).collection('pings');
+
+  /// Marcas de los últimos minutos (las antiguas dejan de mostrarse).
+  Stream<List<CellPing>> pings(String code) {
+    return _pingsCol(code).snapshots().map((snap) {
+      final limit = DateTime.now().subtract(const Duration(minutes: 3));
+      final out = <CellPing>[];
+      for (final d in snap.docs) {
+        final m = d.data();
+        final at = (m['at'] as Timestamp?)?.toDate() ?? DateTime.now();
+        if (at.isBefore(limit)) continue;
+        out.add(CellPing(
+          id: d.id,
+          uid: (m['uid'] ?? '').toString(),
+          x: ((m['x'] ?? 0) as num).toInt(),
+          y: ((m['y'] ?? 0) as num).toInt(),
+          floor: ((m['floor'] ?? 0) as num).toInt(),
+          kind: (m['kind'] ?? 'move').toString(),
+          author: (m['author'] ?? '').toString(),
+          color: ((m['color'] ?? 0xFF607D8B) as num).toInt(),
+        ));
+      }
+      return out;
+    });
+  }
+
+  /// Marca una casilla. Cada usuario tiene una sola marca por casilla.
+  Future<void> addPing(
+    String code, {
+    required int x,
+    required int y,
+    required int floor,
+    required String kind,
+    required String author,
+    required int color,
+  }) =>
+      _pingsCol(code).doc('${_user.uid}_${floor}_${x}_$y').set({
+        'uid': _user.uid,
+        'x': x,
+        'y': y,
+        'floor': floor,
+        'kind': kind,
+        'author': author,
+        'color': color,
+        'at': FieldValue.serverTimestamp(),
+      });
+
+  /// Borra las marcas propias (el Master, todas).
+  Future<void> clearMyPings(String code, {bool all = false}) async {
+    final q = all
+        ? _pingsCol(code)
+        : _pingsCol(code).where('uid', isEqualTo: _user.uid);
+    final snap = await q.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final d in snap.docs) {
+      batch.delete(d.reference);
+    }
+    await batch.commit();
+  }
 
   // ==========================================
   // DADOS
@@ -649,6 +795,15 @@ class GameService {
           .compareTo(a.at ?? DateTime.now()));
       return list;
     });
+  }
+
+  /// El Master borra tiradas ocultas (una o todas) para no verlas más.
+  Future<void> deleteHiddenRolls(String code, List<String> ids) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (final id in ids) {
+      if (id.isNotEmpty) batch.delete(_hiddenRollsCol(code).doc(id));
+    }
+    await batch.commit();
   }
 
   /// Publica una tirada oculta (solo la ven quien la hace y el Master).
@@ -870,15 +1025,31 @@ class GameService {
     if (maxHp != null && maxHp > 0) {
       final left = (maxHp - damage).clamp(0, maxHp).toInt();
       try {
-        await _tokensCol(code)
-            .doc(creatureId)
-            .update({'hpPct': ((left * 100) / maxHp).round()});
+        await _tokensCol(code).doc(creatureId).update({
+          'hpPct': ((left * 100) / maxHp).round(),
+          // A 0 PG sale del mapa y pasa a la bandeja de criaturas
+          if (left == 0) 'hidden': true,
+        });
       } catch (_) {}
     }
   }
 
-  /// Quita la criatura de la partida y su ficha del mapa.
+  /// true si la criatura está en el orden de iniciativa de un combate activo.
+  Future<bool> creatureInCombat(String code, String creatureId) async {
+    final snap = await _combatDoc(code).get();
+    final data = snap.data();
+    if (data == null || data['active'] != true) return false;
+    final st = CombatState.fromMap(data);
+    return st.entries.any((e) => e.covers(creatureId));
+  }
+
+  /// Quita la criatura de la partida y su ficha del mapa. No se puede
+  /// mientras esté en el combate.
   Future<void> removeCreature(String code, String creatureId) async {
+    if (await creatureInCombat(code, creatureId)) {
+      throw Exception(
+          'No se puede quitar una criatura que está en el combate.');
+    }
     final batch = FirebaseFirestore.instance.batch();
     batch.delete(_creaturesCol(code).doc(creatureId));
     batch.delete(_tokensCol(code).doc(creatureId));
@@ -924,6 +1095,12 @@ class GameService {
     try {
       await _deleteCollection(game.collection('hiddenRolls'));
     } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('pings'));
+    } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('paths'));
+    } catch (_) {}
     await game.delete();
   }
 
@@ -944,6 +1121,12 @@ class GameService {
     await _deleteCollection(game.collection('rolls'));
     try {
       await _deleteCollection(game.collection('hiddenRolls'));
+    } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('pings'));
+    } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('paths'));
     } catch (_) {}
   }
 
@@ -1064,4 +1247,22 @@ class GameService {
 
   Future<void> setPlayerEquipped(String code, String uid, List<String> equipped) =>
       _playersCol(code).doc(uid).update({'character.equipped': equipped});
+}
+
+
+/// Recorrido que otro usuario está dibujando en el mapa.
+class SharedPath {
+  final String uid;
+  final int floor;
+  final List<({int x, int y})> cells;
+  final String label;
+  final bool over;
+
+  const SharedPath({
+    required this.uid,
+    required this.floor,
+    required this.cells,
+    required this.label,
+    required this.over,
+  });
 }

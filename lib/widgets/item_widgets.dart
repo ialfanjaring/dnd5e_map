@@ -171,6 +171,10 @@ class CharacterItemsCard extends StatelessWidget {
   /// el formulario del personaje, donde los objetos ya aparecen arriba)
   final bool showList;
 
+  /// false: no se muestran las ranuras ni los ataques (en la partida van en
+  /// la pestaña Armas)
+  final bool showCombat;
+
   const CharacterItemsCard({
     super.key,
     required this.character,
@@ -180,6 +184,7 @@ class CharacterItemsCard extends StatelessWidget {
     this.onAdd,
     this.onRemove,
     this.showList = true,
+    this.showCombat = true,
   });
 
   /// Cambia el objeto activo de una ranura (arma, armadura o escudo).
@@ -278,6 +283,7 @@ class CharacterItemsCard extends StatelessWidget {
                 style: TextStyle(color: Colors.grey.shade600),
               )
             else ...[
+              if (showCombat) ...[
               const Tx(
                 'Equipo activo',
                 style: TextStyle(fontWeight: FontWeight.w600),
@@ -285,6 +291,7 @@ class CharacterItemsCard extends StatelessWidget {
               _slot(tr('Arma activa'), Icons.gavel, (it) => it.slot == 'weapon'),
               _slot(tr('Armadura activa'), Icons.checkroom, (it) => it.slot == 'armor'),
               _slot(tr('Escudo activo'), Icons.shield_outlined, (it) => it.slot == 'shield'),
+              ],
               if (showList) ...[
                 const Divider(height: 24),
                 const Tx(
@@ -299,7 +306,7 @@ class CharacterItemsCard extends StatelessWidget {
                 _tile(context, c.items[i]),
 
             // Efectos del equipo
-            if (effects.attacks.isNotEmpty) ...[
+            if (showCombat && effects.attacks.isNotEmpty) ...[
               const Divider(),
               const Tx('Ataques', style: TextStyle(fontWeight: FontWeight.bold)),
               for (final a in effects.attacks)

@@ -41,6 +41,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
   late final TextEditingController _backgroundCtrl;
   late final TextEditingController _hpCtrl;
   late final TextEditingController _acCtrl;
+  late final TextEditingController _acBonusCtrl;
+  late final TextEditingController _initBonusCtrl;
   late final TextEditingController _speedCtrl;
   late final TextEditingController _equipmentCtrl;
   late final TextEditingController _notesCtrl;
@@ -79,6 +81,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _backgroundCtrl = TextEditingController(text: c?.background ?? '');
     _hpCtrl = TextEditingController(text: '${c?.maxHp ?? 10}');
     _acCtrl = TextEditingController(text: '${c?.armorClass ?? 10}');
+    _acBonusCtrl = TextEditingController(text: '${c?.acBonus ?? 0}');
+    _initBonusCtrl = TextEditingController(text: '${c?.initiativeBonus ?? 0}');
     _speedCtrl = TextEditingController(text: '${c?.speed ?? 30}');
     _equipmentCtrl = TextEditingController(text: c?.equipment ?? '');
     _notesCtrl = TextEditingController(text: c?.notes ?? '');
@@ -139,7 +143,7 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       if (!mounted || _class != index) return;
 
       final saves = {
-        for (final n in info.savingThrows)
+        for (final n in info.saveKeys)
           if (DndData.abilityKeys.contains(n.toLowerCase())) n.toLowerCase(),
       };
 
@@ -201,6 +205,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     _backgroundCtrl.dispose();
     _hpCtrl.dispose();
     _acCtrl.dispose();
+    _acBonusCtrl.dispose();
+    _initBonusCtrl.dispose();
     _speedCtrl.dispose();
     _equipmentCtrl.dispose();
     _notesCtrl.dispose();
@@ -229,6 +235,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       abilities: Map<String, int>.from(_abilities),
       maxHp: int.tryParse(_hpCtrl.text) ?? 1,
       armorClass: int.tryParse(_acCtrl.text) ?? 10,
+      acBonus: int.tryParse(_acBonusCtrl.text) ?? 0,
+      initiativeBonus: int.tryParse(_initBonusCtrl.text) ?? 0,
       speed: int.tryParse(_speedCtrl.text) ?? 30,
       items: _items,
       equipped: _equipped,
@@ -299,6 +307,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
       abilities: Map<String, int>.from(_abilities),
       maxHp: max(1, int.tryParse(_hpCtrl.text) ?? 1),
       armorClass: int.tryParse(_acCtrl.text) ?? 10,
+      acBonus: int.tryParse(_acBonusCtrl.text) ?? 0,
+      initiativeBonus: int.tryParse(_initBonusCtrl.text) ?? 0,
       speed: int.tryParse(_speedCtrl.text) ?? 30,
       savingThrows: _saves.toList(),
       skills: _skills.toList(),
@@ -551,33 +561,92 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Text(
-          'Bonificador de competencia: ${Character.signed(_profBonus)}   ·   '
-          'Iniciativa: ${Character.signed(Character.modifier(_total('dex')))}',
-          style: TextStyle(color: Colors.grey.shade600),
+        Row(
+          children: [
+            Expanded(
+              child: _numberField(_acBonusCtrl, tr('Bonificador extra de CA'),
+                  signed: true),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _numberField(_initBonusCtrl, tr('Bonificador extra de iniciativa'),
+                  signed: true),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Tx(
+            'Para anillos, rasgos (como Alerta: +5 a la iniciativa), conjuros o lo que diga tu Master.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+        ),
+        const SizedBox(height: 12),
         Builder(builder: (context) {
-          final d = _derived().character;
-          return Text(
-            'CA total (con raza y equipo activo): ${d.effectiveAc}   ·   '
-            'Velocidad: ${d.effectiveSpeed} pies',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          final r = _derived();
+          final d = r.character;
+          final extraAc = int.tryParse(_acBonusCtrl.text) ?? 0;
+          final extraIni = int.tryParse(_initBonusCtrl.text) ?? 0;
+          final dex = Character.modifier(_total('dex'));
+          final acParts = [
+            if (r.effects.acParts.isEmpty)
+              '${int.tryParse(_acCtrl.text) ?? 10} ${tr('ficha')}'
+            else
+              ...r.effects.acParts,
+            if (extraAc != 0) '${Character.signed(extraAc)} ${tr('extra')}',
+          ];
+          final iniParts = [
+            '${Character.signed(dex)} DES',
+            if (extraIni != 0) '${Character.signed(extraIni)} ${tr('extra')}',
+          ];
+          Widget line(String label, String total, List<String> parts) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 92,
+                      child: Text('$label $total',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                    Expanded(
+                      child: Text('= ${parts.join('  ')}',
+                          style: TextStyle(color: Colors.grey.shade600)),
+                    ),
+                  ],
+                ),
+              );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              line(tr('CA'), '${d.effectiveAc}', acParts),
+              line(tr('Iniciativa'), Character.signed(dex + extraIni), iniParts),
+              Text(
+                '${tr('Bonificador de competencia')}: ${Character.signed(_profBonus)}   ·   '
+                '${tr('Velocidad')}: ${d.effectiveSpeed} ${tr('pies')}',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
           );
         }),
       ],
     );
   }
 
-  Widget _numberField(TextEditingController ctrl, String label) {
+  Widget _numberField(TextEditingController ctrl, String label,
+      {bool signed = false}) {
     return TextFormField(
       controller: ctrl,
-      keyboardType: TextInputType.number,
-      // Solo cifras (sin símbolos) y como máximo 4 dígitos
+      keyboardType: TextInputType.numberWithOptions(signed: signed),
+      // Solo cifras (y el signo menos en los bonificadores)
       inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
+        signed
+            ? FilteringTextInputFormatter.allow(RegExp(r'^-?\d{0,2}'))
+            : FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(4),
       ],
+      onChanged: signed ? (_) => setState(() {}) : null,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -607,13 +676,89 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
     );
   }
 
+  /// Habilidades que da la raza ("Habilidad: Percepción")
+  List<String> get _raceSkills {
+    final out = <String>[];
+    for (final p in [
+      ...?_raceInfo?.proficiencies,
+    ]) {
+      final m = RegExp(r'^(?:Habilidad|Skill)\s*:\s*(.+)$').firstMatch(p);
+      if (m == null) continue;
+      final name = m.group(1)!.trim();
+      for (final k in DndData.skills.keys) {
+        if (k.toLowerCase() == name.toLowerCase() ||
+            DndData.skillLabel(k).toLowerCase() == name.toLowerCase()) {
+          out.add(k);
+        }
+      }
+    }
+    return out;
+  }
+
   Widget _buildSkills() {
-    return Wrap(
+    final info = _classInfo;
+    final classOpts = info?.skillOptions ?? const <String>[];
+    final choose = info?.skillChoose ?? 0;
+    final raceSkills = _raceSkills;
+    // Total recomendado: los de la clase + los de la raza + 2 del trasfondo
+    final allowed = choose + raceSkills.length + 2;
+    final fromClass = _skills.where(classOpts.contains).length;
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (info != null && classOpts.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr('{c}: elige {n} entre las marcadas con ★ ({k} elegidas).')
+                      .replaceAll('{c}', DndData.className(_class ?? ''))
+                      .replaceAll('{n}', '$choose')
+                      .replaceAll('{k}', '$fromClass'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (raceSkills.isNotEmpty)
+                  Text(
+                    '${tr('Tu raza te da')}: ${raceSkills.map(DndData.skillLabel).join(', ')}',
+                  ),
+                Text(tr('Tu trasfondo te da 2 habilidades más a tu elección.')),
+                const SizedBox(height: 4),
+                Text(
+                  '${tr('Competencias recomendadas a nivel')} $_level: $allowed · '
+                  '${tr('Tienes')}: ${_skills.length}',
+                  style: TextStyle(
+                    color: _skills.length > allowed ? Colors.orange.shade800 : null,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (_level >= 6 && const {'rogue', 'bard'}.contains(_class))
+                  Text(
+                    tr('Tu clase tiene Pericia: dobla el bonificador de competencia en algunas habilidades (anótalo en las notas).'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+        Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         for (final entry in DndData.skills.entries)
           FilterChip(
+            avatar: classOpts.contains(entry.key)
+                ? const Icon(Icons.star, size: 16, color: Colors.amber)
+                : (raceSkills.contains(entry.key)
+                    ? const Icon(Icons.diversity_3, size: 16)
+                    : null),
             label: Text(
               '${DndData.skillLabel(entry.key)} (${DndData.abilityShort[entry.value]}) '
               '${Character.signed(Character.modifier(_total(entry.value)) + (_skills.contains(entry.key) ? _profBonus : 0))}',
@@ -623,6 +768,8 @@ class _CharacterFormScreenState extends State<CharacterFormScreen> {
               sel ? _skills.add(entry.key) : _skills.remove(entry.key);
             }),
           ),
+      ],
+    ),
       ],
     );
   }

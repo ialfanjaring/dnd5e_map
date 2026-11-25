@@ -46,28 +46,16 @@ class _DicePanelState extends State<DicePanel> {
   late final Stream<List<DiceRoll>> _rollsStream;
   StreamSubscription<List<DiceRoll>>? _hiddenSub;
 
-  String _die = 'd20';
-  int _count = 1;
+  /// Dados elegidos para la próxima tirada. Se pueden mezclar dados
+  /// distintos y cada grupo puede ir con ventaja o desventaja.
+  final List<_PoolDie> _pool = [_PoolDie('d20')];
+  int _mod = 0;
   bool _hidden = false;
   bool _rolling = false;
-
-  /// 'normal', 'adv' o 'dis' (solo con un dado que no sea la moneda)
-  String _mode = 'normal';
 
   /// Última tirada hecha aquí, para animarla.
   DiceRoll? _last;
   int _seq = 0;
-
-  bool get _canMode => _count == 1 && _die != 'coin';
-
-  /// Tirada compuesta: varios grupos de dados (ataque, daño cortante,
-  /// daño de hielo…) con su modificador cada uno.
-  bool _compose = false;
-  final List<_GroupDraft> _drafts = [
-    _GroupDraft(die: 'd20', label: tr('Ataque')),
-    _GroupDraft(die: 'd8', label: tr('Cortante')),
-  ];
-  final _titleCtl = TextEditingController();
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
@@ -83,25 +71,88 @@ class _DicePanelState extends State<DicePanel> {
   @override
   void dispose() {
     _hiddenSub?.cancel();
-    _titleCtl.dispose();
     super.dispose();
   }
 
+  /// Toca un dado: lo añade a la tirada (o suma uno si ya estaba).
+  /// La moneda no se mezcla con otros dados.
+  void _addDie(String die) {
+    setState(() {
+      if (die == 'coin') {
+        _pool
+          ..clear()
+          ..add(_PoolDie('coin'));
+        return;
+      }
+      _pool.removeWhere((p) => p.die == 'coin');
+      for (final p in _pool) {
+        if (p.die == die && p.mode == 'normal') {
+          if (p.count < 10) p.count++;
+          return;
+        }
+      }
+      if (_pool.length < 6) _pool.add(_PoolDie(die));
+    });
+  }
+
+  String get _formula {
+    final parts = [
+      for (final p in _pool)
+        '${p.count > 1 ? '${p.count}×' : ''}${DiceRoll.dieName(p.die)}'
+            '${p.mode == 'adv' ? ' ▲' : (p.mode == 'dis' ? ' ▼' : '')}',
+    ];
+    final m = _mod == 0 ? '' : (_mod > 0 ? ' +$_mod' : ' $_mod');
+    return '${parts.join(' + ')}$m';
+  }
+
   Future<void> _roll() async {
+    if (_pool.isEmpty) return;
     final DiceRoll roll;
-    if (_compose) {
+    final single = _pool.length == 1 &&
+        _mod == 0 &&
+        (_pool.first.mode == 'normal' || _pool.first.count == 1);
+    if (single) {
+      final p = _pool.first;
+      final values =
+          DiceRoll.roll(p.die, p.mode == 'normal' ? p.count : 2, _rnd);
+      roll = DiceRoll(
+        uid: _uid,
+        name: widget.nameProvider(),
+        color: widget.colorProvider(),
+        die: p.die,
+        values: values,
+        hidden: _hidden,
+        at: DateTime.now(),
+        mode: p.mode,
+        chosen: DiceRoll.pickIndex(p.mode, values),
+      );
+    } else {
+      // Con ventaja/desventaja cada dado se tira dos veces por separado.
       final groups = <DiceGroup>[];
-      for (final d in _drafts) {
-        final m = d.count == 1 ? d.mode : 'normal';
-        final vals = DiceRoll.roll(d.die, m == 'normal' ? d.count : 2, _rnd);
-        groups.add(DiceGroup(
-          die: d.die,
-          values: vals,
-          label: d.label,
-          mod: d.mod,
-          mode: m,
-          chosen: DiceRoll.pickIndex(m, vals),
-        ));
+      for (final p in _pool) {
+        if (p.mode == 'normal') {
+          groups.add(DiceGroup(die: p.die, values: DiceRoll.roll(p.die, p.count, _rnd)));
+        } else {
+          for (var i = 0; i < p.count; i++) {
+            final v = DiceRoll.roll(p.die, 2, _rnd);
+            groups.add(DiceGroup(
+              die: p.die,
+              values: v,
+              mode: p.mode,
+              chosen: DiceRoll.pickIndex(p.mode, v),
+            ));
+          }
+        }
+      }
+      if (_mod != 0 && groups.isNotEmpty) {
+        final g = groups.last;
+        groups[groups.length - 1] = DiceGroup(
+          die: g.die,
+          values: g.values,
+          mode: g.mode,
+          chosen: g.chosen,
+          mod: _mod,
+        );
       }
       roll = DiceRoll(
         uid: _uid,
@@ -112,21 +163,7 @@ class _DicePanelState extends State<DicePanel> {
         hidden: _hidden,
         at: DateTime.now(),
         groups: groups,
-        title: _titleCtl.text.trim(),
-      );
-    } else {
-      final mode = _canMode ? _mode : 'normal';
-      final values = DiceRoll.roll(_die, mode == 'normal' ? _count : 2, _rnd);
-      roll = DiceRoll(
-        uid: _uid,
-        name: widget.nameProvider(),
-        color: widget.colorProvider(),
-        die: _die,
-        values: values,
-        hidden: _hidden,
-        at: DateTime.now(),
-        mode: mode,
-        chosen: DiceRoll.pickIndex(mode, values),
+        title: _formula,
       );
     }
     setState(() {
@@ -135,7 +172,6 @@ class _DicePanelState extends State<DicePanel> {
     });
 
     if (_hidden) {
-      // La ven quien la hace y el Master
       try {
         await _service.postHiddenRoll(widget.gameCode, roll);
         _snack('${tr('Tirada oculta')} · ${roll.label}: ${roll.resultText}');
@@ -160,157 +196,69 @@ class _DicePanelState extends State<DicePanel> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  List<Widget> _composer() {
-    final dice = DiceRoll.dice.where((d) => d != 'coin').toList();
-    return [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
-        child: TextField(
-          controller: _titleCtl,
-          maxLength: 40,
-          decoration: InputDecoration(
-            isDense: true,
-            counterText: '',
-            border: const OutlineInputBorder(),
-            labelText: tr('Nombre de la tirada (opcional)'),
-            hintText: tr('Espada de hielo'),
+  Widget _stepper(int v, void Function(int) set, int min, int max,
+      {String Function(int)? fmt}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: v > min ? () => setState(() => set(v - 1)) : null,
+          child: Icon(Icons.remove_circle_outline,
+              size: 20, color: v > min ? null : Colors.grey.shade700),
+        ),
+        SizedBox(
+          width: 30,
+          child: Text(
+            fmt != null ? fmt(v) : '$v',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
-      ),
-      for (var i = 0; i < _drafts.length; i++) _groupEditor(i, dice),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-        child: Row(
-          children: [
-            TextButton.icon(
-              onPressed: _drafts.length >= 6
-                  ? null
-                  : () => setState(
-                      () => _drafts.add(_GroupDraft(die: 'd6', label: tr('Hielo')))),
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(tr('Añadir grupo de dados')),
-            ),
-            const Spacer(),
-            Text(tr('Oculta')),
-            Transform.scale(
-              scale: 0.85,
-              child: Switch(
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                value: _hidden,
-                onChanged: (v) => setState(() => _hidden = v),
-              ),
-            ),
-          ],
+        InkWell(
+          onTap: v < max ? () => setState(() => set(v + 1)) : null,
+          child: Icon(Icons.add_circle_outline,
+              size: 20, color: v < max ? null : Colors.grey.shade700),
         ),
-      ),
-    ];
+      ],
+    );
   }
 
-  Widget _groupEditor(int i, List<String> dice) {
-    final d = _drafts[i];
-    final tint = Color(DiceGroup.colorOf(d.label));
-    Widget stepper(int v, void Function(int) set, int min, int max,
-        {String Function(int)? fmt}) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
+  Widget _poolRow(int i) {
+    final p = _pool[i];
+    final isCoin = p.die == 'coin';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 4, 2),
+      child: Row(
         children: [
-          InkWell(
-            onTap: v > min ? () => setState(() => set(v - 1)) : null,
-            child: Icon(Icons.remove_circle_outline,
-                size: 20, color: v > min ? null : Colors.grey.shade700),
-          ),
+          _stepper(p.count, (v) => p.count = v, 1, 10),
+          const SizedBox(width: 4),
           SizedBox(
-            width: 30,
-            child: Text(
-              fmt != null ? fmt(v) : '$v',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            width: 62,
+            child: Text(DiceRoll.dieName(p.die),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
-          InkWell(
-            onTap: v < max ? () => setState(() => set(v + 1)) : null,
-            child: Icon(Icons.add_circle_outline,
-                size: 20, color: v < max ? null : Colors.grey.shade700),
-          ),
-        ],
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 6, 10, 0),
-      padding: const EdgeInsets.fromLTRB(8, 4, 4, 6),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: tint, width: 4)),
-        color: tint.withOpacity(0.08),
-        borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButton<String>(
-                  isDense: true,
-                  isExpanded: true,
-                  underline: const SizedBox.shrink(),
-                  value: d.label,
-                  items: [
-                    for (final k in DiceGroup.kinds)
-                      DropdownMenuItem(
-                        value: k,
-                        child: Text(tr(k),
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(DiceGroup.colorOf(k)))),
-                      ),
-                  ],
-                  onChanged: (v) => setState(() => d.label = v ?? d.label),
-                ),
-              ),
+          if (!isCoin)
+            for (final (m, icon, color, tip) in [
+              ('normal', Icons.casino_outlined, Colors.grey, tr('Normal')),
+              ('adv', Icons.keyboard_double_arrow_up, Colors.green, tr('Ventaja')),
+              ('dis', Icons.keyboard_double_arrow_down, Colors.red, tr('Desventaja')),
+            ])
               IconButton(
                 visualDensity: VisualDensity.compact,
-                tooltip: tr('Quitar grupo'),
-                onPressed: _drafts.length > 1
-                    ? () => setState(() => _drafts.removeAt(i))
-                    : null,
-                icon: const Icon(Icons.close, size: 18),
-              ),
-            ],
-          ),
-          Wrap(
-            spacing: 10,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              stepper(d.count, (v) => d.count = v, 1, 10),
-              DropdownButton<String>(
-                isDense: true,
-                value: d.die,
-                items: [
-                  for (final x in dice)
-                    DropdownMenuItem(value: x, child: Text(DiceRoll.dieName(x))),
-                ],
-                onChanged: (v) => setState(() => d.die = v ?? d.die),
-              ),
-              stepper(d.mod, (v) => d.mod = v, -20, 30,
-                  fmt: (v) => v > 0 ? '+$v' : '$v'),
-              if (d.count == 1)
-                ChoiceChip(
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  showCheckmark: false,
-                  label: Text(
-                    d.mode == 'adv'
-                        ? '▲ ${tr('Ventaja')}'
-                        : (d.mode == 'dis' ? '▼ ${tr('Desventaja')}' : tr('Normal')),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  selected: d.mode != 'normal',
-                  onSelected: (_) => setState(() => d.mode =
-                      d.mode == 'normal' ? 'adv' : (d.mode == 'adv' ? 'dis' : 'normal')),
+                tooltip: tip,
+                isSelected: p.mode == m,
+                style: IconButton.styleFrom(
+                  backgroundColor: p.mode == m ? color.withOpacity(0.2) : null,
                 ),
-            ],
+                onPressed: () => setState(() => p.mode = m),
+                icon: Icon(icon, size: 18, color: color),
+              ),
+          const Spacer(),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: tr('Quitar'),
+            onPressed: () => setState(() => _pool.removeAt(i)),
+            icon: const Icon(Icons.close, size: 18),
           ),
         ],
       ),
@@ -321,63 +269,45 @@ class _DicePanelState extends State<DicePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // SIMPLE / COMPUESTA
+        // Dados: tocar uno lo añade a la tirada
         Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
-          child: SegmentedButton<bool>(
-            showSelectedIcon: false,
-            style: const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            segments: [
-              ButtonSegment(value: false, label: Text(tr('Simple'))),
-              ButtonSegment(value: true, label: Text(tr('Combinada'))),
-            ],
-            selected: {_compose},
-            onSelectionChanged: (v) => setState(() => _compose = v.first),
-          ),
-        ),
-        if (!_compose) ...[
-        // SELECCIÓN DE DADO
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
           child: Wrap(
             spacing: 4,
             runSpacing: 0,
             children: [
               for (final d in DiceRoll.dice)
-                ChoiceChip(
+                ActionChip(
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(DiceRoll.dieName(d)),
-                  selected: _die == d,
-                  onSelected: (_) => setState(() => _die = d),
+                  onPressed: () => _addDie(d),
                 ),
             ],
           ),
         ),
-
-        // CANTIDAD Y OCULTA
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Tx(
+            'Toca los dados para añadirlos. ▲ ventaja · ▼ desventaja (se tira dos veces y cuenta el mayor o el menor).',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+        ),
+        if (_pool.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Tx('Elige al menos un dado.',
+                style: TextStyle(color: Colors.grey.shade600)),
+          ),
+        for (var i = 0; i < _pool.length; i++) _poolRow(i),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
           child: Row(
             children: [
-              const Tx('Cantidad'),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: _count > 1 ? () => setState(() => _count--) : null,
-                icon: const Icon(Icons.remove_circle_outline),
-              ),
-              Text(
-                '$_count',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: _count < 10 ? () => setState(() => _count++) : null,
-                icon: const Icon(Icons.add_circle_outline),
-              ),
+              const Tx('Modificador'),
+              const SizedBox(width: 6),
+              _stepper(_mod, (v) => _mod = v, -20, 30,
+                  fmt: (v) => v > 0 ? '+$v' : '$v'),
               const Spacer(),
               const Tx('Oculta'),
               Transform.scale(
@@ -391,57 +321,17 @@ class _DicePanelState extends State<DicePanel> {
             ],
           ),
         ),
-
-        // NORMAL / VENTAJA / DESVENTAJA
         Padding(
-          padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-          child: Row(
-            children: [
-              for (final (m, label, icon, color) in [
-                ('normal', tr('Normal'), Icons.casino_outlined, Colors.grey),
-                ('adv', tr('Ventaja'), Icons.keyboard_double_arrow_up, Colors.green),
-                ('dis', tr('Desventaja'), Icons.keyboard_double_arrow_down, Colors.red),
-              ])
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: ChoiceChip(
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: EdgeInsets.zero,
-                      showCheckmark: false,
-                      avatar: Icon(icon, size: 14, color: color),
-                      label: Text(tr(label), style: const TextStyle(fontSize: 11)),
-                      selected: (_canMode ? _mode : 'normal') == m,
-                      onSelected: _canMode || m == 'normal'
-                          ? (_) => setState(() => _mode = m)
-                          : null,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
-        ] else
-          ..._composer(),
-
-        // BOTÓN TIRAR
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+          padding: const EdgeInsets.fromLTRB(10, 2, 10, 4),
           child: SizedBox(
             height: 40,
             child: ElevatedButton.icon(
-              onPressed: _rolling ? null : _roll,
+              onPressed: _rolling || _pool.isEmpty ? null : _roll,
               icon: AppIcon(_hidden ? 'ojo' : 'd20_vacio', size: 22),
               label: Text(
-                _compose
-                    ? '${tr('Tirar combinada')}${_hidden ? ' (${tr('oculta')})' : ''}'
-                    : '${tr('Tirar')} ${_count > 1 ? '$_count × ' : ''}'
-                '${DiceRoll.dieName(_die)}'
-                '${!_compose && _canMode && _mode == 'adv' ? ' ${tr('con ventaja')}' : ''}'
-                '${!_compose && _canMode && _mode == 'dis' ? ' ${tr('con desventaja')}' : ''}'
-                '${!_compose && _hidden ? ' (${tr('oculta')})' : ''}',
+                '${tr('Tirar')} $_formula'
+                '${_hidden ? ' (${tr('oculta')})' : ''}',
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -463,6 +353,15 @@ class _DicePanelState extends State<DicePanel> {
         const Divider(height: 1),
       ],
     );
+  }
+
+  Future<void> _deleteHidden(List<DiceRoll> rolls) async {
+    try {
+      await _service.deleteHiddenRolls(
+          widget.gameCode, [for (final r in rolls) r.id]);
+    } catch (e) {
+      _snack('${tr('No se pudo borrar')}: $e');
+    }
   }
 
   @override
@@ -500,18 +399,35 @@ class _DicePanelState extends State<DicePanel> {
                   ),
                 if (hidden.isNotEmpty) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
-                    child: Tx(
-                      widget.isMaster
-                          ? 'Tiradas ocultas (todos los jugadores)'
-                          : 'Mis tiradas ocultas (tú y el Master)',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 4, 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Tx(
+                            widget.isMaster
+                                ? 'Tiradas ocultas (todos los jugadores)'
+                                : 'Mis tiradas ocultas (tú y el Master)',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        if (widget.isMaster)
+                          TextButton.icon(
+                            onPressed: () => _deleteHidden(hidden),
+                            icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                            label: const Tx('Borrar todas'),
+                          ),
+                      ],
                     ),
                   ),
-                  for (final r in hidden) _RollTile(roll: r, isHidden: true),
+                  for (final r in hidden)
+                    _RollTile(
+                      roll: r,
+                      isHidden: true,
+                      onDelete: widget.isMaster ? () => _deleteHidden([r]) : null,
+                    ),
                   const Divider(),
                 ],
                 for (final r in shared) _RollTile(roll: r),
@@ -527,8 +443,9 @@ class _DicePanelState extends State<DicePanel> {
 class _RollTile extends StatelessWidget {
   final DiceRoll roll;
   final bool isHidden;
+  final VoidCallback? onDelete;
 
-  const _RollTile({required this.roll, this.isHidden = false});
+  const _RollTile({required this.roll, this.isHidden = false, this.onDelete});
 
   String _time(DateTime? t) {
     if (t == null) return 'ahora';
@@ -556,27 +473,31 @@ class _RollTile extends StatelessWidget {
             ? '${roll.resultText} · ${_time(roll.at)}'
             : _time(roll.at),
       ),
-      trailing: Text(
-        roll.headline,
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            roll.headline,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          if (onDelete != null)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: tr('Borrar'),
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 18),
+            ),
+        ],
       ),
     );
   }
 }
 
-/// Un grupo de dados en edición dentro de la tirada combinada.
-class _GroupDraft {
-  String die;
-  int count;
-  String label;
-  int mod;
-  String mode; // 'normal', 'adv', 'dis'
+/// Un dado (o varios iguales) en la próxima tirada.
+class _PoolDie {
+  final String die;
+  int count = 1;
+  String mode = 'normal'; // 'normal', 'adv', 'dis'
 
-  _GroupDraft({
-    required this.die,
-    required this.label,
-    this.count = 1,
-    this.mod = 0,
-    this.mode = 'normal',
-  });
+  _PoolDie(this.die);
 }

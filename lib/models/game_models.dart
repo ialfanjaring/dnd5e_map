@@ -85,6 +85,8 @@ enum TerrainPattern {
   stairsDown,
   stairsBoth,
   ladder,
+  teleport,
+  chest,
 }
 
 /// Tipo de terreno que el Master puede pintar en el mapa.
@@ -127,7 +129,7 @@ class Terrains {
   static const String gNaturaleza = 'Naturaleza';
   static const String gConstruccion = 'Construcción';
   static const String gPalacio = 'Palacio';
-  static const String gEscaleras = 'Escaleras';
+  static const String gEscaleras = 'Escaleras y portales';
   static const String gPeligros = 'Peligros';
 
   static const List<String> groups = [
@@ -213,6 +215,11 @@ class Terrains {
         Icons.swap_vert, TerrainPattern.stairsBoth),
     TerrainType('ladder', 'Escalera de mano', gEscaleras, 0xFF8D6E4C,
         Icons.format_line_spacing, TerrainPattern.ladder, MoveRule.difficult),
+    TerrainType('teleport', 'Teletransportador', gEscaleras, 0xFF3D2C6B,
+        Icons.blur_circular, TerrainPattern.teleport),
+    // Objetos
+    TerrainType('chest', 'Cofre / tesoro', gConstruccion, 0xFFB08D57,
+        Icons.inventory_2, TerrainPattern.chest, MoveRule.blocked),
     // Peligros
     TerrainType('lava', 'Lava', gPeligros, 0xFFE8561C,
         Icons.local_fire_department, TerrainPattern.lava, MoveRule.difficult),
@@ -235,7 +242,7 @@ class Terrains {
     if (value == null || value.isEmpty) {
       return const CellInfo(null, MoveRule.normal);
     }
-    final parts = value.split('+');
+    final parts = _core(value).split('#').first.split('+');
     final t = byId(parts.first);
     var rule = t?.move ?? MoveRule.normal;
     if (parts.length > 1) {
@@ -265,6 +272,7 @@ class Terrains {
         return -1;
       case TerrainPattern.stairsBoth:
       case TerrainPattern.ladder:
+      case TerrainPattern.teleport:
         return 0;
       default:
         return null;
@@ -278,16 +286,74 @@ class Terrains {
     return d == 0 || (d > 0 ? to > from : to < from);
   }
 
-  static String idOf(String value) => value.split('+').first;
+  /// Valor sin la zona ("stone+d#2@3" -> "stone+d#2").
+  static String _core(String value) => value.split('@').first;
+
+  static String idOf(String value) =>
+      _core(value).split('#').first.split('+').first;
 
   /// Sufijo de la regla elegida: null = la del terreno.
   static String? flagOf(String value) {
-    final p = value.split('+');
+    final p = _core(value).split('#').first.split('+');
     return p.length > 1 && p[1].isNotEmpty ? p[1] : null;
   }
 
-  static String encode(String id, String? flag) =>
-      flag == null ? id : '$id+$flag';
+  /// Número de grupo de una escalera o teletransportador ("id#3"): todas las
+  /// casillas con el mismo número están conectadas. null = sin número.
+  static int? groupOf(String? value) {
+    if (value == null) return null;
+    final v = _core(value);
+    final i = v.indexOf('#');
+    return i < 0 ? null : int.tryParse(v.substring(i + 1));
+  }
+
+  // ---- Zonas ----
+  // Una casilla puede pertenecer a una zona (1-8), que el Master puede ocultar
+  // a todos o a algunos jugadores. Se guarda al final del valor: "stone@3".
+  // Una casilla sin terreno pero con zona es "@3". El pincel de zona es
+  // "@3" (pintar la zona 3) o "@0" (quitar la zona).
+
+  static const int zoneCount = 8;
+
+  static const List<int> zoneColors = [
+    0xFFE53935, 0xFF1E88E5, 0xFF43A047, 0xFFFDD835,
+    0xFF8E24AA, 0xFFFB8C00, 0xFF00ACC1, 0xFF6D4C41,
+  ];
+
+  static int? zoneOf(String? value) {
+    if (value == null) return null;
+    final i = value.indexOf('@');
+    if (i < 0) return null;
+    final z = int.tryParse(value.substring(i + 1));
+    return z == null || z <= 0 ? null : z;
+  }
+
+  static bool isZoneBrush(String? brush) => brush != null && brush.startsWith('@');
+
+  /// Valor con la zona [zone] (null = sin zona). Devuelve null si no queda nada.
+  static String? withZone(String? value, int? zone) {
+    final core = value == null ? '' : _core(value);
+    if (zone == null || zone <= 0) return core.isEmpty ? null : core;
+    return '$core@$zone';
+  }
+
+  /// Resultado de pintar [brush] sobre una casilla con valor [current]:
+  /// el terreno conserva la zona y la zona conserva el terreno.
+  static String? applyBrush(String? current, String? brush) {
+    if (brush == null) return null;
+    if (isZoneBrush(brush)) {
+      return withZone(current, int.tryParse(brush.substring(1)));
+    }
+    return withZone(brush, zoneOf(current));
+  }
+
+  /// true si el terreno admite número de grupo (escaleras y portales)
+  static bool isLinkId(String id) => linkDirection(id) != null;
+
+  static String encode(String id, String? flag, [int? group]) {
+    final base = flag == null ? id : '$id+$flag';
+    return group == null ? base : '$base#$group';
+  }
 }
 
 /// Ficha colocada en el mapa: de un jugador o de una criatura del Master.

@@ -25,6 +25,9 @@ class SpellcastingPanel extends StatefulWidget {
   /// Si se indica, se pueden configurar los máximos (NPC sin datos de la API)
   final ValueChanged<Map<int, int>>? onMaxChanged;
 
+  /// false: solo los espacios de conjuro (la lista va aparte)
+  final bool showSpellList;
+
   const SpellcastingPanel({
     super.key,
     required this.maxSlots,
@@ -33,6 +36,7 @@ class SpellcastingPanel extends StatefulWidget {
     required this.canEdit,
     required this.onUsedChanged,
     this.onMaxChanged,
+    this.showSpellList = true,
   });
 
   @override
@@ -368,9 +372,11 @@ class _SpellcastingPanelState extends State<SpellcastingPanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _slots(),
-        const Divider(height: 20),
-        const Tx('Hechizos', style: TextStyle(fontWeight: FontWeight.bold)),
-        _spellList(),
+        if (widget.showSpellList) ...[
+          const Divider(height: 20),
+          const Tx('Hechizos', style: TextStyle(fontWeight: FontWeight.bold)),
+          _spellList(),
+        ],
       ],
     );
   }

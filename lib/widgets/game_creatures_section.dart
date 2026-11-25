@@ -180,7 +180,15 @@ class _GameCreatureTile extends StatelessWidget {
         final removeButton = IconButton(
           visualDensity: VisualDensity.compact,
           tooltip: tr('Quitar de la partida'),
-          onPressed: () => service.removeCreature(gameCode, gc.id),
+          onPressed: () => service.removeCreature(gameCode, gc.id).catchError(
+            (Object e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(trMsg(e.toString().replaceFirst('Exception: ', ''))),
+                ));
+              }
+            },
+          ),
           icon: const Icon(Icons.delete_outline),
         );
 

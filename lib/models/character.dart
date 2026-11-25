@@ -235,6 +235,10 @@ class Character {
   final Map<String, int> abilities;
   final int maxHp;
   final int armorClass;
+
+  /// Bonificadores extra que pone el jugador (anillos, rasgos, conjuros…)
+  final int acBonus;
+  final int initiativeBonus;
   final int speed;
   final List<String> savingThrows;
   final List<String> skills;
@@ -277,6 +281,8 @@ class Character {
     required this.abilities,
     required this.maxHp,
     this.armorClass = 10,
+    this.acBonus = 0,
+    this.initiativeBonus = 0,
     this.speed = 30,
     this.savingThrows = const [],
     this.skills = const [],
@@ -311,6 +317,8 @@ class Character {
         abilities: abilities,
         maxHp: maxHp,
         armorClass: armorClass,
+        acBonus: acBonus,
+        initiativeBonus: initiativeBonus,
         speed: speed,
         savingThrows: savingThrows,
         skills: skills,
@@ -328,7 +336,7 @@ class Character {
   Character withRacial(Map<String, int> bonuses) => withDerived(racial: bonuses);
 
   /// CA que se muestra: la calculada con el equipo, o la de la ficha.
-  int get effectiveAc => acOverride ?? armorClass;
+  int get effectiveAc => (acOverride ?? armorClass) + acBonus;
 
   /// Velocidad real (con la penalización de la armadura).
   int get effectiveSpeed => (speed - speedPenalty).clamp(0, 999).toInt();
@@ -346,7 +354,7 @@ class Character {
 
   int mod(String key) => modifier(score(key));
 
-  int get initiative => mod('dex');
+  int get initiative => mod('dex') + initiativeBonus;
 
   int saveBonus(String key) =>
       mod(key) + (savingThrows.contains(key) ? proficiencyBonus : 0);
@@ -379,6 +387,8 @@ class Character {
         'abilities': abilities,
         'maxHp': maxHp,
         'armorClass': armorClass,
+        'acBonus': acBonus,
+        'initiativeBonus': initiativeBonus,
         'speed': speed,
         'savingThrows': savingThrows,
         'skills': skills,
@@ -410,6 +420,8 @@ class Character {
       abilities: abilities,
       maxHp: ((m['maxHp'] ?? 1) as num).toInt(),
       armorClass: ((m['armorClass'] ?? 10) as num).toInt(),
+      acBonus: ((m['acBonus'] ?? 0) as num).toInt(),
+      initiativeBonus: ((m['initiativeBonus'] ?? 0) as num).toInt(),
       speed: ((m['speed'] ?? 30) as num).toInt(),
       savingThrows: List<String>.from(m['savingThrows'] ?? const []),
       skills: List<String>.from(m['skills'] ?? const []),

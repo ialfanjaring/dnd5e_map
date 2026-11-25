@@ -507,6 +507,42 @@ void _texture(
             rail..strokeWidth = max(1.5, w / 16));
       }
 
+    case TerrainPattern.teleport:
+      canvas.drawRect(r, Paint()..color = _shade(base, -0.15));
+      for (var i = 0; i < 3; i++) {
+        canvas.drawCircle(
+          r.center,
+          w * (0.38 - i * 0.11),
+          Paint()
+            ..color = Color.lerp(
+                const Color(0xFFB388FF), const Color(0xFF00E5FF), i / 2)!
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = max(1.5, w / 18),
+        );
+      }
+      canvas.drawCircle(r.center, w * 0.06, Paint()..color = Colors.white);
+
+    case TerrainPattern.chest:
+      canvas.drawRect(r, Paint()..color = _shade(base, -0.25));
+      final box = Rect.fromLTWH(
+          r.left + w * 0.15, r.top + w * 0.3, w * 0.7, w * 0.5);
+      canvas.drawRRect(RRect.fromRectAndRadius(box, Radius.circular(w * 0.05)),
+          Paint()..color = const Color(0xFF8D5A2B));
+      canvas.drawRect(
+          Rect.fromLTWH(box.left, box.top, box.width, box.height * 0.35),
+          Paint()..color = const Color(0xFFA86B33));
+      final band = Paint()..color = const Color(0xFFE0B341);
+      canvas.drawRect(
+          Rect.fromLTWH(box.left + box.width * 0.2, box.top, box.width * 0.08,
+              box.height),
+          band);
+      canvas.drawRect(
+          Rect.fromLTWH(box.right - box.width * 0.28, box.top,
+              box.width * 0.08, box.height),
+          band);
+      canvas.drawCircle(Offset(box.center.dx, box.top + box.height * 0.42),
+          w * 0.05, band);
+
     case TerrainPattern.fire:
       // brasas + llama
       canvas.drawCircle(r.center + Offset(0, w * 0.18), w * 0.32,
@@ -574,7 +610,7 @@ class _SwatchPainter extends CustomPainter {
 
 bool _isWallValue(String? v) {
   if (v == null || v.isEmpty) return false;
-  final id = v.split('+').first;
+  final id = Terrains.idOf(v);
   return id == 'wall' || id == 'woodwall' || id == 'palacewall';
 }
 
@@ -625,7 +661,7 @@ void paintDoorGroups(
 ) {
   bool door(int x, int y) {
     final v = terrain['${x}_$y'];
-    return v != null && v.split('+').first == 'door';
+    return v != null && Terrains.idOf(v) == 'door';
   }
 
   final seen = <String>{};

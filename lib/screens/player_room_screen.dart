@@ -192,7 +192,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${tr('Master')}: ${game['masterEmail'] ?? ''}',
+              '${tr('Master')}: ${game['masterNick'] ?? ''}',
               style: TextStyle(color: Colors.grey.shade600),
             ),
             const SizedBox(height: 4),
@@ -432,7 +432,7 @@ class _PlayerRoomScreenState extends State<PlayerRoomScreen> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${p.character.summary}\n${p.email}'),
+                      Text('${p.character.summary}\n${p.nickname}'),
                       SpellSummaryText(indexes: p.character.spells),
                     ],
                   ),

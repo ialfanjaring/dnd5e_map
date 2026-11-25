@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../widgets/blocking_progress.dart';
 
+import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/game_service.dart';
 import 'characters_screen.dart';
@@ -83,7 +84,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const SizedBox(height: 4),
       Text(
-        user?.email ?? tr('Usuario autenticado'),
+        ProfileService.instance.nickname.isNotEmpty
+            ? ProfileService.instance.nickname
+            : (user?.email ?? tr('Usuario autenticado')),
         style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
       ),
       const SizedBox(height: 16),

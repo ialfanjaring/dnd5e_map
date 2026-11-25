@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../i18n/i18n.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
+import 'nickname_screen.dart';
 import 'verify_email_screen.dart';
 
 /// Puerta de acceso: solo deja pasar a usuarios con sesión Y correo verificado.
@@ -21,6 +24,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   // reconstrucción).
   String? _checkedUid;
   Future<bool>? _tokenCheck;
+
+  // Nickname del usuario (obligatorio para entrar).
+  String? _nickUid;
+  Future<String>? _nickCheck;
 
   /// Lo que cuenta para Firestore es el token, no el dato local del usuario:
   /// solo se entra si el token dice que el correo está verificado. Si el
@@ -97,9 +104,51 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 if (mounted) setState(() => _tokenCheck = null);
               });
             }
-            return const HomeScreen();
+            return _nicknameGate(user);
           },
         );
+      },
+    );
+  }
+
+  /// Sin nickname no se entra: se pide antes de llegar a la pantalla
+  /// principal. Es el nombre que verán los demás en las partidas.
+  Widget _nicknameGate(User user) {
+    if (_nickUid != user.uid || _nickCheck == null) {
+      _nickUid = user.uid;
+      _nickCheck = ProfileService.instance.load();
+    }
+    return FutureBuilder<String>(
+      future: _nickCheck,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snap.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Tx('No se pudo cargar tu perfil.'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => setState(() => _nickCheck = null),
+                    child: Tx('Reintentar'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        if ((snap.data ?? '').isEmpty) {
+          return NicknameScreen(
+            onDone: () => setState(() => _nickCheck = null),
+          );
+        }
+        return const HomeScreen();
       },
     );
   }

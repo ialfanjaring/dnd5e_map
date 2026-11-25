@@ -61,6 +61,8 @@ class _ResolvedCharacterBuilderState extends State<ResolvedCharacterBuilder> {
         c.level,
         c.maxHp,
         c.armorClass,
+        c.acBonus,
+        c.initiativeBonus,
         c.speed,
       ].join('|');
 
