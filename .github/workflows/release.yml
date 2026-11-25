@@ -90,19 +90,29 @@ jobs:
             out/apk/dnd5e_map.apk
             out/windows/dnd5e_map_setup.exe
 
-  pages:
+  # Prepara la web (app + página de descargas) y la sube como artefacto de Pages.
+  pages-build:
     needs: web
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { name: web, path: _site/app }
       - name: Página de descargas
         run: cp -r site/* _site/
+      - name: Comprobar contenido
+        run: ls -la _site _site/app | head -40
       - uses: actions/upload-pages-artifact@v4
-        with: { path: _site }
+        with: { path: _site, name: github-pages }
+
+  # Publica en GitHub Pages en un job aparte (como recomienda deploy-pages).
+  pages:
+    needs: pages-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+        with: { artifact_name: github-pages }
