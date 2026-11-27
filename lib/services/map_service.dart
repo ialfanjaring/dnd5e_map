@@ -48,6 +48,11 @@ class MapService {
       'rows': m.rows,
       'mapName': m.name,
       'floorNames': names,
+      'floorSizes': [
+        for (var i = 0; i < m.floorCount; i++)
+          {'c': m.sizeOf(i).cols, 'r': m.sizeOf(i).rows},
+      ],
+      'hiddenFloors': <int>[],
     });
 
     final mapCol = game.collection('map');
@@ -72,6 +77,7 @@ class MapService {
       final y = ((d['y'] ?? 0) as num).toInt();
       final nx = x >= m.cols ? m.cols - 1 : x;
       final ny = y >= m.rows ? m.rows - 1 : y;
+      // (todas vuelven a la primera escena, que mide cols × rows)
       final floor = ((d['floor'] ?? 0) as num).toInt();
       if (nx != x || ny != y || floor != 0) {
         batch.update(t.reference, {'x': nx, 'y': ny, 'floor': 0});

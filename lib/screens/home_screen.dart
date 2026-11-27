@@ -20,6 +20,9 @@ import '../i18n/i18n.dart';
 import '../services/translation_service.dart';
 import '../settings/app_settings.dart';
 import 'settings_screen.dart';
+import 'beginner_manual.dart';
+import 'tutorial_screen.dart';
+import '../widgets/step_viewer.dart';
 import '../widgets/app_icon.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -114,6 +117,28 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.teal,
         onTap: () => _open(const JoinGameScreen()),
       ),
+      const SizedBox(height: 16),
+      // Tutoriales (editor de mapas, Master y jugador) y manual básico
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 10,
+        runSpacing: 8,
+        children: [
+          FilledButton.tonalIcon(
+            onPressed: () => showTutorialPicker(context),
+            icon: const Icon(Icons.school_outlined),
+            label: const Tx('Tutoriales'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _open(StepViewerScreen(
+              title: tr('Manual para principiantes'),
+              steps: kBeginnerManual,
+            )),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: const Tx('Manual para principiantes'),
+          ),
+        ],
+      ),
     ]);
   }
 
@@ -156,22 +181,33 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         body: IndexedStack(index: _tab, children: pages),
-        bottomNavigationBar: NavigationBar(
-          height: 66,
-          selectedIndex: _tab,
-          onDestinationSelected: (i) => setState(() {
-            _tab = i;
-            _visited.add(i);
-          }),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            for (final (title, asset) in _tabs)
-              NavigationDestination(
-                icon: Opacity(opacity: 0.7, child: AppIcon(asset, size: 30)),
-                selectedIcon: AppIcon(asset, size: 34),
-                label: tr(title),
-              ),
-          ],
+        // Con letra grande del sistema los nombres no deben partirse en dos
+        // líneas: se limita el escalado y se encogen si no caben.
+        bottomNavigationBar: MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: MediaQuery.textScalerOf(context)
+                .clamp(minScaleFactor: 0.8, maxScaleFactor: 1.1),
+          ),
+          child: NavigationBar(
+            height: 70,
+            selectedIndex: _tab,
+            onDestinationSelected: (i) => setState(() {
+              _tab = i;
+              _visited.add(i);
+            }),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            labelTextStyle: const WidgetStatePropertyAll(
+              TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            destinations: [
+              for (final (title, asset) in _tabs)
+                NavigationDestination(
+                  icon: Opacity(opacity: 0.7, child: AppIcon(asset, size: 28)),
+                  selectedIcon: AppIcon(asset, size: 32),
+                  label: tr(title),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -201,14 +237,22 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tinte del color de la tarjeta mezclado con el fondo del tema (sin
+    // transparencias, que en claro quedaban grisáceas)
+    final scheme = Theme.of(context).colorScheme;
+    final light = scheme.brightness == Brightness.light;
+    final bg = Color.alphaBlend(
+      color.withOpacity(light ? 0.08 : 0.14),
+      scheme.surfaceContainer,
+    );
     return Card(
-      elevation: 2,
+      elevation: light ? 1 : 2,
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      color: color.withOpacity(0.10),
+      color: bg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: color.withOpacity(0.45), width: 1.5),
+        side: BorderSide(color: color.withOpacity(light ? 0.30 : 0.45), width: 1.2),
       ),
       child: InkWell(
         onTap: onTap,

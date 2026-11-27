@@ -19,9 +19,15 @@ class MapTemplate {
   /// Pisos superiores o inferiores (del segundo en adelante)
   final List<Map<String, String>> extraFloors;
 
-  /// Nombre de cada piso (el primero incluido). Puede estar vacío: "Piso 1"...
+  /// Nombre de cada escena (la primera incluida). Puede estar vacío.
   final List<String> floorNames;
+
+  /// Tamaño de cada escena (columnas, filas). Si falta, [cols] × [rows].
+  final List<({int cols, int rows})> floorSizes;
   final bool builtIn;
+
+  ({int cols, int rows}) sizeOf(int i) =>
+      i >= 0 && i < floorSizes.length ? floorSizes[i] : (cols: cols, rows: rows);
 
   /// Número de pisos (hojas) del mapa.
   int get floorCount => 1 + extraFloors.length;
@@ -31,7 +37,7 @@ class MapTemplate {
   String floorName(int i) =>
       i < floorNames.length && floorNames[i].trim().isNotEmpty
           ? floorNames[i]
-          : 'Piso ${i + 1}';
+          : 'Escena ${i + 1}';
 
   const MapTemplate({
     this.id,
@@ -42,6 +48,7 @@ class MapTemplate {
     required this.cells,
     this.extraFloors = const [],
     this.floorNames = const [],
+    this.floorSizes = const [],
     this.builtIn = false,
   });
 
@@ -58,6 +65,7 @@ class MapTemplate {
     Map<String, String>? cells,
     List<Map<String, String>>? extraFloors,
     List<String>? floorNames,
+    List<({int cols, int rows})>? floorSizes,
     bool? builtIn,
   }) =>
       MapTemplate(
@@ -69,6 +77,7 @@ class MapTemplate {
         cells: cells ?? this.cells,
         extraFloors: extraFloors ?? this.extraFloors,
         floorNames: floorNames ?? this.floorNames,
+        floorSizes: floorSizes ?? this.floorSizes,
         builtIn: builtIn ?? this.builtIn,
       );
 
@@ -79,6 +88,10 @@ class MapTemplate {
         'rows': rows,
         'cells': cells,
         'floorNames': floorNames,
+        'floorSizes': [
+          for (var i = 0; i < floorCount; i++)
+            {'c': sizeOf(i).cols, 'r': sizeOf(i).rows},
+        ],
         'upper': [
           for (final f in extraFloors) {'cells': f},
         ],
@@ -99,6 +112,13 @@ class MapTemplate {
       floorNames: ((d['floorNames'] as List?) ?? const [])
           .map((e) => e.toString())
           .toList(),
+      floorSizes: [
+        for (final f in ((d['floorSizes'] as List?) ?? const []).whereType<Map>())
+          (
+            cols: ((f['c'] ?? d['cols'] ?? 20) as num).toInt(),
+            rows: ((f['r'] ?? d['rows'] ?? 14) as num).toInt(),
+          ),
+      ],
       extraFloors: [
         for (final f in ((d['upper'] as List?) ?? const []).whereType<Map>())
           {

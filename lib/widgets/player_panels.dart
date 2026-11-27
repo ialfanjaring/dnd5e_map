@@ -12,6 +12,7 @@ import '../services/equipment_api_service.dart';
 import '../services/game_service.dart';
 import '../screens/spell_browser_screen.dart' show spellName;
 import 'resolved_character.dart';
+import 'rules_help.dart';
 import 'spell_widgets.dart';
 import 'spellcasting_panel.dart';
 
@@ -297,109 +298,130 @@ class _PlayerStreamState extends State<_PlayerStream> {
 /// Checklist de lo que has gastado en tu turno. Se reinicia al empezar tu
 /// turno en combate.
 class ActionsPanel extends StatelessWidget {
-  const ActionsPanel({super.key, required this.used});
+  const ActionsPanel({
+    super.key,
+    required this.used,
+    this.inCombat = false,
+    this.pending,
+    this.onRequestUndo,
+    this.moveInfo,
+  });
 
   /// 'action', 'bonus', 'move', 'reaction' -> gastada
   final ValueNotifier<Map<String, bool>> used;
 
-  static const List<(String, String, IconData, String)> _items = [
-    (
-      'action',
-      'Acción principal',
-      Icons.bolt,
-      'Una por turno. Puedes: Atacar (con tu arma, en la pestaña Armas), '
-          'Lanzar un conjuro de 1 acción, Correr (doblas tu movimiento), '
-          'Retirarte (sin ataques de oportunidad), Esquivar (los ataques '
-          'contra ti tienen desventaja), Ayudar a un aliado, Esconderte, '
-          'Prepararte para actuar ante algo, Buscar o Usar un objeto.',
-    ),
-    (
-      'bonus',
-      'Acción secundaria (adicional)',
-      Icons.flash_on_outlined,
-      'Una por turno, solo si un rasgo, un conjuro u otra regla te lo '
-          'permite. Por ejemplo: atacar con la segunda arma ligera, lanzar un '
-          'conjuro de 1 acción adicional (como Palabra curativa), la Acción '
-          'astuta del pícaro o entrar en Furia el bárbaro.',
-    ),
-    (
-      'move',
-      'Movimiento',
-      Icons.directions_walk,
-      'Hasta tu velocidad en pies (cada casilla son 5 pies). Puedes '
-          'repartirlo antes y después de tus acciones. El terreno difícil '
-          'cuesta el doble y levantarte del suelo cuesta la mitad de tu '
-          'velocidad.',
-    ),
-    (
-      'reaction',
-      'Reacción',
-      Icons.reply,
-      'Una por ronda, incluso fuera de tu turno, cuando ocurre algo que la '
-          'provoca: un ataque de oportunidad cuando un enemigo sale de tu '
-          'alcance, un conjuro como Escudo o una acción preparada.',
-    ),
-  ];
+  /// En combate, desmarcar una acción gastada lo tiene que aprobar el Master.
+  final bool inCombat;
+
+  /// Acciones cuya recuperación está esperando la respuesta del Master.
+  final ValueNotifier<Set<String>>? pending;
+
+  /// Pide al Master desmarcar [key]. Si es null, se desmarca directamente.
+  final Future<void> Function(String key, String title)? onRequestUndo;
+
+  /// Texto del contador de movimiento (por ejemplo «Te quedan 15 de 30 pies»).
+  final String? moveInfo;
+
+  void _toggle(RuleEntry r, bool checked) {
+    final u = used.value;
+    if (checked) {
+      used.value = {...u, r.key: true};
+      return;
+    }
+    if (!(u[r.key] ?? false)) return;
+    if (inCombat && onRequestUndo != null) {
+      onRequestUndo!(r.key, r.title);
+      return;
+    }
+    used.value = {...u, r.key: false};
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Map<String, bool>>(
-      valueListenable: used,
-      builder: (context, u, _) {
-        return ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            for (final (key, title, icon, help) in _items)
-              Card(
-                child: CheckboxListTile(
-                  value: u[key] ?? false,
-                  onChanged: (v) =>
-                      used.value = {...used.value, key: v ?? false},
-                  secondary: Icon(icon),
-                  title: Text(
-                    tr(title),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      decoration: (u[key] ?? false)
-                          ? TextDecoration.lineThrough
-                          : null,
+    final empty = ValueNotifier<Set<String>>(const {});
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: pending ?? empty,
+      builder: (context, waiting, _) => ValueListenableBuilder<Map<String, bool>>(
+        valueListenable: used,
+        builder: (context, u, _) {
+          final grey = Colors.grey.shade600;
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              for (final r in kTurnActions)
+                Card(
+                  child: CheckboxListTile(
+                    value: u[r.key] ?? false,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged: waiting.contains(r.key)
+                        ? null
+                        : (v) => _toggle(r, v ?? false),
+                    title: Row(children: [
+                      Icon(r.icon, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          r.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            decoration: (u[r.key] ?? false)
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ]),
+                    subtitle: waiting.contains(r.key)
+                        ? Text(tr('Esperando al Master…'),
+                            style: const TextStyle(fontSize: 12))
+                        : (r.key == 'move' && moveInfo != null
+                            ? Text(moveInfo!, style: const TextStyle(fontSize: 12))
+                            : null),
+                    secondary: IconButton(
+                      tooltip: tr('Qué es'),
+                      icon: const Icon(Icons.info_outline),
+                      onPressed: () => showRuleDialog(
+                        context,
+                        r,
+                        more: r.key == 'action' ? kActionOptions : const [],
+                      ),
                     ),
                   ),
-                  subtitle: Text(tr(help), style: const TextStyle(fontSize: 12)),
+                ),
+              Card(
+                child: ListTile(
+                  leading: Icon(kFreeActions.icon),
+                  title: Text(kFreeActions.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  trailing: IconButton(
+                    tooltip: tr('Qué es'),
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: () => showRuleDialog(context, kFreeActions),
+                  ),
                 ),
               ),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.chat_bubble_outline),
-                title: Text(
-                  tr('Acciones gratuitas'),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+              if (!inCombat) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => used.value = {},
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Tx('Reiniciar el turno'),
                 ),
-                subtitle: Text(
-                  tr('No gastan nada: hablar brevemente, hacer un gesto o '
-                      'interactuar con un objeto una vez por turno (abrir una '
-                      'puerta, desenvainar un arma, coger algo del suelo).'),
-                  style: const TextStyle(fontSize: 12),
+              ],
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Tx(
+                  inCombat
+                      ? 'Se reinicia al empezar tu turno. Para desmarcar una acción en combate, el Master tiene que aprobarlo.'
+                      : 'Se reinicia solo al empezar tu turno en combate.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: grey),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => used.value = {},
-              icon: const Icon(Icons.restart_alt),
-              label: const Tx('Reiniciar el turno'),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Tx(
-                'Se reinicia solo al empezar tu turno en combate.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

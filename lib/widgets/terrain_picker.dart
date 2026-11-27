@@ -178,7 +178,7 @@ class TerrainPicker extends StatelessWidget {
             ],
           ),
           Text(
-            tr('Todas las casillas con el mismo número están conectadas: al pisar una puedes ir a cualquiera de las otras, en este piso o en otro. Sin número, la escalera lleva a la misma casilla del piso de arriba o de abajo.'),
+            tr('Todas las casillas con el mismo número están conectadas: al pisar una puedes ir a cualquiera de las otras, en esta escena o en otra. Sin número, la escalera lleva a la misma casilla de la escena siguiente o anterior.'),
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
         ],

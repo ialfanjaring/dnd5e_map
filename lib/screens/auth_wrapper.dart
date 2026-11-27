@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -32,12 +33,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
   /// Lo que cuenta para Firestore es el token, no el dato local del usuario:
   /// solo se entra si el token dice que el correo está verificado. Si el
   /// usuario ya figura como verificado pero el token es antiguo, se renueva.
+  static bool get _isWindows =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
   Future<bool> _tokenVerified(User user) async {
     try {
       // Recarga el usuario: si la cuenta guardada ya no existe, está
       // deshabilitada o su sesión caducó, esto falla y se cierra la sesión.
       await user.reload();
-      final t = await user.getIdTokenResult(true);
+      // En Windows no se fuerza la renovación del token al arrancar: el
+      // plugin de firebase_auth de escritorio avisa del token nuevo desde un
+      // hilo que no es el principal y Flutter cierra la app («Application
+      // finished»). Si el token estuviera desfasado, las pantallas que lo
+      // necesitan ya lo renuevan al fallar con permission-denied.
+      final t = await user.getIdTokenResult(!_isWindows);
       final claim = t.claims?['email_verified'];
       // En Windows el SDK de escritorio no siempre rellena las «claims» del
       // token. Si no viene el dato, vale el del usuario ya recargado (el

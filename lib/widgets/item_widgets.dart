@@ -103,7 +103,7 @@ Future<void> showItemDetail(
           return AlertDialog(
             title: const Tx('Objeto'),
             content: Text(
-              'No se pudo cargar el objeto.\n\nDetalle: ${snap.error}',
+              '${tr('No se pudo cargar el objeto.')}\n\n${tr('Detalle')}: ${snap.error}',
             ),
             actions: [
               TextButton(
@@ -384,7 +384,7 @@ class CharacterItemsCard extends StatelessWidget {
 
   String _oneLine(ApiItem it) {
     if (it.isShield) return '${tr('Escudo')} +${it.acBase} ${tr('CA')}';
-    if (it.isArmor) return 'CA ${it.acBase}${it.acDexBonus ? ' + Des' : ''}';
+    if (it.isArmor) return '${tr('CA')} ${it.acBase}${it.acDexBonus ? ' + ${tr('Des')}' : ''}';
     if (it.isWeapon) return '${it.damageDice} ${EquipmentApiService.damageTypes[it.damageType] ?? it.damageType.toLowerCase()}';
     if (it.isMagic) {
       final r = EquipmentApiService.rarities[it.rarity] ?? it.rarity;

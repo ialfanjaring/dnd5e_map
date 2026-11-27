@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/i18n.dart';
+
 import '../models/character.dart';
 import '../models/equipment_effects.dart';
 import '../services/class_api_service.dart';
@@ -124,8 +126,8 @@ class CharacterQuickStats extends StatelessWidget {
         final c = r.character;
         return Text(
           '$prefix'
-          'CA ${c.effectiveAc} · Iniciativa ${Character.signed(c.initiative)} · '
-          'PG ${c.maxHp}$suffix',
+          '${tr('CA')} ${c.effectiveAc} · ${tr('Iniciativa')} ${Character.signed(c.initiative)} · '
+          '${tr('PG')} ${c.maxHp}$suffix',
           style: style,
         );
       },

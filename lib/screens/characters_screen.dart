@@ -68,7 +68,7 @@ class CharactersScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'No se pudieron cargar los personajes.\n${snapshot.error}',
+                  '${tr('No se pudieron cargar los personajes.')}\n${snapshot.error}',
                   textAlign: TextAlign.center,
                 ),
               ),

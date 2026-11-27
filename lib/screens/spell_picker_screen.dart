@@ -141,7 +141,7 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'No se pudieron cargar los hechizos.\n${snapshot.error}',
+                      '${tr('No se pudieron cargar los hechizos.')}\n${snapshot.error}',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -339,20 +339,22 @@ class _SpellPickerScreenState extends State<SpellPickerScreen> {
     }
     if (l != null && l.slots.isNotEmpty) {
       lines.add(
-        'Espacios de conjuro: '
-        '${l.slots.entries.map((e) => '${e.key}º ×${e.value}').join(', ')}',
+        '${tr('Espacios de conjuro')}: '
+        '${l.slots.entries.map((e) => '${tr('Nv.')} ${e.key} ×${e.value}').join(', ')}',
       );
     }
 
     if (lines.isEmpty) {
       lines.add(
-        'No hay datos de conjuros para el nivel ${widget.characterLevel}; '
-        'elige los que quieras (elegidos: $cantrips trucos, $spells conjuros).',
+        tr('No hay datos de conjuros para el nivel {n}; elige los que quieras (elegidos: {c} trucos, {s} conjuros).')
+            .replaceAll('{n}', '${widget.characterLevel}')
+            .replaceAll('{c}', '$cantrips')
+            .replaceAll('{s}', '$spells'),
       );
     } else if (l?.spellsKnown == null) {
       lines.add(
-        'Esta clase prepara conjuros: elige los que quieras llevar '
-        '(elegidos: $spells).',
+        tr('Esta clase prepara conjuros: elige los que quieras llevar (elegidos: {s}).')
+            .replaceAll('{s}', '$spells'),
       );
     }
 

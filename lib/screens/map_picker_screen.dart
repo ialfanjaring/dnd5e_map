@@ -196,7 +196,7 @@ class _MapGrid extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '${m.cols} × ${m.rows}${m.floorCount > 1 ? ' · ${m.floorCount} ${tr('pisos')}' : ''}'
+                    '${m.cols} × ${m.rows}${m.floorCount > 1 ? ' · ${m.floorCount} ${tr('escenas')}' : ''}'
                     '${m.description.isEmpty ? '' : ' · ${m.builtIn ? tr(m.description) : m.description}'}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

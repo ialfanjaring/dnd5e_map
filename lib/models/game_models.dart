@@ -258,8 +258,19 @@ class Terrains {
     return CellInfo(t, rule);
   }
 
-  /// Terrenos que comunican pisos (escaleras y escalera de mano)
-  static bool isLink(String? value) => linkDirection(value) != null;
+  /// Casillas que llevan a otro punto: escaleras, escalera de mano,
+  /// portales y puertas con número de conexión.
+  static bool isLink(String? value) =>
+      linkDirection(value) != null || _isNumberedDoor(value);
+
+  /// Puerta con número de conexión: al entrar lleva a las otras puertas (o
+  /// escaleras y portales) con el mismo número. Sin número es una puerta
+  /// normal.
+  static bool _isNumberedDoor(String? value) =>
+      value != null &&
+      value.isNotEmpty &&
+      byId(idOf(value))?.pattern == TerrainPattern.door &&
+      groupOf(value) != null;
 
   /// Hacia dónde se puede cambiar de piso: 1 = solo arriba, -1 = solo abajo,
   /// 0 = ambos; null si no es una escalera.
@@ -347,8 +358,10 @@ class Terrains {
     return withZone(brush, zoneOf(current));
   }
 
-  /// true si el terreno admite número de grupo (escaleras y portales)
-  static bool isLinkId(String id) => linkDirection(id) != null;
+  /// true si el terreno admite número de grupo (escaleras, portales y
+  /// puertas)
+  static bool isLinkId(String id) =>
+      linkDirection(id) != null || byId(id)?.pattern == TerrainPattern.door;
 
   static String encode(String id, String? flag, [int? group]) {
     final base = flag == null ? id : '$id+$flag';
@@ -688,5 +701,50 @@ class DiceRoll {
           .map((e) => DiceGroup.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList(),
     );
+  }
+}
+
+/// Escenas de una partida o de un mapa guardado (antes «pisos»): cada una es
+/// un mapa distinto, con su propio tamaño, que se puede ocultar a los
+/// jugadores. Se conectan con escaleras, portales o puertas con número.
+class Scenes {
+  Scenes._();
+
+  static const int maxScenes = 8;
+
+  /// Tamaño de la escena [i] de una partida. Si no tiene uno propio, el
+  /// general de la partida ('cols' y 'rows').
+  static ({int cols, int rows}) sizeOf(Map<String, dynamic> game, int i) {
+    final cols = ((game['cols'] ?? 20) as num).toInt();
+    final rows = ((game['rows'] ?? 14) as num).toInt();
+    final raw = game['floorSizes'];
+    if (raw is List && i >= 0 && i < raw.length && raw[i] is Map) {
+      final m = raw[i] as Map;
+      return (
+        cols: ((m['c'] ?? cols) as num).toInt(),
+        rows: ((m['r'] ?? rows) as num).toInt(),
+      );
+    }
+    return (cols: cols, rows: rows);
+  }
+
+  /// Lista de tamaños para guardar en la partida ('floorSizes').
+  static List<Map<String, int>> sizesOf(Map<String, dynamic> game, int count) => [
+        for (var i = 0; i < count; i++)
+          {'c': sizeOf(game, i).cols, 'r': sizeOf(game, i).rows},
+      ];
+
+  /// Escenas ocultas a los jugadores.
+  static Set<int> hiddenOf(Map<String, dynamic> game) {
+    final raw = game['hiddenFloors'];
+    if (raw is! List) return const {};
+    return {for (final e in raw) if (e is num) e.toInt()};
+  }
+
+  /// Nombre para mostrar: los antiguos «Piso N» se muestran como «Escena N».
+  static String label(String name) {
+    final m = RegExp(r'^(Piso|Escena) (\d+)$').firstMatch(name.trim());
+    if (m != null) return '${tr('Escena')} ${m.group(2)}';
+    return name;
   }
 }

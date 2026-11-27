@@ -312,7 +312,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
-                      labelText: isShield ? tr('Bonificador a la CA') : 'CA base',
+                      labelText: isShield ? tr('Bonificador a la CA') : tr('CA base'),
                       border: const OutlineInputBorder(),
                     ),
                   ),

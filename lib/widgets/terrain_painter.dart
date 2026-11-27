@@ -151,9 +151,18 @@ void _texture(
       }
 
     case TerrainPattern.tiles:
-      final h = w / 2;
-      canvas.drawLine(Offset(r.left, r.top + h), Offset(r.right, r.top + h), line);
-      canvas.drawLine(Offset(r.left + h, r.top), Offset(r.left + h, r.bottom), line);
+      // Una baldosa por casilla, alineada con la rejilla (antes la cruz del
+      // centro hacía que la ficha pareciera estar entre cuatro baldosas).
+      final inset = w * 0.06;
+      final tile = RRect.fromRectAndRadius(r.deflate(inset), Radius.circular(w / 14));
+      canvas.drawRRect(tile, Paint()..color = _shade(base, 0.04));
+      canvas.drawRRect(
+        tile,
+        Paint()
+          ..color = _shade(base, -0.12)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = max(1.0, w / 40),
+      );
       specks(dark, light, 5, w / 45);
 
     case TerrainPattern.cobble:

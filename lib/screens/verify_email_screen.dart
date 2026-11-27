@@ -120,9 +120,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Hemos enviado un enlace de verificación a\n$email\n'
-                  'Ábrelo para activar tu cuenta. Mira también la carpeta de '
-                  'spam.',
+                  '${tr('Hemos enviado un enlace de verificación a')}\n$email\n'
+                  '${tr('Ábrelo para activar tu cuenta. Mira también la carpeta de spam.')}',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey.shade600),
                 ),

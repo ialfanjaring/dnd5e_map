@@ -24,12 +24,21 @@ class DeathSavesCard extends StatelessWidget {
   /// Es su turno en el combate: se muestra el aviso destacado
   final bool myTurn;
 
+  /// Versión compacta (una franja) para la partida: no tapa el panel
+  final bool compact;
+
+  /// Se llama después de tirar la salvación (por ejemplo, para pasar el
+  /// turno). [roll] es el resultado del d20.
+  final void Function(int roll)? onRolled;
+
   const DeathSavesCard({
     super.key,
     required this.gameCode,
     required this.player,
     required this.canEdit,
     this.myTurn = false,
+    this.compact = false,
+    this.onRolled,
   });
 
   static bool needsSaves(GamePlayer p) =>
@@ -63,6 +72,7 @@ class DeathSavesCard extends StatelessWidget {
         messenger.showSnackBar(SnackBar(
           content: Text('20 · ${player.character.name} ${tr('se levanta con 1 PG')}'),
         ));
+        onRolled?.call(roll);
         return;
       }
       if (roll == 1) {
@@ -90,6 +100,7 @@ class DeathSavesCard extends StatelessWidget {
         msg += ' · ${tr('Queda estable')}';
       }
       messenger.showSnackBar(SnackBar(content: Text(msg)));
+      onRolled?.call(roll);
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('$e')));
     }
@@ -125,8 +136,135 @@ class DeathSavesCard extends StatelessWidget {
     );
   }
 
+  /// Puntos pequeños de éxitos / fallos (solo lectura)
+  Widget _dots(int count, Color color) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 1; i <= 3; i++)
+            Container(
+              width: 10,
+              height: 10,
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i <= count ? color : Colors.transparent,
+                border: Border.all(color: color, width: 1.5),
+              ),
+            ),
+        ],
+      );
+
+  /// Franja compacta: nombre, éxitos y fallos, botón de tirar y menú con el
+  /// resto de opciones. No bloquea el panel.
+  Widget _compact(BuildContext context) {
+    final service = GameService();
+    final cs = Theme.of(context).colorScheme;
+    final dead = player.dead;
+    final stable = !dead && player.deathSuccess >= 3;
+    final status = dead
+        ? tr('ha muerto')
+        : stable
+            ? tr('inconsciente y estable')
+            : tr('inconsciente');
+    return Material(
+      color: cs.errorContainer,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 4, 2, 4),
+        child: Row(
+          children: [
+            CustomPaint(
+              size: const Size(12, 16),
+              painter: CrossPainter(cs.onErrorContainer),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${player.character.name}: $status',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onErrorContainer,
+                    ),
+                  ),
+                  if (!dead)
+                    Row(children: [
+                      _dots(player.deathSuccess, Colors.green.shade600),
+                      const SizedBox(width: 8),
+                      _dots(player.deathFail, cs.error),
+                    ]),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: tr('Salvación de muerte'),
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.info_outline, size: 18, color: cs.onErrorContainer),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Tx('Salvación de muerte'),
+                  content: const Tx(
+                    'En tu turno tiras 1d20: 10 o más es éxito, menos de 10 es '
+                    'fallo, un 1 cuenta como dos fallos y un 20 te levanta con '
+                    '1 PG. Tres éxitos: quedas estable. Tres fallos: mueres. '
+                    'Al tirar, tu turno termina solo.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Tx('Cerrar'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (canEdit && myTurn && !dead && !stable)
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+                onPressed: () => _roll(context),
+                icon: const Icon(Icons.casino, size: 16),
+                label: const Tx('Tirar'),
+              ),
+            if (canEdit)
+              PopupMenuButton<String>(
+                tooltip: tr('Más opciones'),
+                icon: Icon(Icons.more_vert, size: 18, color: cs.onErrorContainer),
+                onSelected: (v) {
+                  if (v == 'dead') {
+                    service.updateDeathSaves(gameCode, player.uid, dead: true);
+                  } else if (v == 'up') {
+                    service.updatePlayerHp(gameCode, player.uid, 1);
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (!dead)
+                    PopupMenuItem(
+                        value: 'dead', child: Text(tr('Marcar como muerto'))),
+                  PopupMenuItem(
+                    value: 'up',
+                    child: Text(tr(dead ? 'Revivir con 1 PG' : 'Levantar con 1 PG')),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (compact) return _compact(context);
     final service = GameService();
     final dead = player.dead;
     final stable = !dead && player.deathSuccess >= 3;

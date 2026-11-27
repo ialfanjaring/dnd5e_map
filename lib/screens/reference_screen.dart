@@ -5,6 +5,8 @@ import '../models/character.dart';
 import '../services/class_api_service.dart';
 import '../widgets/app_icon.dart';
 import '../widgets/options_button.dart';
+import '../widgets/rules_help.dart';
+import 'beginner_manual.dart';
 import 'class_info_screen.dart';
 import 'race_info_screen.dart';
 import 'spell_browser_screen.dart';
@@ -38,33 +40,55 @@ class _ReferenceScreenState extends State<ReferenceScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-            child: SegmentedButton<int>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(
-                  value: 0,
-                  icon: const Icon(Icons.shield_outlined),
-                  label: Text(tr('Clases')),
-                ),
-                ButtonSegment(
-                  value: 1,
-                  icon: const Icon(Icons.groups_outlined),
-                  label: Text(tr('Razas')),
-                ),
-                ButtonSegment(
-                  value: 2,
-                  icon: const Icon(Icons.auto_fix_high),
-                  label: Text(tr('Hechizos')),
-                ),
-              ],
-              selected: {_section},
-              onSelectionChanged: (s) => setState(() => _section = s.first),
+            child: MediaQuery(
+              // Sin partir los nombres con letra grande del sistema
+              data: MediaQuery.of(context).copyWith(
+                textScaler: MediaQuery.textScalerOf(context)
+                    .clamp(minScaleFactor: 0.8, maxScaleFactor: 1.1),
+              ),
+              child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: 3,
+                    icon: const Icon(Icons.school_outlined),
+                    label: Text(tr('Manual')),
+                  ),
+                  ButtonSegment(
+                    value: 4,
+                    icon: const Icon(Icons.bolt),
+                    label: Text(tr('Acciones')),
+                  ),
+                  ButtonSegment(
+                    value: 0,
+                    icon: const Icon(Icons.shield_outlined),
+                    label: Text(tr('Clases')),
+                  ),
+                  ButtonSegment(
+                    value: 1,
+                    icon: const Icon(Icons.groups_outlined),
+                    label: Text(tr('Razas')),
+                  ),
+                  ButtonSegment(
+                    value: 2,
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: Text(tr('Hechizos')),
+                  ),
+                ],
+                selected: {_section},
+                onSelectionChanged: (s) => setState(() => _section = s.first),
+              ),
+            ),
             ),
           ),
           Expanded(
             child: switch (_section) {
               0 => const _ClassGrid(),
               1 => const _RaceGrid(),
+              3 => const ManualView(),
+              4 => const ActionsRulesView(),
               _ => const SpellBrowserView(),
             },
           ),

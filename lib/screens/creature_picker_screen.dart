@@ -418,7 +418,7 @@ class _CreaturePickerScreenState extends State<CreaturePickerScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'No se pudo conectar con la API.\n${snapshot.error}',
+                    '${tr('No se pudo conectar con la API.')}\n${snapshot.error}',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),

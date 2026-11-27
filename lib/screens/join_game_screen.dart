@@ -47,7 +47,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
       if (game == null) {
         setState(() {
           _loading = false;
-          _error = 'No existe ninguna partida con ese código.';
+          _error = tr('No existe ninguna partida con ese código.');
         });
         return;
       }
@@ -63,7 +63,7 @@ class _JoinGameScreenState extends State<JoinGameScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Error al buscar la partida: $e';
+        _error = '${tr('Error al buscar la partida')}: $e';
       });
     }
   }

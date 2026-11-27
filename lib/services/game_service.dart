@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -457,15 +458,24 @@ class GameService {
 
     if (px == null || py == null) {
       final gameData = (await _games.doc(code).get()).data() ?? {};
-      final cols = ((gameData['cols'] ?? 20) as num).toInt();
-      final rows = ((gameData['rows'] ?? 14) as num).toInt();
+      final f = floor ?? 0;
+      final size = Scenes.sizeOf(gameData, f);
+      final cols = size.cols;
+      final rows = size.rows;
       final tokens = await _tokensCol(code).get();
+      // Ocupadas: fichas visibles de esa escena y casillas bloqueadas (muros)
       final occupied = <String>{
         for (final t in tokens.docs)
-          if (t.id != tokenId && t.data()['hidden'] != true)
+          if (t.id != tokenId &&
+              t.data()['hidden'] != true &&
+              ((t.data()['floor'] ?? 0) as num).toInt() == f)
             cellKey(((t.data()['x'] ?? 0) as num).toInt(),
                 ((t.data()['y'] ?? 0) as num).toInt()),
       };
+      final terrain = await terrainOnce(code, f).catchError((_) => <String, String>{});
+      terrain.forEach((k, v) {
+        if (Terrains.parse(v).rule == MoveRule.blocked) occupied.add(k);
+      });
       final cell = _freeCell(occupied, cols, rows);
       px = cell.x;
       py = cell.y;
@@ -548,23 +558,78 @@ class GameService {
     await batch.commit();
   }
 
-  /// Al cambiar el tamaño del mapa, las fichas que quedan fuera se acercan.
-  Future<void> setGridSize(String code, int cols, int rows) async {
+  /// Cambia el tamaño de una escena. Las fichas de esa escena que quedan
+  /// fuera se acercan al borde.
+  Future<void> setSceneSize(String code, int floor, int cols, int rows) async {
+    final gameRef = _games.doc(code);
+    final game = (await gameRef.get()).data() ?? {};
+    final count = max(_sceneCount(game), floor + 1);
+    final sizes = Scenes.sizesOf(game, count);
+    sizes[floor] = {'c': cols, 'r': rows};
+
     final batch = FirebaseFirestore.instance.batch();
-    batch.update(_games.doc(code), {'cols': cols, 'rows': rows});
+    batch.update(gameRef, {
+      'floorSizes': sizes,
+      // La primera escena sigue guardando también 'cols' y 'rows'
+      if (floor == 0) ...{'cols': cols, 'rows': rows},
+    });
 
     final tokens = await _tokensCol(code).get();
     for (final t in tokens.docs) {
       final data = t.data();
+      if (((data['floor'] ?? 0) as num).toInt() != floor) continue;
+      final span = ((data['span'] ?? 1) as num).toInt();
       final x = ((data['x'] ?? 0) as num).toInt();
       final y = ((data['y'] ?? 0) as num).toInt();
-      final nx = x >= cols ? cols - 1 : x;
-      final ny = y >= rows ? rows - 1 : y;
+      final nx = min(x, max(0, cols - span));
+      final ny = min(y, max(0, rows - span));
       if (nx != x || ny != y) batch.update(t.reference, {'x': nx, 'y': ny});
     }
 
     await batch.commit();
   }
+
+  static int _sceneCount(Map<String, dynamic> game) {
+    final raw = game['floorNames'];
+    return raw is List && raw.isNotEmpty ? raw.length : 1;
+  }
+
+  /// Añade escenas al final (vacías o copiadas de un mapa guardado):
+  /// cada una con su nombre, tamaño y terreno.
+  Future<void> addScenes(
+    String code,
+    List<({String name, int cols, int rows, Map<String, String> cells})> scenes,
+  ) async {
+    if (scenes.isEmpty) return;
+    final gameRef = _games.doc(code);
+    final game = (await gameRef.get()).data() ?? {};
+    final count = _sceneCount(game);
+    final raw = game['floorNames'];
+    final names = raw is List && raw.isNotEmpty
+        ? [for (final e in raw) e.toString()]
+        : ['Escena 1'];
+    final sizes = Scenes.sizesOf(game, count);
+
+    final batch = FirebaseFirestore.instance.batch();
+    for (var k = 0; k < scenes.length; k++) {
+      final sc = scenes[k];
+      final i = count + k;
+      if (i >= Scenes.maxScenes) break;
+      names.add(sc.name);
+      sizes.add({'c': sc.cols, 'r': sc.rows});
+      batch.set(_terrainDoc(code, i), {'cells': sc.cells});
+    }
+    batch.update(gameRef, {'floorNames': names, 'floorSizes': sizes});
+    await batch.commit();
+  }
+
+  /// Oculta o muestra una escena entera a los jugadores.
+  Future<void> setSceneHidden(String code, int floor, bool hidden) =>
+      _games.doc(code).update({
+        'hiddenFloors': hidden
+            ? FieldValue.arrayUnion([floor])
+            : FieldValue.arrayRemove([floor]),
+      });
 
   // ==========================================
   // TERRENO DEL MAPA
@@ -616,9 +681,12 @@ class GameService {
   Future<void> removeLastFloor(String code, List<String> names) async {
     if (names.length < 2) return;
     final last = names.length - 1;
+    final game = (await _games.doc(code).get()).data() ?? {};
     final batch = FirebaseFirestore.instance.batch();
     batch.update(_games.doc(code), {
       'floorNames': names.sublist(0, last),
+      'floorSizes': Scenes.sizesOf(game, last),
+      'hiddenFloors': FieldValue.arrayRemove([last]),
     });
     batch.delete(_terrainDoc(code, last));
     final toks = await _tokensCol(code).where('floor', isEqualTo: last).get();
@@ -629,14 +697,22 @@ class GameService {
   }
 
   /// Mueve una ficha a otra casilla y piso (escaleras, trampillas...).
+  /// La posición se ajusta al tamaño de la escena de destino.
   Future<void> moveTokenToFloor(
     String code,
     String tokenId,
     int x,
     int y,
     int floor,
-  ) =>
-      _tokensCol(code).doc(tokenId).update({'x': x, 'y': y, 'floor': floor});
+  ) async {
+    final game = (await _games.doc(code).get()).data() ?? {};
+    final size = Scenes.sizeOf(game, floor);
+    await _tokensCol(code).doc(tokenId).update({
+      'x': min(x, size.cols - 1),
+      'y': min(y, size.rows - 1),
+      'floor': floor,
+    });
+  }
 
   // ==========================================
   // RECORRIDOS QUE SE ESTÁN DIBUJANDO (los ven todos)
@@ -687,6 +763,114 @@ class GameService {
       });
 
   Future<void> clearPath(String code) => _pathsCol(code).doc(_user.uid).delete();
+
+  // ==========================================
+  // CHAT DE LA PARTIDA
+  // ==========================================
+
+  CollectionReference<Map<String, dynamic>> _chatCol(String code) =>
+      _games.doc(code).collection('chat');
+
+  /// Mensajes que puede ver el usuario. El Master los ve todos; un jugador,
+  /// los mensajes para todos, los suyos y los que el Master le manda a él.
+  Stream<List<ChatMessage>> chat(String code, {required bool isMaster}) {
+    List<ChatMessage> parse(QuerySnapshot<Map<String, dynamic>> snap) =>
+        [for (final d in snap.docs) ChatMessage.fromDoc(d)];
+    if (isMaster) {
+      return _chatCol(code).snapshots().map((s) => parse(s)..sort(_byTime));
+    }
+    final col = _chatCol(code);
+    final queries = [
+      col.where('to', isEqualTo: 'all'),
+      col.where('uid', isEqualTo: _user.uid),
+      col.where('to', isEqualTo: _user.uid),
+    ];
+    final parts = List<List<ChatMessage>>.filled(queries.length, const []);
+    late final StreamController<List<ChatMessage>> ctrl;
+    final subs = <StreamSubscription>[];
+    void emit() {
+      final byId = <String, ChatMessage>{};
+      for (final p in parts) {
+        for (final m in p) {
+          byId[m.id] = m;
+        }
+      }
+      ctrl.add(byId.values.toList()..sort(_byTime));
+    }
+
+    ctrl = StreamController<List<ChatMessage>>(
+      onListen: () {
+        for (var i = 0; i < queries.length; i++) {
+          subs.add(queries[i].snapshots().listen((s) {
+            parts[i] = parse(s);
+            emit();
+          }, onError: ctrl.addError));
+        }
+      },
+      onCancel: () async {
+        for (final s in subs) {
+          await s.cancel();
+        }
+      },
+    );
+    return ctrl.stream;
+  }
+
+  static int _byTime(ChatMessage a, ChatMessage b) => a.at.compareTo(b.at);
+
+  /// Envía un mensaje. [to]: 'all', 'master' o el uid de un jugador.
+  Future<void> sendChat(
+    String code, {
+    required String text,
+    required String to,
+    required String nick,
+    required int color,
+  }) =>
+      _chatCol(code).add({
+        'uid': _user.uid,
+        'nick': nick,
+        'text': text,
+        'to': to,
+        'color': color,
+        'at': FieldValue.serverTimestamp(),
+      });
+
+  // ==========================================
+  // PETICIONES AL MASTER (desmarcar una acción en combate)
+  // ==========================================
+
+  CollectionReference<Map<String, dynamic>> _requestsCol(String code) =>
+      _games.doc(code).collection('requests');
+
+  /// El jugador pide al Master recuperar una acción gastada.
+  Future<void> requestUndo(String code,
+          {required String key, required String title, required String nick}) =>
+      _requestsCol(code).doc('${_user.uid}_$key').set({
+        'uid': _user.uid,
+        'nick': nick,
+        'key': key,
+        'title': title,
+        'status': 'pending',
+        'at': FieldValue.serverTimestamp(),
+      });
+
+  /// Peticiones pendientes (para el Master).
+  Stream<List<UndoRequest>> pendingRequests(String code) =>
+      _requestsCol(code).where('status', isEqualTo: 'pending').snapshots().map(
+          (snap) => [for (final d in snap.docs) UndoRequest.fromDoc(d)]);
+
+  /// Peticiones del jugador actual (para saber la respuesta).
+  Stream<List<UndoRequest>> myRequests(String code) => _requestsCol(code)
+      .where('uid', isEqualTo: _user.uid)
+      .snapshots()
+      .map((snap) => [for (final d in snap.docs) UndoRequest.fromDoc(d)]);
+
+  /// El Master acepta o rechaza.
+  Future<void> answerRequest(String code, String id, bool ok) =>
+      _requestsCol(code).doc(id).update({'status': ok ? 'ok' : 'no'});
+
+  Future<void> deleteRequest(String code, String id) =>
+      _requestsCol(code).doc(id).delete();
 
   // ==========================================
   // MARCAS EN CASILLAS
@@ -1101,6 +1285,12 @@ class GameService {
     try {
       await _deleteCollection(game.collection('paths'));
     } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('requests'));
+    } catch (_) {}
+    try {
+      await _deleteCollection(game.collection('chat'));
+    } catch (_) {}
     await game.delete();
   }
 
@@ -1265,4 +1455,76 @@ class SharedPath {
     required this.label,
     required this.over,
   });
+}
+
+/// Petición de un jugador al Master para desmarcar una acción.
+class UndoRequest {
+  const UndoRequest({
+    required this.id,
+    required this.uid,
+    required this.nick,
+    required this.key,
+    required this.title,
+    required this.status,
+  });
+
+  final String id;
+  final String uid;
+  final String nick;
+  final String key;
+  final String title;
+
+  /// 'pending', 'ok' o 'no'
+  final String status;
+
+  factory UndoRequest.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
+    final m = d.data() ?? const {};
+    return UndoRequest(
+      id: d.id,
+      uid: (m['uid'] ?? '').toString(),
+      nick: (m['nick'] ?? '').toString(),
+      key: (m['key'] ?? '').toString(),
+      title: (m['title'] ?? '').toString(),
+      status: (m['status'] ?? 'pending').toString(),
+    );
+  }
+}
+
+/// Mensaje del chat de la partida.
+class ChatMessage {
+  const ChatMessage({
+    required this.id,
+    required this.uid,
+    required this.nick,
+    required this.text,
+    required this.to,
+    required this.color,
+    required this.at,
+  });
+
+  final String id;
+  final String uid;
+  final String nick;
+  final String text;
+
+  /// 'all', 'master' o el uid del jugador al que va
+  final String to;
+  final int color;
+  final DateTime at;
+
+  bool get isPrivate => to != 'all';
+
+  factory ChatMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
+    final m = d.data() ?? const {};
+    return ChatMessage(
+      id: d.id,
+      uid: (m['uid'] ?? '').toString(),
+      nick: (m['nick'] ?? '').toString(),
+      text: (m['text'] ?? '').toString(),
+      to: (m['to'] ?? 'all').toString(),
+      color: ((m['color'] ?? 0xFF607D8B) as num).toInt(),
+      // Mientras el servidor no pone la hora, el mensaje va al final
+      at: (m['at'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
 }

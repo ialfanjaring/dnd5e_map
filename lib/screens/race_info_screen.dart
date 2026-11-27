@@ -279,7 +279,7 @@ class _RaceInfoScreenState extends State<RaceInfoScreen> {
             }
 
             if (snapshot.hasError) {
-              return Text('$title\nNo se pudo cargar de la API.');
+              return Text('$title\n${tr('No se pudo cargar de la API.')}');
             }
 
             final sub = snapshot.data!;

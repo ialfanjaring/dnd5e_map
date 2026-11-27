@@ -106,7 +106,7 @@ class _PlayerLiveSheetState extends State<PlayerLiveSheet> {
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('No se pudo cargar la ficha.\n${snapshot.error}'),
+            child: Text('${tr('No se pudo cargar la ficha.')}\n${snapshot.error}'),
           );
         }
         if (!snapshot.hasData) {
@@ -373,7 +373,7 @@ class _PlayersPanelState extends State<PlayersPanel> {
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('No se pudieron cargar los jugadores.\n${snapshot.error}'),
+            child: Text('${tr('No se pudieron cargar los jugadores.')}\n${snapshot.error}'),
           );
         }
         if (!snapshot.hasData) {

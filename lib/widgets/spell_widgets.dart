@@ -342,12 +342,12 @@ class SpellSummaryText extends StatelessWidget {
 
         if (all == null) {
           // Cargando o sin conexión: solo el número de hechizos
-          text = 'Hechizos: ${indexes.length}';
+          text = '${tr('Hechizos')}: ${indexes.length}';
         } else {
           final names = indexes.map((i) => all[i]?.name ?? i).toList()..sort();
           final shown = names.take(maxNames).join(', ');
           final rest = names.length - maxNames;
-          text = 'Hechizos: $shown${rest > 0 ? ' +$rest más' : ''}';
+          text = '${tr('Hechizos')}: $shown${rest > 0 ? ' +$rest ${tr('más')}' : ''}';
         }
 
         return Text(text, maxLines: 2, overflow: TextOverflow.ellipsis);

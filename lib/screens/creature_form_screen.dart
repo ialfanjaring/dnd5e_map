@@ -64,7 +64,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
     _acCtrl = TextEditingController(text: '${c?.armorClass ?? 10}');
     _hpCtrl = TextEditingController(text: '${c?.maxHp ?? 10}');
     _hitDiceCtrl = TextEditingController(text: c?.hitDice ?? '');
-    _speedCtrl = TextEditingController(text: c?.speed ?? '30 pies');
+    _speedCtrl = TextEditingController(text: c?.speed ?? '30 ${tr('pies')}');
     _skillsCtrl = TextEditingController(text: c?.skills ?? '');
     _sensesCtrl = TextEditingController(text: c?.senses ?? '');
     _languagesCtrl = TextEditingController(text: c?.languages ?? '');
@@ -146,11 +146,13 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final label = _kind == 'npc' ? 'NPC' : 'monstruo';
+    final npc = _kind == 'npc';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? '${tr('Editar')} $label' : '${tr('Nuevo')} $label'),
+        title: Text(_isEditing
+            ? tr(npc ? 'Editar NPC' : 'Editar monstruo')
+            : tr(npc ? 'Nuevo NPC' : 'Nuevo monstruo')),
       ),
       body: SafeArea(top: false, child: Center(
         child: ConstrainedBox(
@@ -177,7 +179,9 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save),
-                    label: Text(_isEditing ? tr('Guardar cambios') : '${tr('Crear')} $label'),
+                    label: Text(_isEditing
+                        ? tr('Guardar cambios')
+                        : tr(npc ? 'Crear NPC' : 'Crear monstruo')),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -225,7 +229,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         border: const OutlineInputBorder(),
       ),
       items: [
-        for (final o in items) DropdownMenuItem(value: o, child: Text(o)),
+        for (final o in items) DropdownMenuItem(value: o, child: Text(tr(o))),
       ],
       onChanged: (v) {
         if (v != null) setState(() => onChanged(v));
@@ -287,7 +291,7 @@ class _CreatureFormScreenState extends State<CreatureFormScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            '${tr('Experiencia')}: ${CreatureData.challengeRatings[_cr] ?? 0} PX',
+            '${tr('Experiencia')}: ${CreatureData.challengeRatings[_cr] ?? 0} ${tr('PX')}',
             style: TextStyle(color: Colors.grey.shade600),
           ),
         ),

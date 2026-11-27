@@ -295,9 +295,9 @@ class _GameCreatureTile extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'CA ${c.armorClass} · '
-                              '${current == 0 ? 'Derrotado' : 'FP ${c.challengeRating}'}'
-                              '${t == null ? '' : (t.hidden ? ' · Fuera del mapa' : ' · En el mapa')}',
+                              '${tr('CA')} ${c.armorClass} · '
+                              '${current == 0 ? tr('Derrotado') : '${tr('FP')} ${c.challengeRating}'}'
+                              '${t == null ? '' : (t.hidden ? ' · ${tr('Fuera del mapa')}' : ' · ${tr('En el mapa')}')}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: t != null && t.hidden

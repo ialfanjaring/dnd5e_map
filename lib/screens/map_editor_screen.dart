@@ -24,9 +24,12 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
   final _service = MapService();
   late final TextEditingController _nameCtrl;
 
-  late int _cols;
-  late int _rows;
+  /// Tamaño de cada escena (cada una puede medir distinto)
+  late List<({int cols, int rows})> _sizes;
   late List<Map<String, String>> _floors;
+
+  int get _cols => _sizes[_cur].cols;
+  int get _rows => _sizes[_cur].rows;
   late List<String> _names;
   int _cur = 0;
 
@@ -49,14 +52,16 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
           ? ''
           : (m.builtIn ? '${m.name} (copia)' : m.name),
     );
-    _cols = m?.cols ?? 20;
-    _rows = m?.rows ?? 14;
     _floors = [
       for (var i = 0; i < (m?.floorCount ?? 1); i++) {...?m?.floorCells(i)},
     ];
     _names = [
       for (var i = 0; i < _floors.length; i++)
-        m == null ? 'Piso ${i + 1}' : m.floorName(i),
+        m == null ? 'Escena ${i + 1}' : m.floorName(i),
+    ];
+    _sizes = [
+      for (var i = 0; i < _floors.length; i++)
+        m == null ? (cols: 20, rows: 14) : m.sizeOf(i),
     ];
   }
 
@@ -79,29 +84,31 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     });
   }
 
+  /// Cambia el tamaño de la escena actual (las demás no cambian).
   void _resize(int cols, int rows) {
     setState(() {
-      _cols = cols.clamp(MapTemplate.minSize, MapTemplate.maxCols).toInt();
-      _rows = rows.clamp(MapTemplate.minSize, MapTemplate.maxRows).toInt();
-      // Se descartan las casillas que quedan fuera (en todos los pisos)
-      for (final f in _floors) {
-        f.removeWhere((k, _) {
-          final p = k.split('_');
-          final x = int.tryParse(p[0]) ?? 0;
-          final y = int.tryParse(p.length > 1 ? p[1] : '0') ?? 0;
-          return x >= _cols || y >= _rows;
-        });
-      }
+      final c = cols.clamp(MapTemplate.minSize, MapTemplate.maxCols).toInt();
+      final r = rows.clamp(MapTemplate.minSize, MapTemplate.maxRows).toInt();
+      _sizes[_cur] = (cols: c, rows: r);
+      // Se descartan las casillas que quedan fuera de esta escena
+      _cells.removeWhere((k, _) {
+        final p = k.split('_');
+        final x = int.tryParse(p[0]) ?? 0;
+        final y = int.tryParse(p.length > 1 ? p[1] : '0') ?? 0;
+        return x >= c || y >= r;
+      });
       _fit++;
     });
   }
 
   void _addFloor() {
-    if (_floors.length >= 6) return;
+    if (_floors.length >= Scenes.maxScenes) return;
     setState(() {
       _floors.add({});
-      _names.add('${tr('Piso')} ${_floors.length}');
+      _sizes.add(_sizes[_cur]);
+      _names.add('${tr('Escena')} ${_floors.length}');
       _cur = _floors.length - 1;
+      _fit++;
     });
   }
 
@@ -110,7 +117,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Tx('Quitar piso'),
+        title: const Tx('Quitar escena'),
         content: Text('${tr('Se borrará el terreno de')} «${_names[_cur]}».'),
         actions: [
           TextButton(
@@ -128,7 +135,9 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     setState(() {
       _floors.removeAt(_cur);
       _names.removeAt(_cur);
+      _sizes.removeAt(_cur);
       _cur = _cur.clamp(0, _floors.length - 1).toInt();
+      _fit++;
     });
   }
 
@@ -137,7 +146,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     final v = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Tx('Nombre del piso'),
+        title: const Tx('Nombre de la escena'),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -161,7 +170,7 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
     }
   }
 
-  /// Selector de pisos (hojas del mapa).
+  /// Selector de escenas (cada una es un mapa con su tamaño).
   Widget _floorBar() {
     return Wrap(
       spacing: 6,
@@ -173,23 +182,26 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
           ChoiceChip(
             selected: _cur == i,
             visualDensity: VisualDensity.compact,
-            label: Text(tr(_names[i])),
-            onSelected: (_) => setState(() => _cur = i),
+            label: Text(Scenes.label(_names[i])),
+            onSelected: (_) => setState(() {
+              _cur = i;
+              _fit++;
+            }),
           ),
         IconButton(
-          tooltip: tr('Añadir piso'),
+          tooltip: tr('Añadir escena'),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.add_circle_outline),
-          onPressed: _floors.length >= 6 ? null : _addFloor,
+          onPressed: _floors.length >= Scenes.maxScenes ? null : _addFloor,
         ),
         IconButton(
-          tooltip: tr('Renombrar piso'),
+          tooltip: tr('Renombrar escena'),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.edit_outlined),
           onPressed: _renameFloor,
         ),
         IconButton(
-          tooltip: tr('Quitar piso'),
+          tooltip: tr('Quitar escena'),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.remove_circle_outline),
           onPressed: _floors.length < 2 ? null : _removeFloor,
@@ -211,11 +223,12 @@ class _MapEditorScreenState extends State<MapEditorScreen> {
       await _service.save(MapTemplate(
         id: widget.initial?.builtIn == true ? null : widget.initial?.id,
         name: name,
-        cols: _cols,
-        rows: _rows,
+        cols: _sizes.first.cols,
+        rows: _sizes.first.rows,
         cells: _floors.first,
         extraFloors: _floors.sublist(1),
         floorNames: _names,
+        floorSizes: List.of(_sizes),
       ));
       if (!mounted) return;
       Navigator.pop(context, true);

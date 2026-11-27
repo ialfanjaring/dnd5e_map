@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'screens/auth_wrapper.dart';
 import 'settings/app_settings.dart';
+import 'settings/app_theme.dart';
 import 'utils/orientation.dart';
 
 Future<void> main() async {
@@ -34,10 +35,6 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // Mismo morado que el tema por defecto de Material 3.
-  static const Color _seed = Color(0xFF6750A4);
-
-  @override
   @override
   Widget build(BuildContext context) {
     // Se reconstruye al cambiar el idioma o el tema en Opciones.
@@ -46,17 +43,9 @@ class MyApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'D&D 5e',
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: _seed),
-        ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: _seed,
-            brightness: Brightness.dark,
-          ),
-        ),
+        // Temas definidos en lib/settings/app_theme.dart
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
         themeMode: AppSettings.instance.themeMode,
         home: const AuthWrapper(),
       ),

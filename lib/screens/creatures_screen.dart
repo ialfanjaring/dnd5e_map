@@ -148,7 +148,7 @@ class _CreaturesScreenState extends State<CreaturesScreen>
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                'No se pudieron cargar las criaturas.\n${snapshot.error}',
+                '${tr('No se pudieron cargar las criaturas.')}\n${snapshot.error}',
                 textAlign: TextAlign.center,
               ),
             ),

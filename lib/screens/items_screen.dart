@@ -51,14 +51,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
   String _sub = ''; // subtipo ('' = todos)
   Set<String>? _subSet; // objetos del subtipo (null = todavía cargando)
   String _rarity = ''; // clave de rareza ('' = todas)
-  String _sort = 'group'; // 'group' (agrupado) o 'name'
+  String _sort = 'level'; // 'level' (por nivel, el predeterminado), 'group' o 'name'
   bool _showFilters = false; // panel de categorías y filtros (oculto por defecto)
 
   /// Cuántos filtros hay activos (para el distintivo del botón).
   int get _activeFilters =>
       (_sub.isNotEmpty ? 1 : 0) +
       (_rarity.isNotEmpty ? 1 : 0) +
-      (_sort != 'group' ? 1 : 0);
+      (_sort != 'level' ? 1 : 0);
 
   // Carga de los detalles (rareza, descripción...) en segundo plano
   int _loadToken = 0;
@@ -326,7 +326,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       parts.add('${it.damageDice} ${AppSettings.instance.lang == 'es' ? (EquipmentApiService.damageTypes[it.damageType] ?? it.damageType) : it.damageType}'
           .trim());
     }
-    if (it.acBase != null) parts.add('CA ${it.acBase}');
+    if (it.acBase != null) parts.add('${tr('CA')} ${it.acBase}');
     if (it.weaponCategory.isNotEmpty) {
       parts.add(EquipmentApiService.term(it.weaponCategory));
     }
@@ -461,7 +461,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   DropdownMenuItem(value: 'name', child: Text(tr('Nombre'))),
                   DropdownMenuItem(value: 'level', child: Text(tr('Nivel'))),
                 ],
-                onChanged: (v) => setState(() => _sort = v ?? 'group'),
+                onChanged: (v) => setState(() => _sort = v ?? 'level'),
               ),
             ],
           ),
@@ -846,7 +846,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('No se pudo cargar la lista.\n${snap.error}',
+                                Text('${tr('No se pudo cargar la lista.')}\n${snap.error}',
                                     textAlign: TextAlign.center),
                                 TextButton(
                                   onPressed: () => _setCategory(_category),

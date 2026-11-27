@@ -384,7 +384,7 @@ class _DicePanelState extends State<DicePanel> {
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'No se pudo cargar el registro.\n${snapshot.error}',
+                      '${tr('No se pudo cargar el registro.')}\n${snapshot.error}',
                     ),
                   )
                 else if (hidden.isEmpty && shared.isEmpty)
